@@ -110,3 +110,9 @@ platform_add_definition(COMPILER_MSVC)
 platform_add_definition(COMPILER_GNU)
 platform_add_definition(COMPILER_GCC)
 platform_add_definition(COMPILER_CLANG)
+
+if(COMPILER_MSVC)
+	# Silent stupid warnings that say to use non-standart stuff
+	set(PLATFORM_DEFINES ${PLATFORM_DEFINES} _CRT_SECURE_NO_WARNINGS)
+endif()
+

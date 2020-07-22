@@ -3,10 +3,38 @@
 #include <appfw/services.h>
 #include <appfw/compiler.h>
 #include <glad/glad.h>
+#include <renderer/shader_manager.h>
+#include <renderer/frame_console.h>
 
 #include "app.h"
 
 static ConCommand quit_cmd("quit", "Exits the app", [](auto &) { App::get().quit(); });
+
+static const char *getGlErrorString(GLenum errorCode) {
+    switch (errorCode) {
+    case GL_NO_ERROR:
+        return "GL_NO_ERROR";
+    case GL_INVALID_ENUM:
+        return "GL_INVALID_ENUM";
+    case GL_INVALID_VALUE:
+        return "GL_INVALID_VALUE";
+    case GL_INVALID_OPERATION:
+        return "GL_INVALID_OPERATION";
+    case GL_OUT_OF_MEMORY:
+        return "GL_OUT_OF_MEMORY";
+    default:
+        return "< Unknown >";
+    }
+}
+
+static void gladPostCallback(const char *name, void *, int, ...) {
+    GLenum errorCode = glad_glGetError();
+
+    if (errorCode != GL_NO_ERROR) {
+        logError("OpenGL Error: {} (0x{:X}) in {}", getGlErrorString(errorCode), (int)errorCode, name);
+        AFW_DEBUG_BREAK();
+    }
+}
 
 void App::quit(int code) {
 	m_iReturnCode = code;
@@ -19,7 +47,7 @@ void App::handleSDLEvent(SDL_Event event) {
         if (event.window.windowID == SDL_GetWindowID(m_pWindow)) {
             switch (event.window.event) {
             case SDL_WINDOWEVENT_SIZE_CHANGED: {
-                // TODO: Adjust viewport
+                updateViewportSize();
                 break;
             }
             case SDL_WINDOWEVENT_CLOSE: {
@@ -42,6 +70,21 @@ void App::handleSDLEvent(SDL_Event event) {
 void App::draw() {
     glClearColor(0, 0.5f, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    m_pFrameConsole->reset();
+    m_pFrameConsole->printLeft(FrameConsole::Cyan, "Hello, world!\n");
+    m_pFrameConsole->printLeft(FrameConsole::Red, "Test!\n");
+    m_pFrameConsole->printLeft(FrameConsole::Red, "Test!\n");
+    m_pFrameConsole->printLeft(FrameConsole::Red, "Test!\n");
+    m_pFrameConsole->printLeft(FrameConsole::Red, "Test!\n");
+    m_pFrameConsole->printLeft(FrameConsole::Red, "Test!\n");
+
+    m_pFrameConsole->printRight(FrameConsole::Cyan, "Hello, world!\n");
+    m_pFrameConsole->printRight(FrameConsole::Red, "Test!\n");
+    m_pFrameConsole->printRight(FrameConsole::Red, "Test!\n");
+    m_pFrameConsole->printRight(FrameConsole::Red, "Test!\n");
+    m_pFrameConsole->printRight(FrameConsole::Red, "Test!\n");
+    m_pFrameConsole->printRight(FrameConsole::Red, "Test!\n");
 
     SDL_GL_SwapWindow(m_pWindow);
 }
@@ -87,19 +130,33 @@ App::App() {
         fatalError("Failed load OpenGL functions.");
     }
 
+    glad_set_post_callback(gladPostCallback);
+
     logInfo("OpenGL Version {}.{} loaded", GLVersion.major, GLVersion.minor);
 
     if (!GLAD_GL_VERSION_3_3) {
-        fatalError(fmt::format("At least OpenGL 3.3 is required. Maximum is {}.{}", GLVersion.major, GLVersion.minor));
+        fatalError(fmt::format("At least OpenGL 3.3 is required. Available {}.{}", GLVersion.major, GLVersion.minor));
     }
+
+    // Init renderer
+    ShaderManager::get().init();
+    m_pFrameConsole = new FrameConsole();
+
+    updateViewportSize();
 }
 
 App::~App() {
     AFW_ASSERT(m_sSingleton);
 
+    // Shutdown renderer
+    delete m_pFrameConsole;
+    ShaderManager::get().shutdown();
+
+    // Remove GL context
     SDL_GL_DeleteContext(m_GLContext);
     m_GLContext = nullptr;
 
+    // Destroy window
     SDL_DestroyWindow(m_pWindow);
     m_pWindow = nullptr;
 
@@ -114,8 +171,14 @@ int App::run() {
 	m_bIsRunning = true;
 
 	while (m_bIsRunning) {
-		tick();
-		std::this_thread::sleep_for(std::chrono::milliseconds(1000 / 60));
+        try {
+            tick();
+		    std::this_thread::sleep_for(std::chrono::milliseconds(1000 / 60));
+        }
+        catch (const std::exception &e) {
+            fatalError("Exception in tick(): "s + e.what());
+        }
+		
 	}
 
 	return m_iReturnCode;
@@ -145,6 +208,14 @@ void App::tick() {
     draw();
 
 	appfw::init::mainLoopTick();
+}
+
+void App::updateViewportSize() {
+    int wide, tall;
+    SDL_GetWindowSize(m_pWindow, &wide, &tall);
+
+    glViewport(0, 0, wide, tall);
+    m_pFrameConsole->updateViewportSize(wide, tall);
 }
 
 void fatalError(const std::string &msg) {

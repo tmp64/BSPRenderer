@@ -15,6 +15,7 @@ endif()
 
 find_package(SDL2 REQUIRED)
 find_package(Freetype REQUIRED)
+find_package(glm REQUIRED)
 
 if(NOT FREETYPE_FOUND)
 	message(FATAL_ERROR "Freetype not found")
@@ -26,6 +27,7 @@ message(STATUS ">>> FMT library end")
 add_subdirectory(external/glad_debug)
 
 add_subdirectory(appfw)
+add_subdirectory(renderer)
 
 add_subdirectory(bspviewer)
 add_subdirectory(playground)

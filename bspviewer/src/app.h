@@ -3,6 +3,8 @@
 #include <SDL2/SDL.h>
 #include <appfw/utils.h>
 
+class FrameConsole;
+
 class App : appfw::utils::NoCopy {
 public:
     static App &get();
@@ -31,10 +33,13 @@ private:
     SDL_Window *m_pWindow = nullptr;
     SDL_GLContext m_GLContext = nullptr;
 
+    FrameConsole *m_pFrameConsole = nullptr;
+
     App();
     ~App();
     int run();
     void tick();
+    void updateViewportSize();
 
     static inline App *m_sSingleton = nullptr;
     friend int realMain(int, char**);
