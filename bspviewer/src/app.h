@@ -1,6 +1,7 @@
 #ifndef APP_H
 #define APP_H
 #include <SDL2/SDL.h>
+#include <appfw/timer.h>
 #include <appfw/utils.h>
 
 class FrameConsole;
@@ -26,14 +27,19 @@ public:
      */
     void draw();
 
+    void drawDebugText();
+
 private:
     bool m_bIsRunning = false;
     int m_iReturnCode = 0;
 
+    appfw::Timer m_Timer;
+    long long m_iLastFrameTime = 0;
     SDL_Window *m_pWindow = nullptr;
     SDL_GLContext m_GLContext = nullptr;
 
     FrameConsole *m_pFrameConsole = nullptr;
+
 
     App();
     ~App();

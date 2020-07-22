@@ -27,6 +27,7 @@ message(STATUS ">>> FMT library end")
 add_subdirectory(external/glad_debug)
 
 add_subdirectory(appfw)
+add_subdirectory(bsp)
 add_subdirectory(renderer)
 
 add_subdirectory(bspviewer)

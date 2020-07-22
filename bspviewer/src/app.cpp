@@ -10,6 +10,9 @@
 
 static ConCommand quit_cmd("quit", "Exits the app", [](auto &) { App::get().quit(); });
 
+static ConVar<float> fps_max("fps_max", 100, "Maximum FPS",
+                             [](const float &, const float &newVal) { return newVal >= 10.f; });
+
 static const char *getGlErrorString(GLenum errorCode) {
     switch (errorCode) {
     case GL_NO_ERROR:
@@ -70,23 +73,19 @@ void App::handleSDLEvent(SDL_Event event) {
 void App::draw() {
     glClearColor(0, 0.5f, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
-
     m_pFrameConsole->reset();
-    m_pFrameConsole->printLeft(FrameConsole::Cyan, "Hello, world!\n");
-    m_pFrameConsole->printLeft(FrameConsole::Red, "Test!\n");
-    m_pFrameConsole->printLeft(FrameConsole::Red, "Test!\n");
-    m_pFrameConsole->printLeft(FrameConsole::Red, "Test!\n");
-    m_pFrameConsole->printLeft(FrameConsole::Red, "Test!\n");
-    m_pFrameConsole->printLeft(FrameConsole::Red, "Test!\n");
-
-    m_pFrameConsole->printRight(FrameConsole::Cyan, "Hello, world!\n");
-    m_pFrameConsole->printRight(FrameConsole::Red, "Test!\n");
-    m_pFrameConsole->printRight(FrameConsole::Red, "Test!\n");
-    m_pFrameConsole->printRight(FrameConsole::Red, "Test!\n");
-    m_pFrameConsole->printRight(FrameConsole::Red, "Test!\n");
-    m_pFrameConsole->printRight(FrameConsole::Red, "Test!\n");
+    
+    drawDebugText();
 
     SDL_GL_SwapWindow(m_pWindow);
+}
+
+void App::drawDebugText() {
+    m_pFrameConsole->printLeft(FrameConsole::Cyan, fmt::format("FPS: {:>4.0f}\n", 1000.f / m_iLastFrameTime));
+
+    m_pFrameConsole->printRight(FrameConsole::White, fmt::format("OpenGL {}.{}\n", GLVersion.major, GLVersion.minor));
+    m_pFrameConsole->printRight(FrameConsole::White, fmt::format("{}\n", glGetString(GL_VENDOR)));
+    m_pFrameConsole->printRight(FrameConsole::White, fmt::format("{}\n", glGetString(GL_RENDERER)));
 }
 
 App::App() {
@@ -171,35 +170,28 @@ int App::run() {
 	m_bIsRunning = true;
 
 	while (m_bIsRunning) {
+        m_Timer.start();
+
         try {
             tick();
-		    std::this_thread::sleep_for(std::chrono::milliseconds(1000 / 60));
         }
         catch (const std::exception &e) {
             fatalError("Exception in tick(): "s + e.what());
         }
+
+        long long minFrameTime = (long long)(1000 / fps_max.getValue());
+        while (m_Timer.elapsedMilliseconds() < minFrameTime) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        m_iLastFrameTime = m_Timer.elapsedMilliseconds();
 		
 	}
 
 	return m_iReturnCode;
 }
 
-//static ConVar<bool> print_shit("print_shit", false, "sdfsdfsdf");
-
 void App::tick() {
-
-	/*if (print_shit.getValue()) {
-        static int tick = 0;
-
-        if (tick == 30) {
-            static int i = 0;
-            logDebug("Test output {}!", ++i);
-            tick = 0;
-        }
-
-        tick++;
-    }*/
-
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         handleSDLEvent(event);

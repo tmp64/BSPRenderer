@@ -31,9 +31,10 @@ appfw::console::ConItemType appfw::console::ConVarBase::getType() { return ConIt
 // ConVar
 //----------------------------------------------------------------
 template <typename T>
-appfw::console::ConVar<T>::ConVar(const char *name, const T &defValue, const char *descr)
+appfw::console::ConVar<T>::ConVar(const char *name, const T &defValue, const char *descr, Callback cb)
     : ConVarBase(name, descr) {
     setValue(defValue);
+    m_Callback = cb;
 }
 
 template <typename T>
@@ -82,6 +83,9 @@ template class appfw::console::ConVar<int>;
 template class appfw::console::ConVar<float>;
 template class appfw::console::ConVar<std::string>;
 
+//----------------------------------------------------------------
+// ConCommand
+//----------------------------------------------------------------
 appfw::console::ConCommand::ConCommand(const char *name, const char *descr, const Callback &callback)
     : ConItemBase(name, descr) {
     AFW_ASSERT_MSG(callback, "ConCommand callback is invalid");

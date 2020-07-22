@@ -123,7 +123,7 @@ class ConVar : public ConVarBase {
 public:
     using Callback = std::function<bool(const T &oldVal, const T &newVal)>;
 
-    ConVar(const char *name, const T &defValue, const char *descr);
+    ConVar(const char *name, const T &defValue, const char *descr, Callback cb = Callback());
 
     /**
      * Returns value of the convar.

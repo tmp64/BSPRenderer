@@ -18,6 +18,7 @@ set(APPFW_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/module_info.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/platform.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/services.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/timer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/utils.h
 )
 
