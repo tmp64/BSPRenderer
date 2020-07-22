@@ -1,0 +1,12 @@
+---
+# We'll use defaults from the LLVM style, but with 4 columns indentation.
+BasedOnStyle: LLVM
+IndentWidth: 4
+---
+Language: Cpp
+AccessModifierOffset: -4
+AllowShortBlocksOnASingleLine: Empty
+AlwaysBreakTemplateDeclarations: Yes
+ColumnLimit: 120
+DerivePointerAlignment: false
+PointerAlignment: Right
