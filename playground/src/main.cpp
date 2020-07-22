@@ -7,6 +7,8 @@
 #include <appfw/init.h>
 #include <appfw/services.h>
 
+#include <bsp/level.h>
+
 static bool s_IsRunning = false;
 
 ConVar<std::string> test_cvar("test_cvar", "test", "A test console variable.");
@@ -23,12 +25,14 @@ int realMain(int, char **) {
 
     logWarn("Test");
 
-    s_IsRunning = true;
+    bsp::Level lvl("maps/crossfire.bsp");
+
+    /*s_IsRunning = true;
 
     while (s_IsRunning) {
         appfw::init::mainLoopTick();
         std::this_thread::sleep_for(std::chrono::milliseconds(1000 / 60));
-    }
+    }*/
 
     logDebug("Quitting...");
     appfw::init::shutdown();
