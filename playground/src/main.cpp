@@ -25,7 +25,7 @@ class TestRenderer : public BaseRenderer {
 public:
     virtual void createSurfaces() override {}
     virtual void destroySurfaces() override {}
-    virtual void drawWorldSurfaces(const std::vector<size_t> &surfaceIdxs) override {
+    virtual void drawWorldSurfaces(const std::vector<size_t> &surfaceIdxs) noexcept override {
         int count = 0;
         for (size_t idx : surfaceIdxs) {
             count++;

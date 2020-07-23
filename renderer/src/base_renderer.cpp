@@ -1,6 +1,17 @@
 #include <appfw/services.h>
 #include <renderer/base_renderer.h>
 
+appfw::console::ConVar<int> r_cull("r_cull", 1,
+                                   "Backface culling:\n"
+                                   "0 - none\n"
+                                   "1 - back\n"
+                                   "2 - front",
+                                   [](const int &, const int &newVal) {
+                                       if (newVal < 0 || newVal > 2)
+                                           return false;
+                                       return true;
+                                   });
+
 LevelNode::LevelNode(const bsp::Level &level, const bsp::BSPNode &bspNode) {
     pPlane = &level.getPlanes().at(bspNode.iPlane);
     children[0] = children[1] = nullptr;
@@ -19,12 +30,16 @@ static inline float planeDiff(glm::vec3 point, const bsp::BSPPlane &plane) {
     switch (plane.nType) {
     case bsp::PlaneType::PlaneX:
         res = point[0];
+        break;
     case bsp::PlaneType::PlaneY:
         res = point[1];
+        break;
     case bsp::PlaneType::PlaneZ:
         res = point[2];
+        break;
     default:
         res = glm::dot(point, plane.vNormal);
+        break;
     }
 
     return res - plane.fDist;
@@ -52,7 +67,7 @@ void BaseRenderer::setLevel(const bsp::Level *level) {
     }
 }
 
-BaseRenderer::DrawStats BaseRenderer::draw(const DrawOptions &options) { 
+BaseRenderer::DrawStats BaseRenderer::draw(const DrawOptions &options) noexcept { 
 	if (!m_pLevel) {
         return DrawStats();
 	}
@@ -179,7 +194,7 @@ void BaseRenderer::updateNodeParents(LevelNodeBase *node, LevelNodeBase *parent)
     updateNodeParents(realNode->children[1], node);
 }
 
-void BaseRenderer::recursiveWorldNodes(LevelNodeBase *pNodeBase) {
+void BaseRenderer::recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept {
 
     if (pNodeBase->nContents < 0) {
         // Leaf
@@ -189,13 +204,15 @@ void BaseRenderer::recursiveWorldNodes(LevelNodeBase *pNodeBase) {
     LevelNode *pNode = static_cast<LevelNode *>(pNodeBase);
 
     float dot = planeDiff(m_pOptions->viewOrigin, *pNode->pPlane);
-    int side = (dot >= 0.0f) ? 0 : 1;
+    int side = (dot >= 0.0f) ? 1 : 0;
 
+    // Front side
     recursiveWorldNodes(pNode->children[side]);
 
     for (int i = 0; i < pNode->iNumSurfaces; i++) {
         m_WorldSurfacesToDraw.push_back((size_t)pNode->iFirstSurface + i);
     }
 
+    // Back side
     recursiveWorldNodes(pNode->children[!side]);
 }

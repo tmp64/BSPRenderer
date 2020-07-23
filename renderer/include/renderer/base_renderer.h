@@ -1,7 +1,10 @@
 #ifndef RENDERER_BASE_RENDERER_H
 #define RENDERER_BASE_RENDERER_H
 #include <appfw/utils.h>
+#include <appfw/console/con_item.h>
 #include <bsp/level.h>
+
+extern appfw::console::ConVar<int> r_cull;
 
 /**
  * Maximum count of vertices a surface can have.
@@ -105,7 +108,7 @@ public:
      * @param   options How to draw
      * @return Draw statistics
      */
-    DrawStats draw(const DrawOptions &options);
+    DrawStats draw(const DrawOptions &options) noexcept;
 
 protected:
     std::vector<std::unique_ptr<LevelLeaf>> m_Leaves;
@@ -139,7 +142,7 @@ protected:
      * Draws static world surfaces. Order is undefined.
      * @param   surfacesIdx List of surfaces that need to be drawn.
      */
-    virtual void drawWorldSurfaces(const std::vector<size_t> &surfaceIdxs) = 0;
+    virtual void drawWorldSurfaces(const std::vector<size_t> &surfaceIdxs) noexcept = 0;
 
 private:
     const DrawOptions *m_pOptions = nullptr;
@@ -154,7 +157,7 @@ private:
     // Rendering
     std::vector<size_t> m_WorldSurfacesToDraw;
 
-    void recursiveWorldNodes(LevelNodeBase *pNodeBase);
+    void recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept;
 };
 
 #endif

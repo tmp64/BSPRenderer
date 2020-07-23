@@ -146,7 +146,6 @@ void BaseShader::disable() { glUseProgram(0); }
 BaseShader::UniformBase::UniformBase(BaseShader *pShader, const char *name) {
     m_pShader = pShader;
     m_pShader->m_UniformList.push_back(this);
-    // LoadLocation(name);
     m_UniformName = name;
 }
 
@@ -154,4 +153,7 @@ BaseShader::UniformBase::UniformBase(BaseShader *pShader, const char *name) {
 
 void BaseShader::UniformBase::loadLocation() {
     m_nLocation = glGetUniformLocation(m_pShader->m_nProgId, m_UniformName.c_str());
+    if (m_nLocation == -1) {
+        throw std::runtime_error(std::string("Failed to get uniform ") + m_UniformName);
+    }
 }

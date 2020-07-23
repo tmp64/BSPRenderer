@@ -23,7 +23,7 @@ static ConCommand map_cmd("map", "Loads a map", [](const appfw::ParsedCommand &c
 static ConVar<float> fps_max("fps_max", 100, "Maximum FPS",
                              [](const float &, const float &newVal) { return newVal >= 10.f; });
 
-static ConVar<float> m_sens("m_sens", 0.2f, "Mouse sensitivity (degrees/pixel)");
+static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
 static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
 static ConVar<float> fov("fov", 90.f, "Horizontal field of view");
 
@@ -233,7 +233,7 @@ void App::handleSDLEvent(SDL_Event event) {
 
 void App::draw() {
     glClearColor(0, 0.5f, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     m_pFrameConsole->reset();
     
     BaseRenderer::DrawOptions options;
@@ -321,6 +321,10 @@ void App::loadMap(const std::string &name) {
     try {
         m_LoadedLevel.loadFromFile(path);
         m_pRenderer->setLevel(&m_LoadedLevel);
+
+        m_Pos = {0.f, 0.f, 0.f};
+        m_Rot = {0.f, 0.f, 0.f};
+
         logInfo("Map loaded");
     } catch (const std::exception &e) {
         logError("Failed to load map: {}", e.what());
