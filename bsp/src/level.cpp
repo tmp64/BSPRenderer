@@ -7,14 +7,16 @@ using namespace std::literals::string_literals;
 
 bsp::Level::Level(appfw::span<uint8_t> data) { loadFromBytes(data); }
 
-bsp::Level::Level(const std::string &filename) {
+bsp::Level::Level(const std::string &filename) { loadFromFile(filename); }
+
+void bsp::Level::loadFromFile(const std::string &filename) {
     std::ifstream file(filename, std::ios::in | std::ios::binary);
     if (file.fail()) {
         throw std::runtime_error(std::string("Failed to open file: ") + strerror(errno));
     }
 
-	std::vector<uint8_t> data;
-    data.reserve(4 * 1024 * 1024);  // Set capacity to 4 MB
+    std::vector<uint8_t> data;
+    data.reserve(4 * 1024 * 1024); // Set capacity to 4 MB
 
     for (;;) {
         uint8_t c;

@@ -27,8 +27,6 @@ set(APPFW_PRIVATE_HEADERS
 )
 
 set(APPFW_PRIVATE_SOURCES
-	${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
-
 	${CMAKE_CURRENT_SOURCE_DIR}/src/console/con_item.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/console/console_system.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/console/std_console.cpp
@@ -43,6 +41,7 @@ set(APPFW_PRIVATE_SOURCES
 )
 
 add_library(appfw STATIC
+	${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
 	${APPFW_PUBLIC_HEADERS}
 	${APPFW_PRIVATE_HEADERS}
 	${APPFW_PRIVATE_SOURCES}

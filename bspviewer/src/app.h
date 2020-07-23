@@ -3,8 +3,12 @@
 #include <SDL2/SDL.h>
 #include <appfw/timer.h>
 #include <appfw/utils.h>
+#include <bsp/level.h>
+#include <glm/glm.hpp>
+#include <renderer/base_renderer.h>
 
 class FrameConsole;
+class PolygonRenderer;
 
 class App : appfw::utils::NoCopy {
 public:
@@ -23,11 +27,32 @@ public:
     void handleSDLEvent(SDL_Event event);
 
     /**
+     * Load a .bsp map
+     * @param   name    Name of the map, without maps/ and .bsp.
+     */
+    void loadMap(const std::string &name);
+
+    /**
      * Updates window contents.
      */
     void draw();
 
-    void drawDebugText();
+    /**
+     * Draw text info
+     */
+    void drawDebugText(const BaseRenderer::DrawStats &stats);
+
+    /**
+     * Returns whether mouse is grabbed by the app.
+     */
+    bool isMouseInputEnabled();
+
+    /**
+     * Enables/disables mouse input.
+     */
+    void setMouseInputEnabled(bool state);
+
+    void checkKeys();
 
 private:
     bool m_bIsRunning = false;
@@ -39,7 +64,13 @@ private:
     SDL_GLContext m_GLContext = nullptr;
 
     FrameConsole *m_pFrameConsole = nullptr;
+    PolygonRenderer *m_pRenderer = nullptr;
+    bsp::Level m_LoadedLevel;
+    glm::vec3 m_Pos = {0.f, 0.f, 0.f};
+    glm::vec3 m_Rot = {0.f, 0.f, 0.f};
+    float m_flAspectRatio = 1.f;
 
+    bool m_bGrabMouse = false;
 
     App();
     ~App();

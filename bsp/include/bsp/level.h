@@ -32,6 +32,11 @@ public:
     Level(const std::string &filename);
 
     /**
+     * Loads BSP from a .bsp file.
+     */
+    void loadFromFile(const std::string &path);
+
+    /**
      * Loads BSP from supplied contents of .bsp.
      */
     void loadFromBytes(appfw::span<uint8_t> data);
