@@ -50,22 +50,31 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
     }
 
     // Load lumps
-    auto fnLoadLump = [&](int lumpId, BaseLump *pLump) {
+    auto fnLoadLump = [&](int lumpId, auto &storage) {
+        using Container = std::remove_reference<decltype(storage)>::type;
+        using DataType = Container::value_type;
         const BSPLump &lumpInfo = bspHeader.lump[lumpId];
 
         if (lumpInfo.nOffset + lumpInfo.nLength > (int32_t)data.size()) {
-            throw LevelFormatException(fmt::format("Lump {}: invalid size/offset.", lumpId));
+            throw LevelFormatException(fmt::format("{}: invalid size/offset.", bsp::LUMP_NAME[lumpId]));
         }
 
-        pLump->loadLump(data.subspan(lumpInfo.nOffset, lumpInfo.nLength));
-        m_Lumps[lumpId].reset(pLump);
+        appfw::span<uint8_t> lumpData = data.subspan(lumpInfo.nOffset, lumpInfo.nLength);
+
+        if (lumpData.size() % sizeof(DataType) != 0) {
+            throw LevelFormatException(fmt::format("{}: incorrect size", bsp::LUMP_NAME[lumpId]));
+        }
+
+        size_t count = lumpData.size() / sizeof(DataType);
+        storage.resize(count);
+        memcpy(storage.data(), lumpData.data(), lumpData.size());
     };
 
-    fnLoadLump(LUMP_PLANES, new PlanesLump());
-    fnLoadLump(LUMP_VERTICES, new VerticesLump());
-    fnLoadLump(LUMP_NODES, new NodesLump());
-    fnLoadLump(LUMP_FACES, new FacesLump());
-    fnLoadLump(LUMP_LEAVES, new LeavesLump());
-    fnLoadLump(LUMP_EDGES, new EdgesLump());
-    fnLoadLump(LUMP_SURFEDGES, new SurfEdgesLump());
+    fnLoadLump(LUMP_PLANES, m_Planes);
+    fnLoadLump(LUMP_VERTICES, m_Vertices);
+    fnLoadLump(LUMP_NODES, m_Nodes);
+    fnLoadLump(LUMP_FACES, m_Faces);
+    fnLoadLump(LUMP_LEAVES, m_Leaves);
+    fnLoadLump(LUMP_EDGES, m_Edges);
+    fnLoadLump(LUMP_SURFEDGES, m_SurfEdges);
 }

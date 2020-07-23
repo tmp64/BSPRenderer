@@ -1,5 +1,6 @@
 #ifndef BSP_BSP_TYPE_H
 #define BSP_BSP_TYPE_H
+#include <array>
 #include <cstdint>
 #include <glm/glm.hpp>
 
@@ -53,6 +54,24 @@ constexpr int MAX_MAP_LIGHTING = 0x200000;
 constexpr int MAX_MAP_VISIBILITY = 0x200000;
 
 constexpr int MAX_MAP_PORTALS = 65536;
+
+constexpr std::array<const char *, MAX_BSP_LUMPS> LUMP_NAME{
+    "LUMP_ENTITIES",
+    "LUMP_PLANES",
+    "LUMP_TEXTURES",
+    "LUMP_VERTICES",
+    "LUMP_VISIBILITY",
+    "LUMP_NODES",
+    "LUMP_TEXINFO",
+    "LUMP_FACES",
+    "LUMP_LIGHTING",
+    "LUMP_CLIPNODES",
+    "LUMP_LEAVES",
+    "LUMP_MARKSURFACES",
+    "LUMP_EDGES",
+    "LUMP_SURFEDGES",
+    "LUMP_MODELS",
+};
 
 //----------------------------------------------------------------
 // BSP Header
