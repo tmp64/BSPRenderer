@@ -35,7 +35,7 @@ LevelLeaf::LevelLeaf(const bsp::Level &level, const bsp::BSPLeaf &bspLeaf) {
     AFW_ASSERT(bspLeaf.nContents < 0);
     nContents = bspLeaf.nContents;
 
-    if (bspLeaf.nVisOffset != -1) {
+    if (bspLeaf.nVisOffset != -1 && !level.getVisData().empty()) {
         pCompressedVis = &level.getVisData().at(bspLeaf.nVisOffset);
     }
 }
@@ -61,7 +61,10 @@ static inline float planeDiff(glm::vec3 point, const bsp::BSPPlane &plane) {
     return res - plane.fDist;
 }
 
-BaseRenderer::BaseRenderer() { memset(s_NoVis, 0xFF, sizeof(s_NoVis)); }
+BaseRenderer::BaseRenderer() {
+    memset(m_DecompressedVis.data(), 0, m_DecompressedVis.size());
+    memset(s_NoVis, 0xFF, sizeof(s_NoVis));
+}
 
 //----------------------------------------------------------------
 // Loading
@@ -72,6 +75,10 @@ void BaseRenderer::setLevel(const bsp::Level *level) {
         m_Leaves.clear();
         m_Nodes.clear();
         m_BaseSurfaces.clear();
+        m_pViewLeaf = nullptr;
+        m_pOldViewLeaf = nullptr;
+        m_iFrame = 0;
+        m_iVisFrame = 0;
     }
 
     m_pLevel = level;
@@ -114,6 +121,10 @@ void BaseRenderer::createBaseSurfaces() {
         surface.iFirstEdge = face.iFirstEdge;
         surface.iNumEdges = face.nEdges;
         surface.pPlane = &getLevel().getPlanes().at(face.iPlane);
+
+        if (face.nPlaneSide) {
+            surface.iFlags |= SURF_PLANEBACK;
+        }
 
         // Create vertices
         auto &lvlVertices = getLevel().getVertices();
@@ -229,6 +240,15 @@ BaseRenderer::DrawStats BaseRenderer::draw(const DrawOptions &options) noexcept 
     return m_DrawStats;
 }
 
+bool BaseRenderer::cullBox(glm::vec3 /* mins */, glm::vec3 /* maxs */) noexcept {
+    if (r_cull.getValue() == 0) {
+        return false;
+    }
+
+    // TODO: Frustum culling
+    return false;
+}
+
 LevelLeaf *BaseRenderer::pointInLeaf(glm::vec3 p) noexcept {
     LevelNodeBase *pBaseNode = m_Nodes[0].get();
 
@@ -323,6 +343,37 @@ void BaseRenderer::markLeaves() noexcept {
     }
 }
 
+bool BaseRenderer::cullSurface(const LevelSurface &pSurface) noexcept {
+    if (r_cull.getValue() == 0) {
+        return false;
+    }
+
+    float dist = planeDiff(m_pOptions->viewOrigin, *pSurface.pPlane);
+
+    if (r_cull.getValue() == 1) {
+        // Back face culling
+        if (pSurface.iFlags & SURF_PLANEBACK) {
+            if (dist >= -BACKFACE_EPSILON)
+                return true; // wrong side
+        } else {
+            if (dist <= BACKFACE_EPSILON)
+                return true; // wrong side
+        }
+    } else if (r_cull.getValue() == 2) {
+        // Front face culling
+        if (pSurface.iFlags & SURF_PLANEBACK) {
+            if (dist <= BACKFACE_EPSILON)
+                return true; // wrong side
+        } else {
+            if (dist >= -BACKFACE_EPSILON)
+                return true; // wrong side
+        }
+    }
+
+    // TODO: Frustum culling
+    return false;
+}
+
 void BaseRenderer::drawWorld() noexcept {
     m_WorldSurfacesToDraw.clear();
     recursiveWorldNodes(m_Nodes[0].get());
@@ -347,6 +398,12 @@ void BaseRenderer::recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept {
     recursiveWorldNodes(pNode->children[side]);
 
     for (int i = 0; i < pNode->iNumSurfaces; i++) {
+        LevelSurface &surface = m_BaseSurfaces[(size_t)pNode->iFirstSurface + i];
+
+        if (cullSurface(surface)) {
+            continue;
+        }
+
         m_WorldSurfacesToDraw.push_back((size_t)pNode->iFirstSurface + i);
     }
 

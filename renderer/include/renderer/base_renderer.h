@@ -8,14 +8,27 @@
 extern appfw::console::ConVar<int> r_cull;
 extern appfw::console::ConVar<bool> r_drawworld;
 
+constexpr float BACKFACE_EPSILON = 0.01f;
+
 /**
  * Maximum count of vertices a surface can have.
  */
 constexpr int MAX_SIDE_VERTS = 512;
 
+/**
+ * Two-sided polygon (e.g. 'water4b')
+ */
+constexpr int SURF_NOCULL = (2 << 0);
+
+/**
+ * Plane should be negated
+ */
+constexpr int SURF_PLANEBACK = (2 << 0);
+
 struct LevelSurface {
     int iFirstEdge = 0;
     int iNumEdges = 0;
+    int iFlags = 0;
     const bsp::BSPPlane *pPlane = nullptr;
     std::vector<glm::vec3> vertices;
 };
@@ -170,9 +183,31 @@ private:
     unsigned m_iVisFrame = 0;
 
     // Visibility
+    /**
+     * Returns true if the box is completely outside the frustum
+     */
+    bool cullBox(glm::vec3 mins, glm::vec3 maxs) noexcept;
+
+    /**
+     * Returns leaf in which the point is located.
+     */
     LevelLeaf *pointInLeaf(glm::vec3 p) noexcept;
+
+    /**
+     * Returns decompressed PVS data for a leaf.
+     */
     uint8_t *leafPVS(LevelLeaf *pLeaf) noexcept;
+
+    /**
+     * Marks surfaces in PVS.
+     */
     void markLeaves() noexcept;
+
+    /**
+     * Culls invisible surfaces.
+     * @return true if surface was culled and shouldn't be drawn.
+     */
+    bool cullSurface(const LevelSurface &pSurface) noexcept;
 
     void drawWorld() noexcept;
     void recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept;
