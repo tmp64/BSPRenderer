@@ -12,6 +12,15 @@ appfw::console::ConVar<int> r_cull("r_cull", 1,
                                        return true;
                                    });
 
+appfw::console::ConVar<bool> r_drawworld("r_drawworld", true, "Draw world polygons");
+appfw::console::ConVar<bool> r_lockpvs("r_lockpvs", false, "Lock current PVS to let devs see where it ends");
+appfw::console::ConVar<bool> r_novis("r_novis", false, "Ignore visibility data");
+
+static uint8_t s_NoVis[bsp::MAX_MAP_LEAFS / 8];
+
+//----------------------------------------------------------------
+// LevelNode
+//----------------------------------------------------------------
 LevelNode::LevelNode(const bsp::Level &level, const bsp::BSPNode &bspNode) {
     pPlane = &level.getPlanes().at(bspNode.iPlane);
     children[0] = children[1] = nullptr;
@@ -19,9 +28,16 @@ LevelNode::LevelNode(const bsp::Level &level, const bsp::BSPNode &bspNode) {
     iNumSurfaces = bspNode.nFaces;
 }
 
-LevelLeaf::LevelLeaf(const bsp::Level &/* level */, const bsp::BSPLeaf &bspLeaf) {
+//----------------------------------------------------------------
+// LevelLeaf
+//----------------------------------------------------------------
+LevelLeaf::LevelLeaf(const bsp::Level &level, const bsp::BSPLeaf &bspLeaf) {
     AFW_ASSERT(bspLeaf.nContents < 0);
     nContents = bspLeaf.nContents;
+
+    if (bspLeaf.nVisOffset != -1) {
+        pCompressedVis = &level.getVisData().at(bspLeaf.nVisOffset);
+    }
 }
 
 static inline float planeDiff(glm::vec3 point, const bsp::BSPPlane &plane) {
@@ -45,6 +61,11 @@ static inline float planeDiff(glm::vec3 point, const bsp::BSPPlane &plane) {
     return res - plane.fDist;
 }
 
+BaseRenderer::BaseRenderer() { memset(s_NoVis, 0xFF, sizeof(s_NoVis)); }
+
+//----------------------------------------------------------------
+// Loading
+//----------------------------------------------------------------
 void BaseRenderer::setLevel(const bsp::Level *level) {
     if (m_pLevel) {
         destroySurfaces();
@@ -65,22 +86,6 @@ void BaseRenderer::setLevel(const bsp::Level *level) {
             throw;
         }
     }
-}
-
-BaseRenderer::DrawStats BaseRenderer::draw(const DrawOptions &options) noexcept { 
-	if (!m_pLevel) {
-        return DrawStats();
-	}
-
-    m_DrawStats = DrawStats();
-    m_pOptions = &options;
-    m_WorldSurfacesToDraw.clear();
-
-    recursiveWorldNodes(m_Nodes[0].get());
-    drawWorldSurfaces(m_WorldSurfacesToDraw);
-
-    m_pOptions = nullptr;
-    return m_DrawStats;
 }
 
 LevelLeaf *BaseRenderer::createLeaf(const bsp::BSPLeaf &bspLeaf) {
@@ -194,7 +199,139 @@ void BaseRenderer::updateNodeParents(LevelNodeBase *node, LevelNodeBase *parent)
     updateNodeParents(realNode->children[1], node);
 }
 
+//----------------------------------------------------------------
+// Rendering
+//----------------------------------------------------------------
+BaseRenderer::DrawStats BaseRenderer::draw(const DrawOptions &options) noexcept {
+    if (!m_pLevel) {
+        return DrawStats();
+    }
+
+    m_DrawStats = DrawStats();
+    m_pOptions = &options;
+    
+    // Prepare data
+    m_iFrame++;
+    m_pOldViewLeaf = m_pViewLeaf;
+    m_pViewLeaf = pointInLeaf(m_pOptions->viewOrigin);
+
+    if (r_drawworld.getValue()) {
+        markLeaves();
+        drawWorld();
+    }
+
+    // Draw everything
+    if (r_drawworld.getValue()) {
+        drawWorldSurfaces(m_WorldSurfacesToDraw);
+    }
+
+    m_pOptions = nullptr;
+    return m_DrawStats;
+}
+
+LevelLeaf *BaseRenderer::pointInLeaf(glm::vec3 p) noexcept {
+    LevelNodeBase *pBaseNode = m_Nodes[0].get();
+
+    for (;;) {
+        if (pBaseNode->nContents < 0) {
+            return static_cast<LevelLeaf *>(pBaseNode);
+        }
+
+        LevelNode *pNode = static_cast<LevelNode *>(pBaseNode);
+        const bsp::BSPPlane &plane = *pNode->pPlane;
+        float d = glm::dot(p, plane.vNormal) - plane.fDist;
+
+        if (d > 0) {
+            pBaseNode = pNode->children[0];
+        } else {
+            pBaseNode = pNode->children[1];
+        }
+    }
+}
+
+uint8_t *BaseRenderer::leafPVS(LevelLeaf *pLeaf) noexcept {
+    if (pLeaf == m_Leaves[0].get()) {
+        return s_NoVis;
+    }
+
+    // Decompress VIS
+    int row = ((int)m_Leaves.size() + 7) >> 3;
+    const uint8_t *in = pLeaf->pCompressedVis;
+    uint8_t *out = m_DecompressedVis.data();
+
+    if (!in) {
+        // no vis info, so make all visible
+        while (row) {
+            *out++ = 0xff;
+            row--;
+        }
+        return m_DecompressedVis.data();
+    }
+
+    do {
+        if (*in) {
+            *out++ = *in++;
+            continue;
+        }
+
+        int c = in[1];
+        in += 2;
+
+        while (c) {
+            *out++ = 0;
+            c--;
+        }
+    } while (out - m_DecompressedVis.data() < row);
+
+    return m_DecompressedVis.data();
+}
+
+void BaseRenderer::markLeaves() noexcept {
+    if (m_pOldViewLeaf == m_pViewLeaf && !r_novis.getValue()) {
+        return;
+    }
+
+    if (r_lockpvs.getValue()) {
+        return;
+    }
+
+    m_iVisFrame++;
+    m_pOldViewLeaf = m_pViewLeaf;
+
+    uint8_t *vis = nullptr;
+    uint8_t solid[4096];
+
+    if (r_novis.getValue()) {
+        AFW_ASSERT(((m_Leaves.size() + 7) >> 3) <= sizeof(solid));
+        vis = solid;
+        memset(solid, 0xFF, (m_Leaves.size() + 7) >> 3);
+    } else {
+        vis = leafPVS(m_pViewLeaf);
+    }
+
+    for (size_t i = 0; i < m_Leaves.size() - 1; i++) {
+        if (vis[i >> 3] & (1 << (i & 7))) {
+            LevelNodeBase *node = m_Leaves[i + 1].get();
+
+            do {
+                if (node->iVisFrame == m_iVisFrame)
+                    break;
+                node->iVisFrame = m_iVisFrame;
+                node = node->pParent;
+            } while (node);
+        }
+    }
+}
+
+void BaseRenderer::drawWorld() noexcept {
+    m_WorldSurfacesToDraw.clear();
+    recursiveWorldNodes(m_Nodes[0].get());
+}
+
 void BaseRenderer::recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept {
+    if (pNodeBase->iVisFrame != m_iVisFrame) {
+        return;
+    }
 
     if (pNodeBase->nContents < 0) {
         // Leaf
@@ -204,7 +341,7 @@ void BaseRenderer::recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept {
     LevelNode *pNode = static_cast<LevelNode *>(pNodeBase);
 
     float dot = planeDiff(m_pOptions->viewOrigin, *pNode->pPlane);
-    int side = (dot >= 0.0f) ? 1 : 0;
+    int side = (dot >= 0.0f) ? 0 : 1;
 
     // Front side
     recursiveWorldNodes(pNode->children[side]);

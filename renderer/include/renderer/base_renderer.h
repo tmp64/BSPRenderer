@@ -1,10 +1,12 @@
 #ifndef RENDERER_BASE_RENDERER_H
 #define RENDERER_BASE_RENDERER_H
+#include <array>
 #include <appfw/utils.h>
 #include <appfw/console/con_item.h>
 #include <bsp/level.h>
 
 extern appfw::console::ConVar<int> r_cull;
+extern appfw::console::ConVar<bool> r_drawworld;
 
 /**
  * Maximum count of vertices a surface can have.
@@ -20,6 +22,7 @@ struct LevelSurface {
 
 struct LevelNodeBase {
     int nContents = 0;
+    unsigned iVisFrame = 0;
     LevelNodeBase *pParent = nullptr;
 };
 
@@ -33,6 +36,8 @@ struct LevelNode : public LevelNodeBase {
 };
 
 struct LevelLeaf : public LevelNodeBase {
+    const uint8_t *pCompressedVis = nullptr;
+
     LevelLeaf(const bsp::Level &level, const bsp::BSPLeaf &bspLeaf);
 };
 
@@ -82,6 +87,8 @@ public:
          */
         size_t worldSurfaces = 0;
     };
+
+    BaseRenderer();
 
     /**
      * Whether or not level is loaded.
@@ -156,7 +163,18 @@ private:
 
     // Rendering
     std::vector<size_t> m_WorldSurfacesToDraw;
+    std::array<uint8_t, bsp::MAX_MAP_LEAFS / 8> m_DecompressedVis;
+    LevelLeaf *m_pViewLeaf = nullptr;
+    LevelLeaf *m_pOldViewLeaf = nullptr;
+    unsigned m_iFrame = 0;
+    unsigned m_iVisFrame = 0;
 
+    // Visibility
+    LevelLeaf *pointInLeaf(glm::vec3 p) noexcept;
+    uint8_t *leafPVS(LevelLeaf *pLeaf) noexcept;
+    void markLeaves() noexcept;
+
+    void drawWorld() noexcept;
     void recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept;
 };
 

@@ -72,11 +72,18 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
         memcpy(storage.data(), lumpData.data(), lumpData.size());
     };
 
+    //fnLoadLump(LUMP_ENTITIES, ???);
     fnLoadLump(LUMP_PLANES, m_Planes);
+    //fnLoadLump(LUMP_TEXTURES, ???);
     fnLoadLump(LUMP_VERTICES, m_Vertices);
+    fnLoadLump(LUMP_VISIBILITY, m_VisData);
     fnLoadLump(LUMP_NODES, m_Nodes);
+    fnLoadLump(LUMP_TEXINFO, m_TexInfo);
     fnLoadLump(LUMP_FACES, m_Faces);
+    fnLoadLump(LUMP_LIGHTING, m_Ligthmaps);
     fnLoadLump(LUMP_LEAVES, m_Leaves);
+    fnLoadLump(LUMP_MARKSURFACES, m_MarkSurfaces);
     fnLoadLump(LUMP_EDGES, m_Edges);
     fnLoadLump(LUMP_SURFEDGES, m_SurfEdges);
+    fnLoadLump(LUMP_MODELS, m_Models);
 }
