@@ -2,6 +2,8 @@ add_executable(bspviewer
 	CMakeLists.txt
 	src/app.cpp
 	src/app.h
+	src/demo.cpp
+	src/demo.h
 	src/main.cpp
 	src/this_module_info.h
 )

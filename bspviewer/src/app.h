@@ -6,6 +6,7 @@
 #include <bsp/level.h>
 #include <glm/glm.hpp>
 #include <renderer/base_renderer.h>
+#include "demo.h"
 
 class FrameConsole;
 class PolygonRenderer;
@@ -54,12 +55,43 @@ public:
 
     void checkKeys();
 
+    void playDemo(const std::string &name);
+    void recordDemo(const std::string &name);
+    void stopDemo();
+
 private:
+    enum class DemoState {
+        None = 0,
+        Record,
+        Play
+    };
+
+    // Time since start (microseconds)
+    // Frame time (microseconds)
+    // World polys
+    class StatsWriter {
+    public:
+        void start();
+        void add();
+        void stop();
+    
+    private:
+        struct SavedData {
+            long long iTime = 0;
+            long long iFrameTime = 0;
+            int iWPoly = 0;
+        };
+
+        long long m_iStartTime = 0;
+        std::vector<SavedData> m_Data;
+    };
+
     bool m_bIsRunning = false;
     int m_iReturnCode = 0;
 
     appfw::Timer m_Timer;
     unsigned m_iLastFrameMicros = 0;
+    long long m_iTimeMicros = 0;
     float m_flLastFrameTime = 0;
     SDL_Window *m_pWindow = nullptr;
     SDL_GLContext m_GLContext = nullptr;
@@ -67,11 +99,19 @@ private:
     FrameConsole *m_pFrameConsole = nullptr;
     PolygonRenderer *m_pRenderer = nullptr;
     bsp::Level m_LoadedLevel;
+    BaseRenderer::DrawStats m_LastDrawStats;
     glm::vec3 m_Pos = {0.f, 0.f, 0.f};
     glm::vec3 m_Rot = {0.f, 0.f, 0.f};
     float m_flAspectRatio = 1.f;
 
     bool m_bGrabMouse = false;
+    bool m_bDrawDebugText = true;
+
+    DemoState m_DemoState = DemoState::None;
+    DemoReader m_DemoReader;
+    DemoWriter m_DemoWriter;
+    StatsWriter m_StatsWriter;
+    std::string m_DemoName;
 
     App();
     ~App();

@@ -1,4 +1,6 @@
+#include <ctime>
 #include <iostream>
+#include <fstream>
 #include <appfw/init.h>
 #include <appfw/services.h>
 #include <appfw/compiler.h>
@@ -8,10 +10,11 @@
 #include <renderer/polygon_renderer.h>
 
 #include "app.h"
+#include "demo.h"
 
 static ConCommand quit_cmd("quit", "Exits the app", [](auto &) { App::get().quit(); });
 
-static ConCommand map_cmd("map", "Loads a map", [](const appfw::ParsedCommand &cmd) {
+static ConCommand cmd_map("map", "Loads a map", [](const appfw::ParsedCommand &cmd) {
     if (cmd.size() != 2) {
         logInfo("Usage: map <map name>");
         return;
@@ -19,6 +22,30 @@ static ConCommand map_cmd("map", "Loads a map", [](const appfw::ParsedCommand &c
 
     App::get().loadMap(cmd[1]);
 });
+
+static ConCommand cmd_dem_stop("dem_stop", "Stops demo playing/recording", [](const appfw::ParsedCommand &) {
+    App::get().stopDemo();
+});
+
+static ConCommand cmd_dem_record("dem_record", "Records a demo", [](const appfw::ParsedCommand &cmd) {
+    if (cmd.size() != 2) {
+        logInfo("Usage: dem_record <demo name>");
+        return;
+    }
+
+    App::get().recordDemo(cmd[1]);
+});
+
+static ConCommand cmd_dem_play("dem_play", "Plays a demo", [](const appfw::ParsedCommand &cmd) {
+    if (cmd.size() != 2) {
+        logInfo("Usage: dem_play <demo name>");
+        return;
+    }
+
+    App::get().playDemo(cmd[1]);
+});
+
+static ConVar<float> dem_tickrate("dem_tickrate", 60.f, "Demo tickrate");
 
 static ConVar<float> fps_max("fps_max", 100, "Maximum FPS",
                              [](const float &, const float &newVal) { return newVal >= 10.f; });
@@ -158,6 +185,9 @@ int App::run() {
 
         m_iLastFrameMicros = (unsigned)m_Timer.elapsedMicroseconds();
         m_flLastFrameTime = m_iLastFrameMicros / 1000000.f;
+        m_iTimeMicros += m_iLastFrameMicros;
+
+        m_StatsWriter.add();
     }
 
     return m_iReturnCode;
@@ -172,6 +202,33 @@ void App::tick() {
     }
 
     checkKeys();
+
+    if (m_DemoState == DemoState::Record) {
+        if (m_DemoWriter.hasTimeCome(m_iTimeMicros)) {
+            DemoTick tick;
+
+            tick.vViewOrigin = m_Pos;
+            tick.vViewAngles = m_Rot;
+            tick.flFov = fov.getValue();
+
+            m_DemoWriter.addFrame(tick);
+        }
+    } else if (m_DemoState == DemoState::Play) {
+        if (m_DemoReader.hasTimeCome(m_iTimeMicros)) {
+            const DemoTick &tick = m_DemoReader.getTick();
+
+            m_Pos = tick.vViewOrigin;
+            m_Rot = tick.vViewAngles;
+            fov.setValue(tick.flFov);
+
+            m_DemoReader.advance();
+
+            if (m_DemoReader.isEnd()) {
+                stopDemo();
+            }
+        }
+    }
+
     draw();
 
     appfw::init::mainLoopTick();
@@ -204,11 +261,15 @@ void App::handleSDLEvent(SDL_Event event) {
     case SDL_KEYDOWN: {
         if (event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
             setMouseInputEnabled(!isMouseInputEnabled());
+        } else if (event.key.keysym.scancode == SDL_SCANCODE_F3) {
+            m_bDrawDebugText = !m_bDrawDebugText;
+        } else if (event.key.keysym.scancode == SDL_SCANCODE_F8) {
+            stopDemo();
         }
         break;
     }
     case SDL_MOUSEMOTION: {
-        if (isMouseInputEnabled()) {
+        if (isMouseInputEnabled() && m_DemoState != DemoState::Play) {
             glm::vec3 rot = m_Rot;
 
             rot.y -= event.motion.xrel * m_sens.getValue();
@@ -247,8 +308,11 @@ void App::draw() {
     options.viewAngles = m_Rot;
     options.fov = fov.getValue();
     options.aspect = m_flAspectRatio;
-    BaseRenderer::DrawStats stats = m_pRenderer->draw(options);
-    drawDebugText(stats);
+    m_LastDrawStats = m_pRenderer->draw(options);
+
+    if (m_bDrawDebugText) {
+        drawDebugText(m_LastDrawStats);
+    }
 
     SDL_GL_SwapWindow(m_pWindow);
 }
@@ -287,35 +351,86 @@ void App::checkKeys() {
     float speed = cam_speed.getValue() * m_flLastFrameTime;
     const Uint8 *state = SDL_GetKeyboardState(NULL);
 
-    auto fnMove = [&](float x, float y, float z) {
-        m_Pos.x += x * speed;
-        m_Pos.y += y * speed;
-        m_Pos.z += z * speed;
-    };
+    if (m_DemoState != DemoState::Play) {
+        auto fnMove = [&](float x, float y, float z) {
+            m_Pos.x += x * speed;
+            m_Pos.y += y * speed;
+            m_Pos.z += z * speed;
+        };
 
-    // !!! In radians
-    float pitch = glm::radians(m_Rot.x);
-    float yaw = glm::radians(m_Rot.y);
+        // !!! In radians
+        float pitch = glm::radians(m_Rot.x);
+        float yaw = glm::radians(m_Rot.y);
 
-    if (state[SDL_SCANCODE_LSHIFT]) {
-        speed *= 5;
+        if (state[SDL_SCANCODE_LSHIFT]) {
+            speed *= 5;
+        }
+
+        if (state[SDL_SCANCODE_W]) {
+            fnMove(cos(yaw) * cos(pitch), sin(yaw) * cos(pitch), -sin(pitch));
+        }
+
+        if (state[SDL_SCANCODE_S]) {
+            fnMove(-cos(yaw) * cos(pitch), -sin(yaw) * cos(pitch), sin(pitch));
+        }
+
+        if (state[SDL_SCANCODE_A]) {
+            fnMove(-cos(yaw - glm::pi<float>() / 2), -sin(yaw - glm::pi<float>() / 2), 0);
+        }
+
+        if (state[SDL_SCANCODE_D]) {
+            fnMove(cos(yaw - glm::pi<float>() / 2), sin(yaw - glm::pi<float>() / 2), 0);
+        }
+    }
+}
+
+void App::playDemo(const std::string &name) {
+    stopDemo();
+
+    try {
+        std::string filename = "demos/" + name + ".dem";
+        m_DemoReader.loadFromFile(filename);
+        m_DemoReader.start(m_iTimeMicros);
+        m_StatsWriter.start();
+        logInfo("Playing {} - {}", filename, m_iTimeMicros);
+        m_DemoState = DemoState::Play;
+        m_bDrawDebugText = false;
+    }
+    catch (const std::exception &e) {
+        logError("Error: {}", e.what());
+    }
+}
+
+void App::recordDemo(const std::string &name) {
+    stopDemo();
+
+    try {
+        m_DemoName = "demos/" + name + ".dem";
+        m_DemoWriter.setTickRate(dem_tickrate.getValue());
+        m_DemoWriter.start(m_iTimeMicros);
+        logInfo("Recording to {}", m_DemoName);
+        m_DemoState = DemoState::Record;
+    } catch (const std::exception &e) { logError("Error: {}", e.what()); }
+}
+
+void App::stopDemo() {
+    if (m_DemoState == DemoState::Record) {
+        try {
+            m_DemoWriter.finish(m_DemoName);
+        } catch (const std::exception &e) {
+            logError("stopDemo: {}", e.what());
+        }
+        logInfo("Demo recording stopped.");
+    } else if (m_DemoState == DemoState::Play) {
+        try {
+            m_DemoReader.stop();
+            m_StatsWriter.stop();
+        } catch (const std::exception &e) { logError("stopDemo: {}", e.what()); }
+        logInfo("Demo playing stopped.");
+        m_bDrawDebugText = true;
     }
 
-    if (state[SDL_SCANCODE_W]) {
-        fnMove(cos(yaw) * cos(pitch), sin(yaw) * cos(pitch), -sin(pitch));
-    }
-
-    if (state[SDL_SCANCODE_S]) {
-        fnMove(-cos(yaw) * cos(pitch), -sin(yaw) * cos(pitch), sin(pitch));
-    }
-
-    if (state[SDL_SCANCODE_A]) {
-        fnMove(-cos(yaw - glm::pi<float>() / 2), -sin(yaw - glm::pi<float>() / 2), 0);
-    }
-
-    if (state[SDL_SCANCODE_D]) {
-        fnMove(cos(yaw - glm::pi<float>() / 2), sin(yaw - glm::pi<float>() / 2), 0);
-    }
+    m_DemoState = DemoState::None;
 }
 
 void App::loadMap(const std::string &name) {
@@ -354,4 +469,37 @@ void fatalError(const std::string &msg) {
     logFatal("Fatal Error: {}\n", msg);
 
     abort();
+}
+
+void App::StatsWriter::start() {
+    m_iStartTime = App::get().m_iTimeMicros;
+    m_Data.clear();
+    m_Data.reserve(1024 * 1024); // 24 MB
+}
+
+void App::StatsWriter::add() {
+    SavedData data;
+
+    data.iTime = App::get().m_iTimeMicros - m_iStartTime;
+    data.iFrameTime = App::get().m_iLastFrameMicros;
+    data.iWPoly = (int)App::get().m_LastDrawStats.worldSurfaces;
+
+    m_Data.push_back(data);
+}
+
+void App::StatsWriter::stop() {
+    char buf[128];
+    time_t t = std::time(nullptr);
+    struct tm *time;
+    time = std::localtime(&t);
+    std::strftime(buf, sizeof(buf), "%Y_%m_%d__%H_%M_%S", time);
+
+    std::ofstream file("stats/"s + buf + ".txt");
+    AFW_ASSERT(!file.fail());
+
+    for (auto &i : m_Data) {
+        file << i.iTime << ' ' << i.iFrameTime << ' ' << i.iWPoly << '\n';
+    }
+
+    file.close();
 }
