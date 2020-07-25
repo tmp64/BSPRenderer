@@ -7,18 +7,20 @@
 [[noreturn]] void fatalError(const std::string &msg);
 
 static FontRenderer::FontShader s_FontShader;
-static FontRenderer::ShadowShader s_ShadowShader;
 
 //-----------------------------------------------------------------------------
 // FontShader
 //-----------------------------------------------------------------------------
 FontRenderer::FontShader::FontShader()
-    : BaseShader("FontShader"), m_ProjMat(this, "projection"), m_Color(this, "textColor") {}
+    : BaseShader("FontShader")
+    , m_ProjMat(this, "uProjection")
+    , m_Color(this, "uTextColor")
+    , m_Pos(this, "uPosition") {}
 
 void FontRenderer::FontShader::create() {
     createProgram();
-    createVertexShader("shaders/font.vert.glsl");
-    createFragmentShader("shaders/font.frag.glsl");
+    createVertexShader("shaders/font/font.vert.glsl");
+    createFragmentShader("shaders/font/font.frag.glsl");
     linkProgram();
 }
 
@@ -26,22 +28,7 @@ void FontRenderer::FontShader::loadMatrices(glm::mat4 projMat) { m_ProjMat.set(p
 
 void FontRenderer::FontShader::setColor(const glm::vec4 &c) { m_Color.set(c); }
 
-//-----------------------------------------------------------------------------
-// ShadowShader
-//-----------------------------------------------------------------------------
-FontRenderer::ShadowShader::ShadowShader()
-    : BaseShader("FontShadowShader"), m_ProjMat(this, "projection"), m_Color(this, "textColor") {}
-
-void FontRenderer::ShadowShader::create() {
-    createProgram();
-    createVertexShader("shaders/font_shadow.vert.glsl");
-    createFragmentShader("shaders/font_shadow.frag.glsl");
-    linkProgram();
-}
-
-void FontRenderer::ShadowShader::loadMatrices(glm::mat4 projMat) { m_ProjMat.set(projMat); }
-
-void FontRenderer::ShadowShader::setColor(const glm::vec4 &c) { m_Color.set(c); }
+void FontRenderer::FontShader::setPos(const glm::vec4 &pos) { m_Pos.set(pos); }
 
 //-----------------------------------------------------------------------------
 // FontRenderer
@@ -58,19 +45,23 @@ FontRenderer::FontRenderer(const char *fontPath, int fontSize) {
     }
 
     FT_Set_Pixel_Sizes(m_FontFace, 0, fontSize);
-
-    glGenVertexArrays(1, &m_Vao);
-    glGenBuffers(1, &m_Vbo);
-    glBindVertexArray(m_Vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_Vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 4, GL_FLOAT, false, 4 * sizeof(GLfloat), 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
 }
 
 FontRenderer::~FontRenderer() {
+    for (auto &i : m_CharInfo) {
+        FontChar &fc = i.second;
+
+        if (fc.m_Vao != 0) {
+            glDeleteVertexArrays(1, &fc.m_Vao);
+            fc.m_Vao = 0;
+        }
+
+        if (fc.m_Vbo != 0) {
+            glDeleteBuffers(1, &fc.m_Vbo);
+            fc.m_Vbo = 0;
+        }
+    }
+
     FT_Done_Face(m_FontFace);
 }
 
@@ -79,7 +70,7 @@ void FontRenderer::updateViewportSize(int wide, int tall) {
     m_ProjMat = glm::ortho(0.0f, (float)wide, 0.0f, (float)tall);
 }
 
-float FontRenderer::drawChar(float x, float y, wchar_t c, float scale) {
+float FontRenderer::drawChar(float x, float y, wchar_t c) {
     FontChar *fc = getChar(c);
     if (!fc)
         return 0;
@@ -87,35 +78,23 @@ float FontRenderer::drawChar(float x, float y, wchar_t c, float scale) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(m_Vao);
+    glBindVertexArray(fc->m_Vao);
 
-    GLfloat xpos = x + fc->m_Bearing.x * scale;
-    GLfloat ypos = (m_flTall - y) - (fc->m_Size.y - fc->m_Bearing.y) * scale;
-
-    GLfloat w = fc->m_Size.x * scale;
-    GLfloat h = fc->m_Size.y * scale;
-    // Update VBO for each character
-    GLfloat vertices[6][4] = {{xpos, ypos + h, 0.0, 0.0}, {xpos, ypos, 0.0, 1.0},     {xpos + w, ypos, 1.0, 1.0},
-
-                              {xpos, ypos + h, 0.0, 0.0}, {xpos + w, ypos, 1.0, 1.0}, {xpos + w, ypos + h, 1.0, 0.0}};
+    GLfloat xpos = x + fc->m_Bearing.x;
+    GLfloat ypos = (m_flTall - y) - (fc->m_Size.y - fc->m_Bearing.y);
 
     // Render glyph texture over quad
     glBindTexture(GL_TEXTURE_2D, fc->m_Texture);
 
-    // Update content of VBO memory
-    glBindBuffer(GL_ARRAY_BUFFER, m_Vbo);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    s_FontShader.enable();
+    s_FontShader.setPos({xpos, ypos, 0.f, 0.f});
 
     // Render shadow
-    s_ShadowShader.enable();
-    s_ShadowShader.loadMatrices(glm::translate(m_ProjMat * glm::identity<glm::mat4>(), {1.f, -2.f, 0.f}));
-    s_ShadowShader.setColor(colorToVec(m_ShadowColor));
+    s_FontShader.loadMatrices(glm::translate(m_ProjMat * glm::identity<glm::mat4>(), {1.f, -2.f, 0.f}));
+    s_FontShader.setColor(colorToVec(m_ShadowColor));
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    s_ShadowShader.disable();
 
     // Render quad
-    s_FontShader.enable();
     s_FontShader.loadMatrices(m_ProjMat);
     s_FontShader.setColor(colorToVec(m_FontColor));
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -126,18 +105,18 @@ float FontRenderer::drawChar(float x, float y, wchar_t c, float scale) {
     glBindTexture(GL_TEXTURE_2D, 0);
 
     // Now advance cursors for next glyph (note that advance is number of 1/64 pixels)
-    return (fc->m_Advance >> 6) * scale; // Bitshift by 6 to get value in pixels (2^6 = 64)
+    return (float)(fc->m_Advance >> 6); // Bitshift by 6 to get value in pixels (2^6 = 64)
 }
 
 void FontRenderer::setFontColor(appfw::Color color) { m_FontColor = color; }
 
 void FontRenderer::setShadowColor(appfw::Color color) { m_ShadowColor = color; }
 
-float FontRenderer::getCharWidth(wchar_t c, float scale) {
+float FontRenderer::getCharWidth(wchar_t c) {
     FontChar *fc = getChar(c);
     if (!fc)
         return 0;
-    return (fc->m_Advance >> 6) * scale;
+    return (float)(fc->m_Advance >> 6);
 }
 
 FontRenderer::FontChar *FontRenderer::getChar(wchar_t c) {
@@ -165,10 +144,52 @@ FontRenderer::FontChar *FontRenderer::getChar(wchar_t c) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    // Size of glyph
+    glm::ivec2 size = glm::ivec2(m_FontFace->glyph->bitmap.width, m_FontFace->glyph->bitmap.rows);
+
+    // Offset from baseline to left/top of glyph
+    glm::ivec2 bearing = glm::ivec2(m_FontFace->glyph->bitmap_left, m_FontFace->glyph->bitmap_top);
+
+    // Offset to advance to next glyph
+    GLuint advance = (GLuint)m_FontFace->glyph->advance.x;
+
+    // Create VAO
+    GLuint vao = 0, vbo = 0;
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    GLfloat w = (GLfloat)size.x;
+    GLfloat h = (GLfloat)size.y;
+
+    GLfloat vertices[6][4] = {
+        {0, 0 + h, 0.0, 0.0},
+        {0, 0, 0.0, 1.0},
+        {0 + w, 0, 1.0, 1.0},
+
+        {0, 0 + h, 0.0, 0.0},
+        {0 + w, 0, 1.0, 1.0},
+        {0 + w, 0 + h, 1.0, 0.0}
+    };
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, false, 4 * sizeof(GLfloat), 0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
     // Now store character for later use
-    FontChar character = {texture, glm::ivec2(m_FontFace->glyph->bitmap.width, m_FontFace->glyph->bitmap.rows),
-                             glm::ivec2(m_FontFace->glyph->bitmap_left, m_FontFace->glyph->bitmap_top),
-                             (GLuint)m_FontFace->glyph->advance.x};
+    FontChar character = {
+        texture,
+        size,
+        bearing,
+        advance,
+        vao,
+        vbo
+    };
 
     return &(m_CharInfo.insert(std::pair<wchar_t, FontChar>(c, character)).first->second);
 }
