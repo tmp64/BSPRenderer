@@ -59,7 +59,8 @@ private:
     int m_iReturnCode = 0;
 
     appfw::Timer m_Timer;
-    long long m_iLastFrameTime = 0;
+    unsigned m_iLastFrameMicros = 0;
+    float m_flLastFrameTime = 0;
     SDL_Window *m_pWindow = nullptr;
     SDL_GLContext m_GLContext = nullptr;
 

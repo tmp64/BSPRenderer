@@ -146,12 +146,18 @@ int App::run() {
             tick();
         } catch (const std::exception &e) { fatalError("Exception in tick(): "s + e.what()); }
 
-        long long minFrameTime = (long long)(1000 / fps_max.getValue());
-        while (m_Timer.elapsedMilliseconds() < minFrameTime) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        // Delay
+        long long minFrameTime = (unsigned)(1000000 / fps_max.getValue());
+        while (m_Timer.elapsedMicroseconds() < minFrameTime - 4000) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
 
-        m_iLastFrameTime = m_Timer.elapsedMilliseconds();
+        while (m_Timer.elapsedMicroseconds() < minFrameTime) {
+            std::this_thread::yield();
+        }
+
+        m_iLastFrameMicros = (unsigned)m_Timer.elapsedMicroseconds();
+        m_flLastFrameTime = m_iLastFrameMicros / 1000000.f;
     }
 
     return m_iReturnCode;
@@ -248,8 +254,8 @@ void App::draw() {
 }
 
 void App::drawDebugText(const BaseRenderer::DrawStats &stats) {
-    m_pFrameConsole->printLeft(FrameConsole::Cyan, fmt::format("FPS: {:>4.0f}\n", 1000.f / m_iLastFrameTime));
-    m_pFrameConsole->printLeft(FrameConsole::Cyan, fmt::format("Last frame time: {:>3} ms\n", m_iLastFrameTime));
+    m_pFrameConsole->printLeft(FrameConsole::Cyan, fmt::format("FPS: {:>4.0f}\n", 1.f / m_flLastFrameTime));
+    m_pFrameConsole->printLeft(FrameConsole::Cyan, fmt::format("Last frame time: {:>6.3f} ms\n", m_iLastFrameMicros / 1000.f));
     m_pFrameConsole->printLeft(FrameConsole::White, fmt::format("Pos: {} {} {}\n", m_Pos.x, m_Pos.y, m_Pos.z));
     m_pFrameConsole->printLeft(FrameConsole::White, fmt::format("Pitch: {}\n", m_Rot.x));
     m_pFrameConsole->printLeft(FrameConsole::White, fmt::format("Yaw: {}\n", m_Rot.y));
@@ -278,7 +284,7 @@ void App::setMouseInputEnabled(bool state) {
 }
 
 void App::checkKeys() {
-    float speed = cam_speed.getValue() * m_iLastFrameTime / 1000.f;
+    float speed = cam_speed.getValue() * m_flLastFrameTime;
     const Uint8 *state = SDL_GetKeyboardState(NULL);
 
     auto fnMove = [&](float x, float y, float z) {

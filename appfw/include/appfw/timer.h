@@ -32,7 +32,19 @@ public:
         return std::chrono::duration_cast<std::chrono::milliseconds>(endTime - m_StartTime).count();
     }
 
-    inline double elapsedSeconds() { return elapsedMilliseconds() / 1000.0; }
+    inline long long elapsedMicroseconds() {
+        std::chrono::time_point<std::chrono::steady_clock> endTime;
+
+        if (m_bRunning) {
+            endTime = std::chrono::steady_clock::now();
+        } else {
+            endTime = m_EndTime;
+        }
+
+        return std::chrono::duration_cast<std::chrono::microseconds>(endTime - m_StartTime).count();
+    }
+
+    inline double elapsedSeconds() { return elapsedMicroseconds() / 1000000.0; }
 
 private:
     std::chrono::time_point<std::chrono::steady_clock> m_StartTime;
