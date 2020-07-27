@@ -37,6 +37,7 @@ struct LevelNodeBase {
     int nContents = 0;
     unsigned iVisFrame = 0;
     LevelNodeBase *pParent = nullptr;
+    virtual ~LevelNodeBase() = default;
 };
 
 struct LevelNode : public LevelNodeBase {
@@ -131,22 +132,12 @@ public:
     DrawStats draw(const DrawOptions &options) noexcept;
 
 protected:
-    std::vector<std::unique_ptr<LevelLeaf>> m_Leaves;
-    std::vector<std::unique_ptr<LevelNode>> m_Nodes;
+    std::vector<LevelLeaf> m_Leaves;
+    std::vector<LevelNode> m_Nodes;
     std::vector<LevelSurface> m_BaseSurfaces;
     DrawStats m_DrawStats;
 
     inline const DrawOptions &getOptions() { return *m_pOptions; }
-
-    /**
-     * Creates an instance of LevelLeaf. It may be extended by renderers.
-     */
-    virtual LevelLeaf *createLeaf(const bsp::BSPLeaf &bspLeaf);
-
-    /**
-     * Creates an instance of LevelNode. It may be extended by renderers.
-     */
-    virtual LevelNode *createNode(const bsp::BSPNode &bspNode);
 
     /**
      * Creates surfaces based on data from m_BaseSurfaces.

@@ -95,14 +95,6 @@ void BaseRenderer::setLevel(const bsp::Level *level) {
     }
 }
 
-LevelLeaf *BaseRenderer::createLeaf(const bsp::BSPLeaf &bspLeaf) {
-    return new LevelLeaf(getLevel(), bspLeaf);
-}
-
-LevelNode *BaseRenderer::createNode(const bsp::BSPNode &bspNode) {
-    return new LevelNode(getLevel(), bspNode);
-}
-
 void BaseRenderer::createBaseSurfaces() { 
     AFW_ASSERT(m_BaseSurfaces.empty());
     auto &lvlFaces = getLevel().getFaces();
@@ -160,23 +152,21 @@ void BaseRenderer::createLeaves() {
     AFW_ASSERT(m_Leaves.empty());
     auto &lvlLeaves = getLevel().getLeaves();
 
-    m_Leaves.resize(lvlLeaves.size());
+    m_Leaves.reserve(lvlLeaves.size());
 
     for (size_t i = 0; i < lvlLeaves.size(); i++) {
-        m_Leaves[i].reset(createLeaf(lvlLeaves[i]));
+        m_Leaves.emplace_back(getLevel(), lvlLeaves[i]);
     }
-
-    m_Leaves.shrink_to_fit();
 }
 
 void BaseRenderer::createNodes() {
     AFW_ASSERT(m_Nodes.empty());
     auto &lvlNodes = getLevel().getNodes();
 
-    m_Nodes.resize(lvlNodes.size());
+    m_Nodes.reserve(lvlNodes.size());
 
     for (size_t i = 0; i < lvlNodes.size(); i++) {
-        m_Nodes[i].reset(createNode(lvlNodes[i]));
+        m_Nodes.emplace_back(getLevel(), lvlNodes[i]);
     }
 
     // Set up children
@@ -185,17 +175,15 @@ void BaseRenderer::createNodes() {
             int childNodeIdx = lvlNodes[i].iChildren[j];
 
             if (childNodeIdx >= 0) {
-                m_Nodes[i]->children[j] = m_Nodes[childNodeIdx].get();
+                m_Nodes[i].children[j] = &m_Nodes.at(childNodeIdx);
             } else {
                 childNodeIdx = ~childNodeIdx;
-                m_Nodes[i]->children[j] = m_Leaves[childNodeIdx].get();
+                m_Nodes[i].children[j] = &m_Leaves.at(childNodeIdx);
             }
         }
     }
 
-    m_Nodes.shrink_to_fit();
-
-    updateNodeParents(m_Nodes[0].get(), nullptr);
+    updateNodeParents(&m_Nodes[0], nullptr);
 }
 
 void BaseRenderer::updateNodeParents(LevelNodeBase *node, LevelNodeBase *parent) {
@@ -250,7 +238,7 @@ bool BaseRenderer::cullBox(glm::vec3 /* mins */, glm::vec3 /* maxs */) noexcept 
 }
 
 LevelLeaf *BaseRenderer::pointInLeaf(glm::vec3 p) noexcept {
-    LevelNodeBase *pBaseNode = m_Nodes[0].get();
+    LevelNodeBase *pBaseNode = &m_Nodes[0];
 
     for (;;) {
         if (pBaseNode->nContents < 0) {
@@ -270,7 +258,7 @@ LevelLeaf *BaseRenderer::pointInLeaf(glm::vec3 p) noexcept {
 }
 
 uint8_t *BaseRenderer::leafPVS(LevelLeaf *pLeaf) noexcept {
-    if (pLeaf == m_Leaves[0].get()) {
+    if (pLeaf == &m_Leaves[0]) {
         return s_NoVis;
     }
 
@@ -331,7 +319,7 @@ void BaseRenderer::markLeaves() noexcept {
 
     for (size_t i = 0; i < m_Leaves.size() - 1; i++) {
         if (vis[i >> 3] & (1 << (i & 7))) {
-            LevelNodeBase *node = m_Leaves[i + 1].get();
+            LevelNodeBase *node = &m_Leaves[i + 1];
 
             do {
                 if (node->iVisFrame == m_iVisFrame)
@@ -376,7 +364,7 @@ bool BaseRenderer::cullSurface(const LevelSurface &pSurface) noexcept {
 
 void BaseRenderer::drawWorld() noexcept {
     m_WorldSurfacesToDraw.clear();
-    recursiveWorldNodes(m_Nodes[0].get());
+    recursiveWorldNodes(&m_Nodes[0]);
 }
 
 void BaseRenderer::recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept {
