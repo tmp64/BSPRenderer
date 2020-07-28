@@ -8,6 +8,7 @@
 #include <appfw/services.h>
 
 #include <bsp/level.h>
+#include <bsp/wad_file.h>
 #include <renderer/base_renderer.h>
 
 static bool s_IsRunning = false;
@@ -46,10 +47,12 @@ int realMain(int, char **) {
 
     logWarn("Test");
 
-    bsp::Level lvl("maps/test1.bsp");
+    /*bsp::Level lvl("maps/test1.bsp");
     TestRenderer renderer;
     renderer.setLevel(&lvl);
-    renderer.draw(BaseRenderer::DrawOptions{{0.f, 0.f, 0.f}});
+    renderer.draw(BaseRenderer::DrawOptions{{0.f, 0.f, 0.f}});*/
+
+    bsp::WADFile wad("halflife.wad");
 
     /*s_IsRunning = true;
 

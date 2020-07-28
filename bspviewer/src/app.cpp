@@ -6,8 +6,9 @@
 #include <appfw/compiler.h>
 #include <glad/glad.h>
 #include <renderer/shader_manager.h>
+#include <renderer/material_manager.h>
 #include <renderer/frame_console.h>
-#include <renderer/polygon_renderer.h>
+#include <renderer/textured_renderer.h>
 
 #include "app.h"
 #include "demo.h"
@@ -131,8 +132,12 @@ App::App() {
 
     // Init renderer
     ShaderManager::get().init();
+
+    MaterialManager::get().init();
+    MaterialManager::get().addWadFile("halflife.wad");
+
     m_pFrameConsole = new FrameConsole();
-    m_pRenderer = new PolygonRenderer();
+    m_pRenderer = new TexturedRenderer();
     loadMap("crossfire");
 
     updateViewportSize();
@@ -143,7 +148,9 @@ App::~App() {
     AFW_ASSERT(m_sSingleton);
 
     // Shutdown renderer
+    delete m_pRenderer;
     delete m_pFrameConsole;
+    MaterialManager::get().shutdown();
     ShaderManager::get().shutdown();
 
     // Remove GL context

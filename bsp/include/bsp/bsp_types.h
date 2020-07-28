@@ -9,6 +9,7 @@ static_assert(sizeof(glm::vec3) == 3 * sizeof(float), "glm::vec3 is not packed")
 /**
  * Based on HLBSP project
  * See http://hlbsp.sourceforge.net/index.php?content=bspdef
+ * And http://hlbsp.sourceforge.net/index.php?content=waddef
  */
 
 namespace bsp {
@@ -205,12 +206,19 @@ struct BSPNode {
 // Texinfo Lump
 //----------------------------------------------------------------
 struct BSPTextureInfo {
+    /**
+     * S in world space
+     */
     glm::vec3 vS;
 
     /**
      * Texture shift in s direction
      */
     float fSShift;
+
+    /**
+     * T in world space
+     */
     glm::vec3 vT;
 
     /**
@@ -382,6 +390,71 @@ struct BSPModel {
      * Index and count into faces
      */
     int32_t iFirstFace, nFaces;
+};
+
+//----------------------------------------------------------------
+// WAD File
+//----------------------------------------------------------------
+constexpr char WAD3_MAGIC[] = "WAD3";
+constexpr char WAD2_MAGIC[] = "WAD2";
+
+struct WADHeader {
+    /**
+     * Should be WAD3_MAGIC or WAD2_MAGIC
+     */
+    char szMagic[4];
+
+    /**
+     * Number of directory entries
+     */
+    int32_t nDir;
+
+    /**
+     * Offset into directory
+     */
+    int32_t nDirOffset;
+};
+
+struct WADDirEntry {
+    /**
+     * Offset in WAD
+     */
+    int32_t nFilePos;
+
+    /**
+     * Size in file
+     */
+    int32_t nDiskSize;
+
+    /**
+     * Uncompressed size
+     */
+    int32_t nSize;
+
+    /**
+     * Type of entry
+     */
+    int8_t nType;
+
+    /**
+     * File attribs
+     */
+    int8_t nAttribs;
+
+    /**
+     * IMG_*
+     */
+    int8_t nImgType;
+
+    /**
+     * Padding
+     */
+    int8_t pad;
+
+    /**
+     * Must be null terminated
+     */
+    char szName[MAX_TEXTURE_NAME];
 };
 
 } // namespace bsp

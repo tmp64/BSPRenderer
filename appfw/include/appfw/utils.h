@@ -59,7 +59,7 @@ public:
     }
 
     inline span<T> subspan(size_t offset, size_t count) const noexcept {
-        AFW_ASSERT_MSG(count <= m_Size - offset, "subspan out of range");
+        AFW_ASSERT_MSG(count + offset <= m_Size, "subspan out of range");
         return span(m_Ptr + offset, count);
     }
 

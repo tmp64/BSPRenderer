@@ -16,7 +16,7 @@ void bsp::Level::loadFromFile(const std::string &filename) {
     }
 
     std::vector<uint8_t> data;
-    data.reserve(4 * 1024 * 1024); // Set capacity to 4 MB
+    data.reserve(64 * 1024 * 1024); // Set capacity to 4 MB
 
     for (;;) {
         uint8_t c;
@@ -40,7 +40,7 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
 
     // Read BSP header
     BSPHeader bspHeader;
-    
+
     if (data.size() < sizeof(BSPHeader)) {
         throw LevelFormatException("File is too small for header");
     }
@@ -58,7 +58,7 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
         const BSPLump &lumpInfo = bspHeader.lump[lumpId];
 
         if (lumpInfo.nOffset + lumpInfo.nLength > (int32_t)data.size()) {
-            throw LevelFormatException(fmt::format("{}: invalid size/offset.", bsp::LUMP_NAME[lumpId]));
+            throw LevelFormatException(fmt::format("{}: invalid size/offset", bsp::LUMP_NAME[lumpId]));
         }
 
         appfw::span<uint8_t> lumpData = data.subspan(lumpInfo.nOffset, lumpInfo.nLength);
@@ -72,9 +72,52 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
         memcpy(storage.data(), lumpData.data(), lumpData.size());
     };
 
+    auto fnLoadTextures = [&]() {
+        const BSPLump &lumpInfo = bspHeader.lump[LUMP_TEXTURES];
+
+        if (lumpInfo.nOffset + lumpInfo.nLength > (int32_t)data.size()) {
+            throw LevelFormatException(fmt::format("LUMP_TEXTURES: invalid size/offset."));
+        }
+
+        appfw::span<uint8_t> lumpData = data.subspan(lumpInfo.nOffset, lumpInfo.nLength);
+
+        // Copy header
+        BSPTextureHeader header;
+
+        if (sizeof(header) > lumpData.size()) {
+            throw LevelFormatException(fmt::format("LUMP_TEXTURES: size too small for header"));
+        }
+
+        memcpy(&header, lumpData.data(), sizeof(header));
+
+        // Copy offsets
+        std::vector<BSPMipTexOffset> offsets;
+        offsets.resize(header.nMipTextures);
+
+        if (sizeof(header) + sizeof(BSPMipTexOffset) * header.nMipTextures > lumpData.size()) {
+            throw LevelFormatException(fmt::format("LUMP_TEXTURES: size too small for offsets"));
+        }
+
+        memcpy(offsets.data(), lumpData.data() + sizeof(header), sizeof(BSPMipTexOffset) * header.nMipTextures);
+
+        // Copy textures
+        m_Textures.resize(header.nMipTextures);
+
+        for (size_t i = 0; i < m_Textures.size(); i++) {
+            size_t offset = offsets[i];
+            
+            if (offset + sizeof(BSPMipTex) > lumpData.size()) {
+                throw LevelFormatException(fmt::format("LUMP_TEXTURES: size too small for BSPMipTex"));
+            }
+
+            memcpy(m_Textures.data() + i, lumpData.data() + offset, sizeof(BSPMipTex));
+            m_Textures[i].szName[MAX_TEXTURE_NAME - 1] = '\0';
+        }
+    };
+
     //fnLoadLump(LUMP_ENTITIES, ???);
     fnLoadLump(LUMP_PLANES, m_Planes);
-    //fnLoadLump(LUMP_TEXTURES, ???);
+    fnLoadTextures();
     fnLoadLump(LUMP_VERTICES, m_Vertices);
     fnLoadLump(LUMP_VISIBILITY, m_VisData);
     fnLoadLump(LUMP_NODES, m_Nodes);

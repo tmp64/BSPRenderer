@@ -15,6 +15,7 @@ appfw::console::ConVar<int> r_cull("r_cull", 1,
 appfw::console::ConVar<bool> r_drawworld("r_drawworld", true, "Draw world polygons");
 appfw::console::ConVar<bool> r_lockpvs("r_lockpvs", false, "Lock current PVS to let devs see where it ends");
 appfw::console::ConVar<bool> r_novis("r_novis", false, "Ignore visibility data");
+appfw::console::ConVar<int> r_fullbright("r_fullbright", 0, "Disable lighting");
 
 static uint8_t s_NoVis[bsp::MAX_MAP_LEAFS / 8];
 
@@ -141,6 +142,12 @@ void BaseRenderer::createBaseSurfaces() {
         }
 
         surface.vertices.shrink_to_fit();
+
+        // Find material
+        const bsp::BSPTextureInfo &texInfo = getLevel().getTexInfo().at(face.iTextureInfo);
+        const bsp::BSPMipTex &tex = getLevel().getTextures().at(texInfo.iMiptex);
+        surface.pTexInfo = &texInfo;
+        surface.nMatIndex = MaterialManager::get().findMaterial(tex.szName);
     }
 
     m_BaseSurfaces.shrink_to_fit();

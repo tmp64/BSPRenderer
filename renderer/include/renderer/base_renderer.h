@@ -4,9 +4,11 @@
 #include <appfw/utils.h>
 #include <appfw/console/con_item.h>
 #include <bsp/level.h>
+#include <renderer/material_manager.h>
 
 extern appfw::console::ConVar<int> r_cull;
 extern appfw::console::ConVar<bool> r_drawworld;
+extern appfw::console::ConVar<int> r_fullbright;
 
 constexpr float BACKFACE_EPSILON = 0.01f;
 
@@ -30,6 +32,8 @@ struct LevelSurface {
     int iNumEdges = 0;
     int iFlags = 0;
     const bsp::BSPPlane *pPlane = nullptr;
+    const bsp::BSPTextureInfo *pTexInfo = nullptr;
+    size_t nMatIndex = NULL_MATERIAL;
     std::vector<glm::vec3> vertices;
 };
 
@@ -103,6 +107,7 @@ public:
     };
 
     BaseRenderer();
+    virtual ~BaseRenderer() = default;
 
     /**
      * Whether or not level is loaded.

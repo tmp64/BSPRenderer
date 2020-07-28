@@ -9,7 +9,7 @@
 #include "demo.h"
 
 class FrameConsole;
-class PolygonRenderer;
+class BaseRenderer;
 
 class App : appfw::utils::NoCopy {
 public:
@@ -97,7 +97,7 @@ private:
     SDL_GLContext m_GLContext = nullptr;
 
     FrameConsole *m_pFrameConsole = nullptr;
-    PolygonRenderer *m_pRenderer = nullptr;
+    BaseRenderer *m_pRenderer = nullptr;
     bsp::Level m_LoadedLevel;
     BaseRenderer::DrawStats m_LastDrawStats;
     glm::vec3 m_Pos = {0.f, 0.f, 0.f};

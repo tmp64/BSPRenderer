@@ -42,6 +42,7 @@ public:
     void loadFromBytes(appfw::span<uint8_t> data);
 
     inline const std::vector<BSPPlane> &getPlanes() const { return m_Planes; }
+    inline const std::vector<BSPMipTex> &getTextures() const { return m_Textures; }
     inline const std::vector<glm::vec3> &getVertices() const { return m_Vertices; }
     inline const std::vector<uint8_t> &getVisData() const { return m_VisData; }
     inline const std::vector<BSPNode> &getNodes() const { return m_Nodes; }
@@ -56,6 +57,7 @@ public:
 
 private:
     std::vector<BSPPlane> m_Planes;
+    std::vector<BSPMipTex> m_Textures;
     std::vector<glm::vec3> m_Vertices;
     std::vector<uint8_t> m_VisData;
     std::vector<BSPNode> m_Nodes;
