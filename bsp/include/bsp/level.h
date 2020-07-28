@@ -48,7 +48,7 @@ public:
     inline const std::vector<BSPNode> &getNodes() const { return m_Nodes; }
     inline const std::vector<BSPTextureInfo> &getTexInfo() const { return m_TexInfo; }
     inline const std::vector<BSPFace> &getFaces() const { return m_Faces; }
-    inline const std::vector<uint8_t> &getLightMaps() const { return m_Ligthmaps; }
+    inline const std::vector<uint8_t> &getLightMaps() const { return m_Lightmaps; }
     inline const std::vector<BSPLeaf> &getLeaves() const { return m_Leaves; }
     inline const std::vector<BSPMarkSurface> &getMarkSurfaces() const { return m_MarkSurfaces; }
     inline const std::vector<BSPEdge> &getEdges() const { return m_Edges; }
@@ -63,7 +63,7 @@ private:
     std::vector<BSPNode> m_Nodes;
     std::vector<BSPTextureInfo> m_TexInfo;
     std::vector<BSPFace> m_Faces;
-    std::vector<uint8_t> m_Ligthmaps;
+    std::vector<uint8_t> m_Lightmaps;
     std::vector<BSPLeaf> m_Leaves;
     std::vector<BSPMarkSurface> m_MarkSurfaces;
     std::vector<BSPEdge> m_Edges;

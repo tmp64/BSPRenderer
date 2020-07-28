@@ -123,10 +123,14 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
     fnLoadLump(LUMP_NODES, m_Nodes);
     fnLoadLump(LUMP_TEXINFO, m_TexInfo);
     fnLoadLump(LUMP_FACES, m_Faces);
-    fnLoadLump(LUMP_LIGHTING, m_Ligthmaps);
+    fnLoadLump(LUMP_LIGHTING, m_Lightmaps);
     fnLoadLump(LUMP_LEAVES, m_Leaves);
     fnLoadLump(LUMP_MARKSURFACES, m_MarkSurfaces);
     fnLoadLump(LUMP_EDGES, m_Edges);
     fnLoadLump(LUMP_SURFEDGES, m_SurfEdges);
     fnLoadLump(LUMP_MODELS, m_Models);
+
+    if (m_Lightmaps.size() % 3 != 0) {
+        throw LevelFormatException(fmt::format("LUMP_LIGHTING: invalid size"));
+    }
 }
