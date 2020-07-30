@@ -59,6 +59,10 @@ struct LevelLeaf : public LevelNodeBase {
     LevelLeaf(const bsp::Level &level, const bsp::BSPLeaf &bspLeaf);
 };
 
+struct Plane : public bsp::BSPPlane {
+    uint8_t signbits; // signx + (signy<<1) + (signz<<1)
+};
+
 class BaseRenderer : appfw::utils::NoCopy {
 public:
     /**
@@ -86,14 +90,41 @@ public:
         float aspect = 1;
 
         /**
-         * Near clipping plane
+         * Near clipping plane (minimum is 4 units)
          */
         float near = 8.f;
 
         /**
-         * Fra clipping plane
+         * Far clipping plane
          */
         float far = 8192.f;
+    };
+
+    struct LevelVars {
+        std::vector<LevelLeaf> leaves;
+        std::vector<LevelNode> nodes;
+        std::vector<LevelSurface> baseSurfaces;
+
+        LevelLeaf *pOldViewLeaf = nullptr;
+        unsigned iFrame = 0;
+        unsigned iVisFrame = 0;
+    };
+
+    struct FrameVars {
+        float fov_x = 90;
+        float fov_y = 90;
+        glm::vec3 viewOrigin;
+        glm::vec3 viewAngles;
+        glm::mat4 viewMat;
+        glm::mat4 projMat;
+        glm::vec3 vForward, vRight, vUp;
+        float flViewPlaneDist = 0;
+        std::array<Plane, 6> frustum;
+
+        std::vector<size_t> worldSurfacesToDraw;
+
+        std::array<uint8_t, bsp::MAX_MAP_LEAFS / 8> decompressedVis;
+        LevelLeaf *pViewLeaf = nullptr;
     };
 
     /**
@@ -137,12 +168,10 @@ public:
     DrawStats draw(const DrawOptions &options) noexcept;
 
 protected:
-    std::vector<LevelLeaf> m_Leaves;
-    std::vector<LevelNode> m_Nodes;
-    std::vector<LevelSurface> m_BaseSurfaces;
     DrawStats m_DrawStats;
 
-    inline const DrawOptions &getOptions() { return *m_pOptions; }
+    inline LevelVars &getLevelVars() { return m_LevelVars; }
+    inline FrameVars &getFrameVars() { return m_FrameVars; }
 
     /**
      * Creates surfaces based on data from m_BaseSurfaces.
@@ -164,21 +193,27 @@ private:
     const DrawOptions *m_pOptions = nullptr;
     const bsp::Level *m_pLevel = nullptr;
 
+    /**
+     * Variables that are only valid for a level.
+     */
+    LevelVars m_LevelVars;
+
+    /**
+     * Variables that are updated every frame.
+     */
+    FrameVars m_FrameVars;
+
+    //----------------------------------------------------------------
     // Level loading
+    //----------------------------------------------------------------
     void createBaseSurfaces();
     void createLeaves();
     void createNodes();
     void updateNodeParents(LevelNodeBase *node, LevelNodeBase *parent);
 
-    // Rendering
-    std::vector<size_t> m_WorldSurfacesToDraw;
-    std::array<uint8_t, bsp::MAX_MAP_LEAFS / 8> m_DecompressedVis;
-    LevelLeaf *m_pViewLeaf = nullptr;
-    LevelLeaf *m_pOldViewLeaf = nullptr;
-    unsigned m_iFrame = 0;
-    unsigned m_iVisFrame = 0;
-
-    // Visibility
+    //----------------------------------------------------------------
+    // Visibility calculations
+    //----------------------------------------------------------------
     /**
      * Returns true if the box is completely outside the frustum
      */
@@ -205,6 +240,10 @@ private:
      */
     bool cullSurface(const LevelSurface &pSurface) noexcept;
 
+    //----------------------------------------------------------------
+    // Rendering
+    //----------------------------------------------------------------
+    void setupFrame() noexcept;
     void drawWorld() noexcept;
     void recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept;
 };

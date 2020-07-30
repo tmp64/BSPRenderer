@@ -1,5 +1,8 @@
 #include <appfw/services.h>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
 #include <renderer/base_renderer.h>
+#include <renderer/utils.h>
 
 appfw::console::ConVar<int> r_cull("r_cull", 1,
                                    "Backface culling:\n"
@@ -63,7 +66,7 @@ static inline float planeDiff(glm::vec3 point, const bsp::BSPPlane &plane) {
 }
 
 BaseRenderer::BaseRenderer() {
-    memset(m_DecompressedVis.data(), 0, m_DecompressedVis.size());
+    memset(getFrameVars().decompressedVis.data(), 0, getFrameVars().decompressedVis.size());
     memset(s_NoVis, 0xFF, sizeof(s_NoVis));
 }
 
@@ -73,13 +76,8 @@ BaseRenderer::BaseRenderer() {
 void BaseRenderer::setLevel(const bsp::Level *level) {
     if (m_pLevel) {
         destroySurfaces();
-        m_Leaves.clear();
-        m_Nodes.clear();
-        m_BaseSurfaces.clear();
-        m_pViewLeaf = nullptr;
-        m_pOldViewLeaf = nullptr;
-        m_iFrame = 0;
-        m_iVisFrame = 0;
+        getFrameVars() = FrameVars();
+        getLevelVars() = LevelVars();
     }
 
     m_pLevel = level;
@@ -90,21 +88,22 @@ void BaseRenderer::setLevel(const bsp::Level *level) {
             createLeaves();
             createNodes();
         } catch (...) {
-            m_pLevel = nullptr;
+            // Clean up everything created
+            setLevel(nullptr);
             throw;
         }
     }
 }
 
 void BaseRenderer::createBaseSurfaces() { 
-    AFW_ASSERT(m_BaseSurfaces.empty());
+    AFW_ASSERT(getLevelVars().baseSurfaces.empty());
     auto &lvlFaces = getLevel().getFaces();
     auto &lvlSurfEdges = getLevel().getSurfEdges();
-    m_BaseSurfaces.resize(lvlFaces.size());
+    getLevelVars().baseSurfaces.resize(lvlFaces.size());
 
     for (size_t i = 0; i < lvlFaces.size(); i++) {
         const bsp::BSPFace &face = lvlFaces[i];
-        LevelSurface &surface = m_BaseSurfaces[i];
+        LevelSurface &surface = getLevelVars().baseSurfaces[i];
 
         if (face.iFirstEdge + face.nEdges > (uint32_t)lvlSurfEdges.size()) {
             logWarn("createBaseSurfaces(): Bad surface {}", i);
@@ -150,30 +149,30 @@ void BaseRenderer::createBaseSurfaces() {
         surface.nMatIndex = MaterialManager::get().findMaterial(tex.szName);
     }
 
-    m_BaseSurfaces.shrink_to_fit();
+    getLevelVars().baseSurfaces.shrink_to_fit();
 
     createSurfaces();
 }
 
 void BaseRenderer::createLeaves() {
-    AFW_ASSERT(m_Leaves.empty());
+    AFW_ASSERT(getLevelVars().leaves.empty());
     auto &lvlLeaves = getLevel().getLeaves();
 
-    m_Leaves.reserve(lvlLeaves.size());
+    getLevelVars().leaves.reserve(lvlLeaves.size());
 
     for (size_t i = 0; i < lvlLeaves.size(); i++) {
-        m_Leaves.emplace_back(getLevel(), lvlLeaves[i]);
+        getLevelVars().leaves.emplace_back(getLevel(), lvlLeaves[i]);
     }
 }
 
 void BaseRenderer::createNodes() {
-    AFW_ASSERT(m_Nodes.empty());
+    AFW_ASSERT(getLevelVars().nodes.empty());
     auto &lvlNodes = getLevel().getNodes();
 
-    m_Nodes.reserve(lvlNodes.size());
+    getLevelVars().nodes.reserve(lvlNodes.size());
 
     for (size_t i = 0; i < lvlNodes.size(); i++) {
-        m_Nodes.emplace_back(getLevel(), lvlNodes[i]);
+        getLevelVars().nodes.emplace_back(getLevel(), lvlNodes[i]);
     }
 
     // Set up children
@@ -182,15 +181,15 @@ void BaseRenderer::createNodes() {
             int childNodeIdx = lvlNodes[i].iChildren[j];
 
             if (childNodeIdx >= 0) {
-                m_Nodes[i].children[j] = &m_Nodes.at(childNodeIdx);
+                getLevelVars().nodes[i].children[j] = &getLevelVars().nodes.at(childNodeIdx);
             } else {
                 childNodeIdx = ~childNodeIdx;
-                m_Nodes[i].children[j] = &m_Leaves.at(childNodeIdx);
+                getLevelVars().nodes[i].children[j] = &getLevelVars().leaves.at(childNodeIdx);
             }
         }
     }
 
-    updateNodeParents(&m_Nodes[0], nullptr);
+    updateNodeParents(&getLevelVars().nodes[0], nullptr);
 }
 
 void BaseRenderer::updateNodeParents(LevelNodeBase *node, LevelNodeBase *parent) {
@@ -217,9 +216,7 @@ BaseRenderer::DrawStats BaseRenderer::draw(const DrawOptions &options) noexcept 
     m_pOptions = &options;
     
     // Prepare data
-    m_iFrame++;
-    m_pOldViewLeaf = m_pViewLeaf;
-    m_pViewLeaf = pointInLeaf(m_pOptions->viewOrigin);
+    setupFrame();
 
     if (r_drawworld.getValue()) {
         markLeaves();
@@ -228,10 +225,11 @@ BaseRenderer::DrawStats BaseRenderer::draw(const DrawOptions &options) noexcept 
 
     // Draw everything
     if (r_drawworld.getValue()) {
-        drawWorldSurfaces(m_WorldSurfacesToDraw);
+        drawWorldSurfaces(getFrameVars().worldSurfacesToDraw);
     }
 
     m_pOptions = nullptr;
+
     return m_DrawStats;
 }
 
@@ -245,7 +243,7 @@ bool BaseRenderer::cullBox(glm::vec3 /* mins */, glm::vec3 /* maxs */) noexcept 
 }
 
 LevelLeaf *BaseRenderer::pointInLeaf(glm::vec3 p) noexcept {
-    LevelNodeBase *pBaseNode = &m_Nodes[0];
+    LevelNodeBase *pBaseNode = &getLevelVars().nodes[0];
 
     for (;;) {
         if (pBaseNode->nContents < 0) {
@@ -265,14 +263,14 @@ LevelLeaf *BaseRenderer::pointInLeaf(glm::vec3 p) noexcept {
 }
 
 uint8_t *BaseRenderer::leafPVS(LevelLeaf *pLeaf) noexcept {
-    if (pLeaf == &m_Leaves[0]) {
+    if (pLeaf == &getLevelVars().leaves[0]) {
         return s_NoVis;
     }
 
     // Decompress VIS
-    int row = ((int)m_Leaves.size() + 7) >> 3;
+    int row = ((int)getLevelVars().leaves.size() + 7) >> 3;
     const uint8_t *in = pLeaf->pCompressedVis;
-    uint8_t *out = m_DecompressedVis.data();
+    uint8_t *out = getFrameVars().decompressedVis.data();
 
     if (!in) {
         // no vis info, so make all visible
@@ -280,7 +278,7 @@ uint8_t *BaseRenderer::leafPVS(LevelLeaf *pLeaf) noexcept {
             *out++ = 0xff;
             row--;
         }
-        return m_DecompressedVis.data();
+        return getFrameVars().decompressedVis.data();
     }
 
     do {
@@ -296,13 +294,92 @@ uint8_t *BaseRenderer::leafPVS(LevelLeaf *pLeaf) noexcept {
             *out++ = 0;
             c--;
         }
-    } while (out - m_DecompressedVis.data() < row);
+    } while (out - getFrameVars().decompressedVis.data() < row);
 
-    return m_DecompressedVis.data();
+    return getFrameVars().decompressedVis.data();
+}
+
+void BaseRenderer::setupFrame() noexcept {
+    getFrameVars().viewOrigin = m_pOptions->viewOrigin;
+    getFrameVars().viewAngles = m_pOptions->viewAngles;
+
+    getLevelVars().iFrame++;
+    getLevelVars().pOldViewLeaf = getFrameVars().pViewLeaf;
+    getFrameVars().pViewLeaf = pointInLeaf(getFrameVars().viewOrigin);
+
+    // Set up view matrix
+    {
+        getFrameVars().viewMat = glm::identity<glm::mat4>();
+        getFrameVars().viewMat = glm::rotate(getFrameVars().viewMat, glm::radians(-90.f), {1.0f, 0.0f, 0.0f});
+        getFrameVars().viewMat = glm::rotate(getFrameVars().viewMat, glm::radians(90.f), {0.0f, 0.0f, 1.0f});
+        getFrameVars().viewMat = glm::rotate(getFrameVars().viewMat, glm::radians(-getFrameVars().viewAngles.z), {1.0f, 0.0f, 0.0f});
+        getFrameVars().viewMat = glm::rotate(getFrameVars().viewMat, glm::radians(-getFrameVars().viewAngles.x), {0.0f, 1.0f, 0.0f});
+        getFrameVars().viewMat = glm::rotate(getFrameVars().viewMat, glm::radians(-getFrameVars().viewAngles.y), {0.0f, 0.0f, 1.0f});
+        getFrameVars().viewMat = glm::translate(getFrameVars().viewMat,
+                                           {-getFrameVars().viewOrigin.x, -getFrameVars().viewOrigin.y, -getFrameVars().viewOrigin.z});
+    }
+
+    // Set up projection matrix
+    {
+        float fov_x = m_pOptions->fov;
+        float aspect = m_pOptions->aspect;
+        float fov_x_tan = 0;
+
+        if (fov_x < 1.0) {
+            fov_x_tan = 1.0;
+        } else if (fov_x <= 179.0) {
+            fov_x_tan = tan(fov_x * glm::pi<float>() / 360.f);
+        } else {
+            fov_x_tan = 1.0;
+        }
+
+        float fov_y = atanf(fov_x_tan / aspect) * 360.f / glm::pi<float>();
+        float fov_y_tan = tan(fov_y * glm::pi<float>() / 360.f) * 4.f;
+
+        float zNear = 4.0f;
+        float zFar = std::max(256.0f, m_pOptions->far);
+
+        float xMax = fov_y_tan * aspect;
+        float xMin = -xMax;
+
+        getFrameVars().projMat = glm::frustum(xMin, xMax, -fov_y_tan, fov_y_tan, zNear, zFar);
+
+        m_FrameVars.fov_x = fov_x;
+        m_FrameVars.fov_y = fov_y;
+    }
+
+    // Build the transformation matrix for the given view angles
+    angleVectors(getFrameVars().viewAngles, &getFrameVars().vForward, &getFrameVars().vRight, &getFrameVars().vUp);
+
+    // Setup viewplane dist
+    getFrameVars().flViewPlaneDist = glm::dot(getFrameVars().viewOrigin, getFrameVars().vForward);
+
+    // Setup frustum
+    // rotate getFrameVars().vForward right by FOV_X/2 degrees
+    getFrameVars().frustum[0].vNormal = rotatePointAroundVector(getFrameVars().vUp, getFrameVars().vForward, -(90 - m_FrameVars.fov_x / 2));
+    // rotate getFrameVars().vForward left by FOV_X/2 degrees
+    getFrameVars().frustum[1].vNormal = rotatePointAroundVector(getFrameVars().vUp, getFrameVars().vForward, 90 - m_FrameVars.fov_x / 2);
+    // rotate getFrameVars().vForward up by FOV_X/2 degrees
+    getFrameVars().frustum[2].vNormal = rotatePointAroundVector(getFrameVars().vRight, getFrameVars().vForward, 90 - m_FrameVars.fov_y / 2);
+    // rotate getFrameVars().vForward down by FOV_X/2 degrees
+    getFrameVars().frustum[3].vNormal = rotatePointAroundVector(getFrameVars().vRight, getFrameVars().vForward, -(90 - m_FrameVars.fov_y / 2));
+    // negate forward vector
+    getFrameVars().frustum[4].vNormal = -getFrameVars().vForward;
+
+    for (size_t i = 0; i < 4; i++) {
+        getFrameVars().frustum[i].nType = bsp::PlaneType::PlaneNonAxial;
+        getFrameVars().frustum[i].fDist = glm::dot(getFrameVars().viewOrigin, getFrameVars().frustum[i].vNormal);
+        getFrameVars().frustum[i].signbits = signbitsForPlane(getFrameVars().frustum[i].vNormal);
+    }
+
+    glm::vec3 farPoint = vectorMA(getFrameVars().viewOrigin, m_pOptions->far, getFrameVars().vForward);
+    getFrameVars().frustum[5].nType = bsp::PlaneType::PlaneNonAxial;
+    getFrameVars().frustum[5].fDist = glm::dot(farPoint, getFrameVars().frustum[5].vNormal);
+    getFrameVars().frustum[5].signbits = signbitsForPlane(getFrameVars().frustum[5].vNormal);
 }
 
 void BaseRenderer::markLeaves() noexcept {
-    if (m_pOldViewLeaf == m_pViewLeaf && !r_novis.getValue()) {
+    if (getLevelVars().pOldViewLeaf == getFrameVars().pViewLeaf && !r_novis.getValue()) {
         return;
     }
 
@@ -310,28 +387,28 @@ void BaseRenderer::markLeaves() noexcept {
         return;
     }
 
-    m_iVisFrame++;
-    m_pOldViewLeaf = m_pViewLeaf;
+    getLevelVars().iVisFrame++;
+    getLevelVars().pOldViewLeaf = getFrameVars().pViewLeaf;
 
     uint8_t *vis = nullptr;
     uint8_t solid[4096];
 
     if (r_novis.getValue()) {
-        AFW_ASSERT(((m_Leaves.size() + 7) >> 3) <= sizeof(solid));
+        AFW_ASSERT(((getLevelVars().leaves.size() + 7) >> 3) <= sizeof(solid));
         vis = solid;
-        memset(solid, 0xFF, (m_Leaves.size() + 7) >> 3);
+        memset(solid, 0xFF, (getLevelVars().leaves.size() + 7) >> 3);
     } else {
-        vis = leafPVS(m_pViewLeaf);
+        vis = leafPVS(getFrameVars().pViewLeaf);
     }
 
-    for (size_t i = 0; i < m_Leaves.size() - 1; i++) {
+    for (size_t i = 0; i < getLevelVars().leaves.size() - 1; i++) {
         if (vis[i >> 3] & (1 << (i & 7))) {
-            LevelNodeBase *node = &m_Leaves[i + 1];
+            LevelNodeBase *node = &getLevelVars().leaves[i + 1];
 
             do {
-                if (node->iVisFrame == m_iVisFrame)
+                if (node->iVisFrame == getLevelVars().iVisFrame)
                     break;
-                node->iVisFrame = m_iVisFrame;
+                node->iVisFrame = getLevelVars().iVisFrame;
                 node = node->pParent;
             } while (node);
         }
@@ -343,7 +420,7 @@ bool BaseRenderer::cullSurface(const LevelSurface &pSurface) noexcept {
         return false;
     }
 
-    float dist = planeDiff(m_pOptions->viewOrigin, *pSurface.pPlane);
+    float dist = planeDiff(getFrameVars().viewOrigin, *pSurface.pPlane);
 
     if (r_cull.getValue() == 1) {
         // Back face culling
@@ -370,12 +447,12 @@ bool BaseRenderer::cullSurface(const LevelSurface &pSurface) noexcept {
 }
 
 void BaseRenderer::drawWorld() noexcept {
-    m_WorldSurfacesToDraw.clear();
-    recursiveWorldNodes(&m_Nodes[0]);
+    getFrameVars().worldSurfacesToDraw.clear();
+    recursiveWorldNodes(&getLevelVars().nodes[0]);
 }
 
 void BaseRenderer::recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept {
-    if (pNodeBase->iVisFrame != m_iVisFrame) {
+    if (pNodeBase->iVisFrame != getLevelVars().iVisFrame) {
         return;
     }
 
@@ -386,20 +463,20 @@ void BaseRenderer::recursiveWorldNodes(LevelNodeBase *pNodeBase) noexcept {
 
     LevelNode *pNode = static_cast<LevelNode *>(pNodeBase);
 
-    float dot = planeDiff(m_pOptions->viewOrigin, *pNode->pPlane);
+    float dot = planeDiff(getFrameVars().viewOrigin, *pNode->pPlane);
     int side = (dot >= 0.0f) ? 0 : 1;
 
     // Front side
     recursiveWorldNodes(pNode->children[side]);
 
     for (int i = 0; i < pNode->iNumSurfaces; i++) {
-        LevelSurface &surface = m_BaseSurfaces[(size_t)pNode->iFirstSurface + i];
+        LevelSurface &surface = getLevelVars().baseSurfaces[(size_t)pNode->iFirstSurface + i];
 
         if (cullSurface(surface)) {
             continue;
         }
 
-        m_WorldSurfacesToDraw.push_back((size_t)pNode->iFirstSurface + i);
+        getFrameVars().worldSurfacesToDraw.push_back((size_t)pNode->iFirstSurface + i);
     }
 
     // Back side

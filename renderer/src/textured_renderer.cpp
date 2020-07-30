@@ -21,21 +21,9 @@ void TexturedRenderer::Shader::create() {
     linkProgram();
 }
 
-void TexturedRenderer::Shader::loadMatrices(const BaseRenderer::DrawOptions &options) {
-    glm::mat4 proj =
-        glm::perspective(glm::radians(options.fov), options.aspect, options.near, options.far);
-    m_ProjMat.set(proj);
-
-    // From quake
-    glm::mat4 viewMat = glm::identity<glm::mat4>();
-    viewMat = glm::rotate(viewMat, glm::radians(-90.f), {1.0f, 0.0f, 0.0f});
-    viewMat = glm::rotate(viewMat, glm::radians(90.f), {0.0f, 0.0f, 1.0f});
-    viewMat = glm::rotate(viewMat, glm::radians(-options.viewAngles.z), {1.0f, 0.0f, 0.0f});
-    viewMat = glm::rotate(viewMat, glm::radians(-options.viewAngles.x), {0.0f, 1.0f, 0.0f});
-    viewMat = glm::rotate(viewMat, glm::radians(-options.viewAngles.y), {0.0f, 0.0f, 1.0f});
-    viewMat = glm::translate(viewMat, {-options.viewOrigin.x, -options.viewOrigin.y, -options.viewOrigin.z});
-    m_ViewMat.set(viewMat);
-
+void TexturedRenderer::Shader::loadMatrices(const BaseRenderer::FrameVars &vars) {
+    m_ProjMat.set(vars.projMat);
+    m_ViewMat.set(vars.viewMat);
     m_FullBright.set(r_fullbright.getValue());
 }
 
@@ -143,10 +131,10 @@ void TexturedRenderer::Surface::draw() noexcept {
 //-----------------------------------------------------------------------------
 void TexturedRenderer::createSurfaces() {
     AFW_ASSERT(m_Surfaces.empty());
-    m_Surfaces.reserve(m_BaseSurfaces.size());
+    m_Surfaces.reserve(getLevelVars().baseSurfaces.size());
 
-    for (size_t i = 0; i < m_BaseSurfaces.size(); i++) {
-        const LevelSurface &baseSurface = m_BaseSurfaces[i];
+    for (size_t i = 0; i < getLevelVars().baseSurfaces.size(); i++) {
+        const LevelSurface &baseSurface = getLevelVars().baseSurfaces[i];
         m_Surfaces.emplace_back(baseSurface);
     }
 }
@@ -166,7 +154,7 @@ void TexturedRenderer::drawWorldSurfaces(const std::vector<size_t> &surfaceIdxs)
     }
 
     s_Shader.enable();
-    s_Shader.loadMatrices(getOptions());
+    s_Shader.loadMatrices(getFrameVars());
 
     for (size_t idx : surfaceIdxs) {
         Surface &surf = m_Surfaces[idx];

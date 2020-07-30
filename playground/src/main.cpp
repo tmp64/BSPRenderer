@@ -31,7 +31,7 @@ public:
         for (size_t idx : surfaceIdxs) {
             count++;
             logWarn("Surface {}", count);
-            LevelSurface &surf = m_BaseSurfaces[idx];
+            LevelSurface &surf = getLevelVars().baseSurfaces[idx];
 
             for (glm::vec3 v : surf.vertices) {
                 logInfo("    {} {} {}", v.x, v.y, v.z);

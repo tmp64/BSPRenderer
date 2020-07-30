@@ -10,7 +10,7 @@ public:
     public:
         Shader();
         virtual void create() override;
-        void loadMatrices(const BaseRenderer::DrawOptions &options);
+        void loadMatrices(const BaseRenderer::FrameVars &vars);
         void setColor(const glm::vec3 &c);
 
     private:

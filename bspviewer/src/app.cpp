@@ -53,7 +53,7 @@ static ConVar<float> fps_max("fps_max", 100, "Maximum FPS",
 
 static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
 static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
-static ConVar<float> fov("fov", 90.f, "Horizontal field of view");
+static ConVar<float> fov("fov", 120.f, "Horizontal field of view");
 
 //----------------------------------------------------------------
 

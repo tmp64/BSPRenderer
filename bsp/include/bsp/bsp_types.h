@@ -116,7 +116,8 @@ enum class PlaneType : int32_t {
     PlaneZ,
     PlaneAnyX,
     PlaneAnyY,
-    PlaneAnyZ
+    PlaneAnyZ,
+    PlaneNonAxial
 };
 
 struct BSPPlane {
