@@ -4,7 +4,7 @@
 #include <cmath>
 #include <glm/glm.hpp>
 
-enum { ANGLE_PITCH, ANGLE_YAW, ANGLE_ROLL };
+enum { ANGLE_PITCH = 0, ANGLE_YAW = 1, ANGLE_ROLL = 2 };
 
 inline glm::vec4 colorToVec(appfw::Color c) {
     return {
@@ -18,14 +18,14 @@ inline glm::vec4 colorToVec(appfw::Color c) {
 inline void angleVectors(glm::vec3 angles, glm::vec3 *forward, glm::vec3 *right, glm::vec3 *up) {
     float sr, sp, sy, cr, cp, cy;
 
-    sy = glm::sin(angles[ANGLE_YAW]);
-    cy = glm::cos(angles[ANGLE_YAW]);
+    sy = glm::sin(glm::radians(angles[ANGLE_YAW]));
+    cy = glm::cos(glm::radians(angles[ANGLE_YAW]));
 
-    sp = glm::sin(angles[ANGLE_PITCH]);
-    cp = glm::cos(angles[ANGLE_PITCH]);
+    sp = glm::sin(glm::radians(angles[ANGLE_PITCH]));
+    cp = glm::cos(glm::radians(angles[ANGLE_PITCH]));
 
-    sr = glm::sin(angles[ANGLE_ROLL]);
-    cr = glm::cos(angles[ANGLE_ROLL]);
+    sr = glm::sin(glm::radians(angles[ANGLE_ROLL]));
+    cr = glm::cos(glm::radians(angles[ANGLE_ROLL]));
 
     if (forward) {
         forward->x = cp * cy;
@@ -63,7 +63,7 @@ inline void vectorVectors(glm::vec3 forward, glm::vec3 &right, glm::vec3 &up) {
 
     d = glm::dot(forward, right);
     right = vectorMA(right, -d, forward);
-    glm::normalize(right);
+    right = glm::normalize(right);
     up = glm::cross(right, forward);
 }
 

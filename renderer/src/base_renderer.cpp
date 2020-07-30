@@ -19,6 +19,7 @@ appfw::console::ConVar<bool> r_drawworld("r_drawworld", true, "Draw world polygo
 appfw::console::ConVar<bool> r_lockpvs("r_lockpvs", false, "Lock current PVS to let devs see where it ends");
 appfw::console::ConVar<bool> r_novis("r_novis", false, "Ignore visibility data");
 appfw::console::ConVar<int> r_fullbright("r_fullbright", 0, "Disable lighting");
+appfw::console::ConVar<bool> r_no_frustum_culling("r_no_frustum_culling", true, "Disable frustum culling");
 
 static uint8_t s_NoVis[bsp::MAX_MAP_LEAFS / 8];
 
@@ -118,8 +119,11 @@ void BaseRenderer::createBaseSurfaces() {
             surface.iFlags |= SURF_PLANEBACK;
         }
 
-        // Create vertices
+        // Create vertices and calculate bounds
+        surface.mins[0] = surface.mins[1] = surface.mins[2] = 999999.0f;
+        surface.maxs[0] = surface.maxs[1] = surface.maxs[2] = -999999.0f;
         auto &lvlVertices = getLevel().getVertices();
+
         for (int j = 0; j < surface.iNumEdges; j++) {
             if (j == MAX_SIDE_VERTS) {
                 logWarn("createBaseSurfaces(): polygon {} is too large (exceeded {} vertices)", j, MAX_SIDE_VERTS);
@@ -127,7 +131,7 @@ void BaseRenderer::createBaseSurfaces() {
             }
 
             glm::vec3 vertex;
-            bsp::BSPSurfEdge iEdgeIdx = lvlSurfEdges[(size_t)surface.iFirstEdge + j];
+            bsp::BSPSurfEdge iEdgeIdx = lvlSurfEdges.at((size_t)surface.iFirstEdge + j);
 
             if (iEdgeIdx > 0) {
                 const bsp::BSPEdge &edge = getLevel().getEdges().at(iEdgeIdx);
@@ -138,6 +142,15 @@ void BaseRenderer::createBaseSurfaces() {
             }
 
             surface.vertices.push_back(vertex);
+
+            // Add vertex to bounds
+            for (int k = 0; k < 3; k++) {
+                float val = vertex[k];
+                if (val < surface.mins[k])
+                    surface.mins[k] = val;
+                if (val > surface.maxs[k])
+                    surface.maxs[k] = val;
+            }
         }
 
         surface.vertices.shrink_to_fit();
@@ -233,12 +246,52 @@ BaseRenderer::DrawStats BaseRenderer::draw(const DrawOptions &options) noexcept 
     return m_DrawStats;
 }
 
-bool BaseRenderer::cullBox(glm::vec3 /* mins */, glm::vec3 /* maxs */) noexcept {
-    if (r_cull.getValue() == 0) {
+bool BaseRenderer::cullBox(glm::vec3 mins, glm::vec3 maxs) noexcept {
+    if (r_cull.getValue() == 0 || r_no_frustum_culling.getValue()) {
         return false;
     }
 
-    // TODO: Frustum culling
+    unsigned i;
+    const Plane *p;
+
+    for (i = (unsigned)getFrameVars().frustum.size(), p = &getFrameVars().frustum[0]; i > 0; i--, p++) {
+        switch (p->signbits) {
+        case 0:
+            if (p->vNormal[0] * maxs[0] + p->vNormal[1] * maxs[1] + p->vNormal[2] * maxs[2] < p->fDist)
+                return true;
+            break;
+        case 1:
+            if (p->vNormal[0] * mins[0] + p->vNormal[1] * maxs[1] + p->vNormal[2] * maxs[2] < p->fDist)
+                return true;
+            break;
+        case 2:
+            if (p->vNormal[0] * maxs[0] + p->vNormal[1] * mins[1] + p->vNormal[2] * maxs[2] < p->fDist)
+                return true;
+            break;
+        case 3:
+            if (p->vNormal[0] * mins[0] + p->vNormal[1] * mins[1] + p->vNormal[2] * maxs[2] < p->fDist)
+                return true;
+            break;
+        case 4:
+            if (p->vNormal[0] * maxs[0] + p->vNormal[1] * maxs[1] + p->vNormal[2] * mins[2] < p->fDist)
+                return true;
+            break;
+        case 5:
+            if (p->vNormal[0] * mins[0] + p->vNormal[1] * maxs[1] + p->vNormal[2] * mins[2] < p->fDist)
+                return true;
+            break;
+        case 6:
+            if (p->vNormal[0] * maxs[0] + p->vNormal[1] * mins[1] + p->vNormal[2] * mins[2] < p->fDist)
+                return true;
+            break;
+        case 7:
+            if (p->vNormal[0] * mins[0] + p->vNormal[1] * mins[1] + p->vNormal[2] * mins[2] < p->fDist)
+                return true;
+            break;
+        default:
+            return false;
+        }
+    }
     return false;
 }
 
@@ -415,16 +468,16 @@ void BaseRenderer::markLeaves() noexcept {
     }
 }
 
-bool BaseRenderer::cullSurface(const LevelSurface &pSurface) noexcept {
+bool BaseRenderer::cullSurface(const LevelSurface &surface) noexcept {
     if (r_cull.getValue() == 0) {
         return false;
     }
 
-    float dist = planeDiff(getFrameVars().viewOrigin, *pSurface.pPlane);
+    float dist = planeDiff(getFrameVars().viewOrigin, *surface.pPlane);
 
     if (r_cull.getValue() == 1) {
         // Back face culling
-        if (pSurface.iFlags & SURF_PLANEBACK) {
+        if (surface.iFlags & SURF_PLANEBACK) {
             if (dist >= -BACKFACE_EPSILON)
                 return true; // wrong side
         } else {
@@ -433,7 +486,7 @@ bool BaseRenderer::cullSurface(const LevelSurface &pSurface) noexcept {
         }
     } else if (r_cull.getValue() == 2) {
         // Front face culling
-        if (pSurface.iFlags & SURF_PLANEBACK) {
+        if (surface.iFlags & SURF_PLANEBACK) {
             if (dist <= BACKFACE_EPSILON)
                 return true; // wrong side
         } else {
@@ -443,7 +496,7 @@ bool BaseRenderer::cullSurface(const LevelSurface &pSurface) noexcept {
     }
 
     // TODO: Frustum culling
-    return false;
+    return cullBox(surface.mins, surface.maxs);
 }
 
 void BaseRenderer::drawWorld() noexcept {

@@ -35,6 +35,7 @@ struct LevelSurface {
     const bsp::BSPTextureInfo *pTexInfo = nullptr;
     size_t nMatIndex = NULL_MATERIAL;
     std::vector<glm::vec3> vertices;
+    glm::vec3 mins, maxs;
 };
 
 struct LevelNodeBase {
