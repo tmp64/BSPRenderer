@@ -1,5 +1,5 @@
 add_executable(playground
-	../CMakeLists.txt
+	../../CMakeLists.txt
 	CMakeLists.txt
 	src/main.cpp
 	src/this_module_info.h

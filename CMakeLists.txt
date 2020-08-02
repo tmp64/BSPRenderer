@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16.0)
 
 project(hl_advgl)
 
-include(appfw/cmake/platform_info.cmake)
+include(src/appfw/cmake/platform_info.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,9 +26,9 @@ add_subdirectory(external/fmt)
 message(STATUS ">>> FMT library end")
 add_subdirectory(external/glad_debug)
 
-add_subdirectory(appfw)
-add_subdirectory(bsp)
-add_subdirectory(renderer)
+add_subdirectory(src/appfw)
+add_subdirectory(src/bsp)
+add_subdirectory(src/renderer)
 
-add_subdirectory(bspviewer)
-add_subdirectory(playground)
+add_subdirectory(src/bspviewer)
+add_subdirectory(src/playground)
