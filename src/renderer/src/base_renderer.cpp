@@ -279,6 +279,8 @@ void BaseRenderer::loadLightmapFile(const std::string &filepath) {
                          data.data());
             glGenerateMipmap(GL_TEXTURE_2D);
         }
+
+        r_fullbright.setValue(0);
     }
     catch (const std::exception &e) {
         logWarn("Failed to load light map file {}: {}", filepath, e.what());
