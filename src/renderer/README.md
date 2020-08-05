@@ -9,16 +9,16 @@ Contains BSP world surface renderers and font renderer. Handles shaders and mate
 Console commands
 ----------------
 - `r_cull <int>` Backface culling
-    0. None
-    1. Back
-    2. Front
+    - 0: None
+    - 1: Back
+    - 2: Front
 - `r_drawworld <bool>` Draw world polygons.
 - `r_lockpvs <bool>` Lock current PVS to let devs see where it ends.
 - `r_novis <bool>` Ignore VIS data.
 - `r_fullbright <int>` Disable lighting.
-    0. Apply lightmaps
-    1. Disable lighting completely (full brightness).
-    2. Don't apply textures (as if all objects were white).
-    3. All polygons have random color (like with PolygonRenderer).
-    4. Use direct lighting instad of lightmaps. Set automatically if lightmaps failed to load.
+    - 0: Apply lightmaps
+    - 1: Disable lighting completely (full brightness).
+    - 2: Don't apply textures (as if all objects were white).
+    - 3: All polygons have random color (like with PolygonRenderer).
+    - 4: Use direct lighting instad of lightmaps. Set automatically if lightmaps failed to load.
 - `r_no_frustum_culling <bool>` Disable frustum culling. Default TRUE since it is broken.
