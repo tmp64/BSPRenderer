@@ -36,6 +36,11 @@ struct LevelSurface {
     size_t nMatIndex = NULL_MATERIAL;
     std::vector<glm::vec3> vertices;
     glm::vec3 mins, maxs;
+
+    // Lightmap info
+    std::vector<glm::vec2> lmTexCoords;
+    glm::ivec2 lmSize;
+    GLuint nLightmapTex = 0;
 };
 
 struct LevelNodeBase {
@@ -105,6 +110,7 @@ public:
         std::vector<LevelLeaf> leaves;
         std::vector<LevelNode> nodes;
         std::vector<LevelSurface> baseSurfaces;
+        bool bLightmapLoaded = false;
 
         LevelLeaf *pOldViewLeaf = nullptr;
         unsigned iFrame = 0;
@@ -158,8 +164,9 @@ public:
      * Sets which level to draw. It must exist for as long as it is set and must not change.
      * On error, throws and leaves no map loaded.
      * @param   level   Level or nullptr
+     * @param   mapPath Path to .bsp file (used for lightmap loading)
      */
-    void setLevel(const bsp::Level *level);
+    void setLevel(const bsp::Level *level, const std::string &mapPath = "");
 
     /**
      * Draws the world onto the screen.
@@ -211,6 +218,7 @@ private:
     void createLeaves();
     void createNodes();
     void updateNodeParents(LevelNodeBase *node, LevelNodeBase *parent);
+    void loadLightmapFile(const std::string &filepath);
 
     //----------------------------------------------------------------
     // Visibility calculations

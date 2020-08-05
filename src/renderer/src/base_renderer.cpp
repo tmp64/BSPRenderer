@@ -1,3 +1,4 @@
+#include <appfw/binary_file.h>
 #include <appfw/services.h>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -74,7 +75,7 @@ BaseRenderer::BaseRenderer() {
 //----------------------------------------------------------------
 // Loading
 //----------------------------------------------------------------
-void BaseRenderer::setLevel(const bsp::Level *level) {
+void BaseRenderer::setLevel(const bsp::Level *level, const std::string &mapPath) {
     if (m_pLevel) {
         destroySurfaces();
         getFrameVars() = FrameVars();
@@ -88,6 +89,8 @@ void BaseRenderer::setLevel(const bsp::Level *level) {
             createBaseSurfaces();
             createLeaves();
             createNodes();
+            loadLightmapFile(mapPath + ".lm");
+            createSurfaces();
         } catch (...) {
             // Clean up everything created
             setLevel(nullptr);
@@ -163,8 +166,6 @@ void BaseRenderer::createBaseSurfaces() {
     }
 
     getLevelVars().baseSurfaces.shrink_to_fit();
-
-    createSurfaces();
 }
 
 void BaseRenderer::createLeaves() {
@@ -215,6 +216,74 @@ void BaseRenderer::updateNodeParents(LevelNodeBase *node, LevelNodeBase *parent)
     LevelNode *realNode = static_cast<LevelNode *>(node);
     updateNodeParents(realNode->children[0], node);
     updateNodeParents(realNode->children[1], node);
+}
+
+void BaseRenderer::loadLightmapFile(const std::string &filepath) {
+    try {
+        constexpr uint32_t LM_MAGIC = ('1' << 24) | ('0' << 16) | ('M' << 8) | ('L' << 0);
+
+        struct LightmapFileHeader {
+            uint32_t nMagic;
+            uint32_t iFaceCount;
+        };
+
+        struct LightmapFaceInfo {
+            uint32_t iVertexCount;
+            glm::ivec2 lmSize;
+        };
+
+        appfw::BinaryReader file(filepath);
+
+        LightmapFileHeader lmHeader;
+        file.read(lmHeader);
+
+        if (lmHeader.nMagic != LM_MAGIC) {
+            throw std::runtime_error(fmt::format("Invalid magic: expected {}, got {}", LM_MAGIC, lmHeader.nMagic));
+        }
+
+        if (lmHeader.iFaceCount != getLevelVars().baseSurfaces.size()) {
+            throw std::runtime_error(fmt::format("Face count mismatch: expected {}, got {}",
+                                                 getLevelVars().baseSurfaces.size(), lmHeader.iFaceCount));
+        }
+
+        // Read face info
+        for (size_t i = 0; i < lmHeader.iFaceCount; i++) {
+            LevelSurface &surf = getLevelVars().baseSurfaces[i];
+            LightmapFaceInfo info;
+            file.read(info);
+
+            if (info.iVertexCount != surf.vertices.size()) {
+                throw std::runtime_error("Face vertex count mismatch");
+            }
+
+            surf.lmSize = info.lmSize;
+            surf.lmTexCoords.resize(info.iVertexCount);
+            file.readArray(appfw::span(surf.lmTexCoords));
+        }
+
+        // Read textures
+        for (size_t i = 0; i < lmHeader.iFaceCount; i++) {
+            LevelSurface &surf = getLevelVars().baseSurfaces[i];
+            std::vector<glm::vec3> data;
+            data.resize((size_t)surf.lmSize.x * (size_t)surf.lmSize.y);
+            file.readArray(appfw::span(data));
+
+            // TODO: Fix resource leak
+            glGenTextures(1, &surf.nLightmapTex);
+            glBindTexture(GL_TEXTURE_2D, surf.nLightmapTex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, surf.lmSize.x, surf.lmSize.y, 0, GL_RGB, GL_FLOAT,
+                         data.data());
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+    }
+    catch (const std::exception &e) {
+        logWarn("Failed to load light map file {}: {}", filepath, e.what());
+        r_fullbright.setValue(4);
+    }
 }
 
 //----------------------------------------------------------------

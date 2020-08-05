@@ -50,7 +50,7 @@ void bsp::WADFile::loadFromFile(const std::string &path) {
     data.insert(data.begin(), std::istream_iterator<uint8_t>(file), std::istream_iterator<uint8_t>());
 #endif
 
-    file.seekg(0, file.end); // N is the total number of doubles
+    file.seekg(0, file.end);
     size_t size = file.tellg();
     file.seekg(0, file.beg);
     std::vector<uint8_t> data;

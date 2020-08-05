@@ -9,7 +9,8 @@ set(APPFW_PUBLIC_HEADERS
 
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/log/base_logger.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/log/console_logger.h
-
+	
+	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/binary_file.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/color.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/command_buffer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/compiler.h
@@ -33,7 +34,8 @@ set(APPFW_PRIVATE_SOURCES
 	
 	${CMAKE_CURRENT_SOURCE_DIR}/src/log/base_logger.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/log/console_logger.cpp
-
+	
+	${CMAKE_CURRENT_SOURCE_DIR}/src/binary_file.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/command_buffer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dbg.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/init.cpp

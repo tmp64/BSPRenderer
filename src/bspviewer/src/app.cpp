@@ -448,7 +448,7 @@ void App::loadMap(const std::string &name) {
 
     try {
         m_LoadedLevel.loadFromFile(path);
-        m_pRenderer->setLevel(&m_LoadedLevel);
+        m_pRenderer->setLevel(&m_LoadedLevel, path);
 
         m_Pos = {0.f, 0.f, 0.f};
         m_Rot = {0.f, 0.f, 0.f};
