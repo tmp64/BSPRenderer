@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16.0)
 
-project(hl_advgl)
+project(BSPRenderer)
 
 include(src/appfw/cmake/platform_info.cmake)
 
