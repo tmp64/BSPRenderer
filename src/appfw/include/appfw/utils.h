@@ -78,6 +78,11 @@ namespace utils {
  */
 ParsedCommand parseCommand(const std::string &cmd);
 
+/**
+ * Converts a parsed command to a string. All arguments are quoted.
+ */
+std::string commandToString(const ParsedCommand &cmd);
+
 //----------------------------------------------------------------
 
 /**

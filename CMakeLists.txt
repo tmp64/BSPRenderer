@@ -26,6 +26,7 @@ message(STATUS ">>> FMT library begin")
 add_subdirectory(external/fmt)
 message(STATUS ">>> FMT library end")
 add_subdirectory(external/glad_debug)
+add_subdirectory(external/imgui)
 
 # Libraries
 add_subdirectory(src/appfw)

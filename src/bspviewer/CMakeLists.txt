@@ -4,6 +4,10 @@ add_executable(bspviewer
 	src/app.h
 	src/demo.cpp
 	src/demo.h
+	src/dev_console_dialog.cpp
+	src/dev_console_dialog.h
+	src/input_system.cpp
+	src/input_system.h
 	src/main.cpp
 	src/this_module_info.h
 )
@@ -16,6 +20,7 @@ target_link_libraries(bspviewer
 	appfw
 	glad
 	Freetype::Freetype
+	imgui
 	renderer
 	SDL2::SDL2
 	SDL2::SDL2main

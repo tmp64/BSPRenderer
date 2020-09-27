@@ -1,3 +1,4 @@
+#include <fmt/format.h>
 #include <appfw/utils.h>
 
 appfw::ParsedCommand appfw::utils::parseCommand(const std::string &cmd) {
@@ -44,6 +45,16 @@ appfw::ParsedCommand appfw::utils::parseCommand(const std::string &cmd) {
     }
 
     return args;
+}
+
+std::string appfw::utils::commandToString(const ParsedCommand &cmd) {
+    std::string ret;
+
+    for (const std::string &i : cmd) {
+        ret += fmt::format("\"{}\" ", i);
+    }
+
+    return ret.substr(0, ret.size() - 1);
 }
 
 //----------------------------------------------------------------

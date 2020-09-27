@@ -5,6 +5,9 @@
 #include <appfw/services.h>
 #include <appfw/compiler.h>
 #include <glad/glad.h>
+#include <imgui.h>
+#include <imgui_impl_sdl.h>
+#include <imgui_impl_opengl3.h>
 #include <renderer/shader_manager.h>
 #include <renderer/material_manager.h>
 #include <renderer/frame_console.h>
@@ -44,6 +47,14 @@ static ConCommand cmd_dem_play("dem_play", "Plays a demo", [](const appfw::Parse
     }
 
     App::get().playDemo(cmd[1]);
+});
+
+static ConCommand cmd_toggle_debug_text("toggle_debug_text", "", [](const appfw::ParsedCommand &) {
+    App::get().setDrawDebugTextEnabled(!App::get().isDrawDebugTextEnabled());
+});
+
+static ConCommand cmd_toggleconsole("toggleconsole", "", [](const appfw::ParsedCommand &) {
+    App::get().toggleConsole();
 });
 
 static ConVar<float> dem_tickrate("dem_tickrate", 60.f, "Demo tickrate");
@@ -130,28 +141,50 @@ App::App() {
         fatalError(fmt::format("At least OpenGL 3.3 is required. Available {}.{}", GLVersion.major, GLVersion.minor));
     }
 
+    initDearImGui();
+    m_pDevConsole = new DevConsoleDialog();
+    appfw::getConsole().addConsoleReceiver(m_pDevConsole);
+
     // Init renderer
     ShaderManager::get().init();
 
     MaterialManager::get().init();
     MaterialManager::get().addWadFile("halflife.wad");
 
-    m_pFrameConsole = new FrameConsole();
     m_pRenderer = new TexturedRenderer();
+
+    // Init input
+    m_pInputSystem = new InputSystem();
+    m_pInputSystem->bindKey(SDL_SCANCODE_F3, "toggle_debug_text");
+    m_pInputSystem->bindKey(SDL_SCANCODE_F8, "dem_stop");
+    m_pInputSystem->bindKey(SDL_SCANCODE_GRAVE, "toggleconsole");
+
     loadMap("crossfire");
 
     updateViewportSize();
-    setMouseInputEnabled(false);
 }
 
 App::~App() {
     AFW_ASSERT(m_sSingleton);
 
+    // Shutdown input
+    delete m_pInputSystem;
+    m_pInputSystem = nullptr;
+
     // Shutdown renderer
     delete m_pRenderer;
-    delete m_pFrameConsole;
+    m_pRenderer = nullptr;
     MaterialManager::get().shutdown();
     ShaderManager::get().shutdown();
+
+    appfw::getConsole().removeConsoleReceiver(m_pDevConsole);
+    delete m_pDevConsole;
+    m_pDevConsole = nullptr;
+
+    // Shutdown Dear ImGui
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
 
     // Remove GL context
     SDL_GL_DeleteContext(m_GLContext);
@@ -166,6 +199,43 @@ App::~App() {
     SDL_Quit();
 
     m_sSingleton = nullptr;
+}
+
+void App::initDearImGui() {
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void)io;
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    // ImGui::StyleColorsClassic();
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplSDL2_InitForOpenGL(m_pWindow, m_GLContext);
+    ImGui_ImplOpenGL3_Init();
+
+    // Load Fonts
+    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use
+    // ImGui::PushFont()/PopFont() to select them.
+    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
+    // - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application
+    // (e.g. use an assertion, or display an error and quit).
+    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling
+    // ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
+    // - Read 'docs/FONTS.md' for more instructions and details.
+    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double
+    // backslash \\ !
+    // io.Fonts->AddFontDefault();
+    // io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
+    // io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
+    // io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
+    // io.Fonts->AddFontFromFileTTF("../../misc/fonts/ProggyTiny.ttf", 10.0f);
+    // ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL,
+    // io.Fonts->GetGlyphRangesJapanese()); IM_ASSERT(font != NULL);
 }
 
 //----------------------------------------------------------------
@@ -208,7 +278,15 @@ void App::tick() {
         handleSDLEvent(event);
     }
 
-    checkKeys();
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDL2_NewFrame(m_pWindow);
+    ImGui::NewFrame();
+
+    //
+    ImGui::ShowDemoWindow();
+    //
+
+    m_pInputSystem->tick();
 
     if (m_DemoState == DemoState::Record) {
         if (m_DemoWriter.hasTimeCome(m_iTimeMicros)) {
@@ -247,6 +325,10 @@ void App::quit(int code) {
 }
 
 void App::handleSDLEvent(SDL_Event event) {
+    if (m_pInputSystem->handleSDLEvent(event)) {
+        return;
+    }
+
     switch (event.type) {
     case SDL_WINDOWEVENT: {
         if (event.window.windowID == SDL_GetWindowID(m_pWindow)) {
@@ -265,39 +347,6 @@ void App::handleSDLEvent(SDL_Event event) {
 
         break;
     }
-    case SDL_KEYDOWN: {
-        if (event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
-            setMouseInputEnabled(!isMouseInputEnabled());
-        } else if (event.key.keysym.scancode == SDL_SCANCODE_F3) {
-            m_bDrawDebugText = !m_bDrawDebugText;
-        } else if (event.key.keysym.scancode == SDL_SCANCODE_F8) {
-            stopDemo();
-        }
-        break;
-    }
-    case SDL_MOUSEMOTION: {
-        if (isMouseInputEnabled() && m_DemoState != DemoState::Play) {
-            glm::vec3 rot = m_Rot;
-
-            rot.y -= event.motion.xrel * m_sens.getValue();
-            rot.x += event.motion.yrel * m_sens.getValue();
-
-            if (rot.x < -90.0f) {
-                rot.x = -90.0f;
-            } else if (rot.x > 90.0f) {
-                rot.x = 90.0f;
-            }
-
-            if (rot.y < 0.0f) {
-                rot.y = 360.0f + rot.y;
-            } else if (rot.y > 360.f) {
-                rot.y = rot.y - 360.0f;
-            }
-            // sf::Mouse::setPosition({xt, yt});
-            m_Rot = rot;
-        }
-        break;
-    }
     case SDL_QUIT: {
         quit();
         break;
@@ -308,7 +357,6 @@ void App::handleSDLEvent(SDL_Event event) {
 void App::draw() {
     glClearColor(0, 0.5f, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    m_pFrameConsole->reset();
     
     BaseRenderer::DrawOptions options;
     options.viewOrigin = m_Pos;
@@ -318,41 +366,56 @@ void App::draw() {
     m_LastDrawStats = m_pRenderer->draw(options);
 
     if (m_bDrawDebugText) {
-        drawDebugText(m_LastDrawStats);
+        drawDebugText();
+        m_pRenderer->drawGui(m_LastDrawStats);
+
+        if (!m_pInputSystem->isInputGrabbed() && m_bIsConsoleVisible)
+            m_pDevConsole->Draw("Developer Console", &m_bIsConsoleVisible);
     }
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
     SDL_GL_SwapWindow(m_pWindow);
 }
 
-void App::drawDebugText(const BaseRenderer::DrawStats &stats) {
-    m_pFrameConsole->printLeft(FrameConsole::Cyan, fmt::format("FPS: {:>4.0f}\n", 1.f / m_flLastFrameTime));
-    m_pFrameConsole->printLeft(FrameConsole::Cyan, fmt::format("Last frame time: {:>6.3f} ms\n", m_iLastFrameMicros / 1000.f));
-    m_pFrameConsole->printLeft(FrameConsole::White, fmt::format("Pos: {} {} {}\n", m_Pos.x, m_Pos.y, m_Pos.z));
-    m_pFrameConsole->printLeft(FrameConsole::White, fmt::format("Pitch: {}\n", m_Rot.x));
-    m_pFrameConsole->printLeft(FrameConsole::White, fmt::format("Yaw: {}\n", m_Rot.y));
-    m_pFrameConsole->printLeft(FrameConsole::White, fmt::format("Roll: {}\n", m_Rot.z));
-    m_pFrameConsole->printLeft(FrameConsole::White, fmt::format("World surfaces: {}\n", stats.worldSurfaces));
+void App::drawDebugText() {
+    static bool open = true;
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize |
+                                    ImGuiWindowFlags_NoFocusOnAppearing |
+                                    ImGuiWindowFlags_NoNav;
 
-    if (!isMouseInputEnabled()) {
-        m_pFrameConsole->printLeft(FrameConsole::Red, "Mouse released\n");
+    ImGui::SetNextWindowBgAlpha(0.2f);
+
+    ImColor cyan =
+        ImColor(FrameConsole::Cyan.r(), FrameConsole::Cyan.g(), FrameConsole::Cyan.b(), FrameConsole::Cyan.a());
+    ImColor red = ImColor(FrameConsole::Red.r(), FrameConsole::Red.g(), FrameConsole::Red.b(), FrameConsole::Red.a());
+
+    if (ImGui::Begin("BSPViewer Stats", nullptr, window_flags)) {
+        ImGui::TextColored(cyan, "FPS: %4.0f (%.3f ms)", 1.f / m_flLastFrameTime, m_iLastFrameMicros / 1000.f);
+        ImGui::Text("FPS Limit: %4.2f", fps_max.getValue());
+
+        ImGui::Separator();
+        ImGui::Text("Pos: X: %9.3f / Y: %9.3f / Z: %9.3f", m_Pos.x, m_Pos.y, m_Pos.z);
+        ImGui::Text("Rot: P: %9.3f / Y: %9.3f / R: %9.3f", m_Rot.x, m_Rot.y, m_Rot.z);
+
+        ImGui::Separator();
+        ImGui::Text("%s", glGetString(GL_VENDOR));
+        ImGui::Text("%s", glGetString(GL_RENDERER));
+
+        ImGui::Separator();
+        if (m_pInputSystem->isInputGrabbed()) {
+            ImGui::Text("Input grabbed");
+        } else {
+            ImGui::TextColored(red, "Input released");
+        }
     }
+    ImGui::End();
 
-    m_pFrameConsole->printRight(FrameConsole::White, fmt::format("OpenGL {}.{}\n", GLVersion.major, GLVersion.minor));
-    m_pFrameConsole->printRight(FrameConsole::White, fmt::format("{}\n", glGetString(GL_VENDOR)));
-    m_pFrameConsole->printRight(FrameConsole::White, fmt::format("{}\n", glGetString(GL_RENDERER)));
+
 }
 
-bool App::isMouseInputEnabled() { return m_bGrabMouse; }
-
-void App::setMouseInputEnabled(bool state) {
-    if (state) {
-        SDL_SetRelativeMouseMode(SDL_TRUE);
-    } else {
-        SDL_SetRelativeMouseMode(SDL_FALSE);
-    }
-
-    m_bGrabMouse = state;
-}
+bool App::isMouseInputEnabled() { return m_pInputSystem->isInputGrabbed(); }
 
 void App::checkKeys() {
     float speed = cam_speed.getValue() * m_flLastFrameTime;
@@ -388,6 +451,29 @@ void App::checkKeys() {
         if (state[SDL_SCANCODE_D]) {
             fnMove(cos(yaw - glm::pi<float>() / 2), sin(yaw - glm::pi<float>() / 2), 0);
         }
+    }
+}
+
+void App::mouseMoved(int xrel, int yrel) {
+    if (m_DemoState != DemoState::Play) {
+        glm::vec3 rot = m_Rot;
+
+        rot.y -= xrel * m_sens.getValue();
+        rot.x += yrel * m_sens.getValue();
+
+        if (rot.x < -90.0f) {
+            rot.x = -90.0f;
+        } else if (rot.x > 90.0f) {
+            rot.x = 90.0f;
+        }
+
+        if (rot.y < 0.0f) {
+            rot.y = 360.0f + rot.y;
+        } else if (rot.y > 360.f) {
+            rot.y = rot.y - 360.0f;
+        }
+
+        m_Rot = rot;
     }
 }
 
@@ -440,6 +526,17 @@ void App::stopDemo() {
     m_DemoState = DemoState::None;
 }
 
+void App::setDrawDebugTextEnabled(bool state) { m_bDrawDebugText = state; }
+
+void App::toggleConsole() {
+    if (m_pInputSystem->isInputGrabbed()) {
+        m_pInputSystem->setGrabInput(false);
+        m_bIsConsoleVisible = true;
+    } else {
+        m_bIsConsoleVisible = !m_bIsConsoleVisible;
+    }
+}
+
 void App::loadMap(const std::string &name) {
     m_pRenderer->setLevel(nullptr);
 
@@ -466,7 +563,6 @@ void App::updateViewportSize() {
 
     m_flAspectRatio = (float)wide / tall;
     glViewport(0, 0, wide, tall);
-    m_pFrameConsole->updateViewportSize(wide, tall);
 }
 
 void fatalError(const std::string &msg) {

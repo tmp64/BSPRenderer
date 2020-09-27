@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <renderer/base_renderer.h>
 #include "demo.h"
+#include "input_system.h"
+#include "dev_console_dialog.h"
 
 class FrameConsole;
 class BaseRenderer;
@@ -41,23 +43,25 @@ public:
     /**
      * Draw text info
      */
-    void drawDebugText(const BaseRenderer::DrawStats &stats);
+    void drawDebugText();
 
     /**
      * Returns whether mouse is grabbed by the app.
      */
     bool isMouseInputEnabled();
 
-    /**
-     * Enables/disables mouse input.
-     */
-    void setMouseInputEnabled(bool state);
-
     void checkKeys();
+
+    void mouseMoved(int xrel, int yrel);
 
     void playDemo(const std::string &name);
     void recordDemo(const std::string &name);
     void stopDemo();
+
+    void setDrawDebugTextEnabled(bool state);
+    void toggleConsole();
+
+    inline bool isDrawDebugTextEnabled() { return m_bDrawDebugText; }
 
 private:
     enum class DemoState {
@@ -96,7 +100,6 @@ private:
     SDL_Window *m_pWindow = nullptr;
     SDL_GLContext m_GLContext = nullptr;
 
-    FrameConsole *m_pFrameConsole = nullptr;
     BaseRenderer *m_pRenderer = nullptr;
     bsp::Level m_LoadedLevel;
     BaseRenderer::DrawStats m_LastDrawStats;
@@ -104,7 +107,6 @@ private:
     glm::vec3 m_Rot = {0.f, 0.f, 0.f};
     float m_flAspectRatio = 1.f;
 
-    bool m_bGrabMouse = false;
     bool m_bDrawDebugText = true;
 
     DemoState m_DemoState = DemoState::None;
@@ -113,8 +115,13 @@ private:
     StatsWriter m_StatsWriter;
     std::string m_DemoName;
 
+    InputSystem *m_pInputSystem = nullptr;
+    DevConsoleDialog *m_pDevConsole = nullptr;
+    bool m_bIsConsoleVisible = true;
+
     App();
     ~App();
+    void initDearImGui();
     int run();
     void tick();
     void updateViewportSize();

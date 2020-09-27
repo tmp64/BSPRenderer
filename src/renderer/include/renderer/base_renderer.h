@@ -175,6 +175,8 @@ public:
      */
     DrawStats draw(const DrawOptions &options) noexcept;
 
+    void drawGui(const DrawStats &stats);
+
 protected:
     DrawStats m_DrawStats;
 
@@ -196,6 +198,8 @@ protected:
      * @param   surfacesIdx List of surfaces that need to be drawn.
      */
     virtual void drawWorldSurfaces(const std::vector<size_t> &surfaceIdxs) noexcept = 0;
+
+    virtual void drawChildGui(const DrawStats &stats);
 
 private:
     const DrawOptions *m_pOptions = nullptr;

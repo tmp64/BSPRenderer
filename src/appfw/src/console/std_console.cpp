@@ -23,7 +23,7 @@ void appfw::console::STDConsole::processQueue() {
     std::lock_guard<std::mutex> lock(m_pSyncData->mutex);
     if (!m_CmdQueue.empty()) {
         const std::string &cmd = m_CmdQueue.front();
-        print(ConsoleMsgInfo(ConsoleMsgType::ConInput), "> " + cmd + "\n");
+        m_pConSystem->print(ConsoleMsgInfo(ConsoleMsgType::ConInput), "> " + cmd + "\n");
         m_pConSystem->command(cmd);
         m_CmdQueue.pop();
     }

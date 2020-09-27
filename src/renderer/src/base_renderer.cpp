@@ -2,6 +2,7 @@
 #include <appfw/services.h>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
+#include <imgui.h>
 #include <renderer/base_renderer.h>
 #include <renderer/utils.h>
 
@@ -23,6 +24,14 @@ appfw::console::ConVar<int> r_fullbright("r_fullbright", 0, "Disable lighting");
 appfw::console::ConVar<bool> r_no_frustum_culling("r_no_frustum_culling", true, "Disable frustum culling");
 
 static uint8_t s_NoVis[bsp::MAX_MAP_LEAFS / 8];
+
+static const char *r_fullbright_values[] = {
+    "Lightmaps", "Fullbright", "No tex + lmaps", "Colored polys", "Basic lighting",
+};
+
+static inline const char *getFullbrightText() {
+    return r_fullbright_values[std::clamp(r_fullbright.getValue(), 0, (int)std::size(r_fullbright_values))];
+}
 
 //----------------------------------------------------------------
 // LevelNode
@@ -98,6 +107,8 @@ void BaseRenderer::setLevel(const bsp::Level *level, const std::string &mapPath)
         }
     }
 }
+
+void BaseRenderer::drawChildGui(const DrawStats &) {}
 
 void BaseRenderer::createBaseSurfaces() { 
     AFW_ASSERT(getLevelVars().baseSurfaces.empty());
@@ -315,6 +326,37 @@ BaseRenderer::DrawStats BaseRenderer::draw(const DrawOptions &options) noexcept 
     m_pOptions = nullptr;
 
     return m_DrawStats;
+}
+
+void BaseRenderer::drawGui(const DrawStats &stats) {
+    static bool open = true;
+    ImGuiWindowFlags window_flags =
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+
+    ImGui::SetNextWindowBgAlpha(0.2f);
+
+    if (ImGui::Begin("BSP Renderer", nullptr, window_flags)) {
+        ImGui::Text("World surfaces: %4llu", stats.worldSurfaces);
+
+        if (ImGui::BeginCombo("##lighting", getFullbrightText())) {
+            for (int i = 0; i < (int)std::size(r_fullbright_values); i++) {
+                if (ImGui::Selectable(r_fullbright_values[i])) {
+                    r_fullbright.setValue(i);
+                }
+                if (r_fullbright.getValue() == i) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        if (ImGui::Button("Reload shaders")) {
+            appfw::getConsole().command("r_reloadshaders");
+        }
+
+        drawChildGui(stats);
+    }
+    ImGui::End();
 }
 
 bool BaseRenderer::cullBox(glm::vec3 mins, glm::vec3 maxs) noexcept {
