@@ -111,15 +111,10 @@ void createPatches() {
     logInfo("        ... {:.3} s", timer.elapsedSeconds());
 }
 
-void calcViewFactors() {
-    logInfo("Calculating view factors...");
-
-    appfw::Timer timer;
-    timer.start();
-
+void viewFactorWorker(appfw::ThreadPool::ThreadInfo &ti) {
     size_t patchCount = g_Patches.size();
 
-    for (size_t i = 0; i < patchCount; i++) {
+    for (size_t i = g_Dispatcher.getWork(); i != g_Dispatcher.WORK_DONE; i = g_Dispatcher.getWork(), ti.iWorkDone++) {
         Patch &patch = g_Patches[i];
         float sum = 0;
 
@@ -173,6 +168,36 @@ void calcViewFactors() {
         for (auto &j : patch.viewFactors) {
             j.second *= k;
         }
+    }
+}
+
+void calcViewFactors() {
+    logInfo("Calculating view factors...");
+
+    appfw::Timer timer;
+    timer.start();
+
+    g_Dispatcher.setWorkCount(g_Patches.size());
+    g_ThreadPool.run(viewFactorWorker, 0);
+
+    double lastPercentageShown = 0;
+
+    while (!g_ThreadPool.isFinished()) {
+        double time = timer.elapsedSeconds();
+        if (time > lastPercentageShown + 2) {
+            double done = (double)g_ThreadPool.getStatus() / g_Patches.size();
+            printf("%.f%%...", done * 100.0);
+            lastPercentageShown = time;
+        }
+
+        std::this_thread::sleep_for(g_ThreadPool.POLL_DELAY);
+    }
+
+    printf("\n");
+
+    if (g_ThreadPool.getStatus() != g_Patches.size()) {
+        logError("Threading failure!");
+        abort();
     }
 
     timer.stop();

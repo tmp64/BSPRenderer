@@ -19,6 +19,7 @@ set(APPFW_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/module_info.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/platform.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/services.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/thread_pool.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/timer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/appfw/utils.h
 )
@@ -39,6 +40,7 @@ set(APPFW_PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/command_buffer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dbg.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/init.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/thread_pool.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils.cpp
 )
 

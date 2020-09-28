@@ -1,9 +1,11 @@
+#include <cstdio>
 #include <appfw/services.h>
 #include <appfw/timer.h>
+#include <appfw/binary_file.h>
 #include "main.h"
 #include "vis.h"
 #include "bsp_tree.h"
-#include <appfw/binary_file.h>
+#include "plat.h"
 
 // Decreases memory usage in half
 #define HALFBIT
@@ -27,14 +29,35 @@ void buildVisMatrix() {
     logInfo("Visibility matrix: {:5.1f} MiB", c / (1024 * 1024.0));
     s_VisMatrix.resize(c);
     
-    // TODO: Multithreading?
-    buildVisLeaves();
+    // Run vis in multiple threads
+    // Skip 0-th leaf as it's the solid leaf
+    g_Dispatcher.setWorkCount(g_Level.getLeaves().size(), 1);
+    g_ThreadPool.run(buildVisLeaves, 0);
 
+    double lastPercentageShown = 0;
+
+    while (!g_ThreadPool.isFinished()) {
+        double time = timer.elapsedSeconds(); 
+        if (time  > lastPercentageShown + 2) {
+            double done = (double)g_ThreadPool.getStatus() / g_Level.getLeaves().size();
+            printf("%.f%%...", done * 100.0);
+            lastPercentageShown = time;
+        }
+
+        std::this_thread::sleep_for(g_ThreadPool.POLL_DELAY);
+    }
+
+    printf("\n");
+
+    if (g_ThreadPool.getStatus() != g_Level.getLeaves().size() - 1) {
+        logError("Threading failure!");
+        abort();
+    }
     timer.stop();
     logInfo("        ... {:.3} s", timer.elapsedSeconds());
 }
 
-void buildVisLeaves() {
+void buildVisLeaves(appfw::ThreadPool::ThreadInfo &ti) {
     int lface, facenum;
     uint8_t pvs[(bsp::MAX_MAP_LEAFS + 7) / 8];
 
@@ -42,7 +65,7 @@ void buildVisLeaves() {
     auto &visdata = g_Level.getVisData();
     auto &marksurfaces = g_Level.getMarkSurfaces();
 
-    for (size_t i = 1; i < leaves.size(); i++) {
+    for (size_t i = g_Dispatcher.getWork(); i != g_Dispatcher.WORK_DONE; i = g_Dispatcher.getWork(), ti.iWorkDone++) {
         //
         // build a minimal BSP tree that only
         // covers areas relevent to the PVS
@@ -181,8 +204,8 @@ void testPatchToFace(size_t patchnum, int facenum, size_t bitpos) {
                 size_t bitset2 = m * g_Patches.size() + patchnum;
 #endif
 
-                s_VisMatrix[bitset1 >> 3] |= 1 << (bitset1 & 7);
-                s_VisMatrix[bitset2 >> 3] |= 1 << (bitset2 & 7);
+                plat::atomicSetBit(&s_VisMatrix[bitset1 >> 3], bitset1 & 7);
+                plat::atomicSetBit(&s_VisMatrix[bitset2 >> 3], bitset2 & 7);
             }
         }
     }

@@ -18,6 +18,9 @@ std::vector<Face> g_Faces;
 std::vector<Patch> g_Patches;
 std::vector<LightmapTexture> g_Lightmaps;
 
+appfw::ThreadPool g_ThreadPool;
+appfw::ThreadDispatcher g_Dispatcher;
+
 void loadLevel(const std::string &levelPath);
 void loadPlanes();
 void loadFaces();
@@ -36,6 +39,16 @@ int main(int, char **) {
         // TODO: Read config from cmd line args
         g_Config.flPatchSize = 32;
         g_Config.iBounceCount = 8;
+
+        // Set up thread pool
+        size_t threadCount = std::thread::hardware_concurrency();
+        if (threadCount == 0) {
+            logWarn("Failed to detect CPU thread count. Falling back to 1.");
+            threadCount = 1;
+        }
+
+        g_ThreadPool.setThreadCount(threadCount);
+        logInfo("Using {} thread(s).", threadCount);
 
         loadLevel("maps/crossfire.bsp");
         createPatches();

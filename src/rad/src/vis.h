@@ -1,8 +1,9 @@
 #ifndef VIS_H
 #define VIS_H
+#include <appfw/thread_pool.h>
 
 void buildVisMatrix();
-void buildVisLeaves();
+void buildVisLeaves(appfw::ThreadPool::ThreadInfo &ti);
 void buildVisRow(size_t patchnum, uint8_t *pvs, size_t bitpos);
 void testPatchToFace(size_t patchnum, int facenum, size_t bitpos);
 void decompressVis(const uint8_t *in, uint8_t *decompressed);

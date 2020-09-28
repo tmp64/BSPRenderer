@@ -1,9 +1,11 @@
 #ifndef MAIN_H
 #define MAIN_H
+#include <appfw/thread_pool.h>
 #include <bsp/level.h>
 #include <glm/glm.hpp>
 #include <vector>
 #include <unordered_map>
+#include <map>
 
 struct Plane : public bsp::BSPPlane {
     /**
@@ -138,7 +140,7 @@ struct Patch {
     /**
      * View factors for visible patches.
      */
-    std::unordered_map<size_t, float> viewFactors;
+    std::map<size_t, float> viewFactors;
 };
 
 struct LightmapTexture {
@@ -179,5 +181,8 @@ extern std::vector<Plane> g_Planes;
 extern std::vector<Face> g_Faces;
 extern std::vector<Patch> g_Patches;
 extern std::vector<LightmapTexture> g_Lightmaps;
+
+extern appfw::ThreadPool g_ThreadPool;
+extern appfw::ThreadDispatcher g_Dispatcher;
 
 #endif
