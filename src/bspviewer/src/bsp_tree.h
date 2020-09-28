@@ -1,6 +1,6 @@
 #ifndef BSP_TREE_H
 #define BSP_TREE_H
-#include "main.h"
+#include <bsp/level.h>
 
 class BSPTree {
 public:
@@ -12,9 +12,9 @@ public:
     };
 
     struct Node : public NodeBase {
-        const Plane *pPlane = nullptr;
+        const bsp::BSPPlane *pPlane = nullptr;
         NodeBase *pChildren[2];
-        appfw::span<Face> faces;
+        appfw::span<bsp::BSPFace> faces;
 
         Node(const bsp::BSPNode &bspNode);
     };
@@ -32,13 +32,14 @@ public:
 
     /**
      * Traces a line and returns true if hit something.
+     * WARNING: Doesn't work properly, requires further testing.
      */
     bool traceLine(glm::vec3 from, glm::vec3 to);
 
-    inline const std::vector<Leaf> &getLeaves() { return m_Leaves; }
-    inline const std::vector<Node> &getNodes() { return m_Nodes; }
+    static inline void setLevel(bsp::Level *lvl) { m_pLevel = lvl; }
 
 private:
+    static inline bsp::Level *m_pLevel = nullptr;
     std::vector<Leaf> m_Leaves;
     std::vector<Node> m_Nodes;
 

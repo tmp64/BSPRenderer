@@ -52,7 +52,7 @@ public:
      */
     static constexpr bool DRAW_LINES = false;
 
-    static PointShader m_sPointShader;
+    static inline PointShader m_sPointShader;
 
     PointRenderer() {
         appfw::BinaryReader file("test.dat");
@@ -280,9 +280,10 @@ void TexturedRenderer::drawWorldSurfaces(const std::vector<size_t> &surfaceIdxs)
 
     s_Shader.disable();
     glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
 
     if constexpr (PointRenderer::ENABLE) {
         s_pPoints->draw(getFrameVars());
     }
+
+    glDisable(GL_DEPTH_TEST);
 }

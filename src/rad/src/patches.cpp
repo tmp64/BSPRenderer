@@ -5,6 +5,7 @@
 #include "main.h"
 #include "utils.h"
 #include "bsp_tree.h"
+#include "vis.h"
 
 static std::vector<glm::vec3> s_PatchBounce;
 
@@ -44,12 +45,19 @@ void createPatches() {
         face.lmSize.x = texFloatToInt(lmFloatSize.x);
         face.lmSize.y = texFloatToInt(lmFloatSize.y);
 
-        pixelCount += (size_t)face.lmSize.x * face.lmSize.y;
-
         // Create lightmap
         g_Lightmaps[lightmapIdx] = LightmapTexture(face.lmSize);
         face.iLightmapIdx = (int)lightmapIdx;
         lightmapIdx++;
+
+        // Skies don't have patches
+        if (face.iFlags & FACE_SKY) {
+            continue;
+        }
+
+        // Allocate patches
+        face.iNumPatches = (size_t)face.lmSize.x * face.lmSize.y;
+        pixelCount += face.iNumPatches;
     }
 
     g_Patches.resize(pixelCount);
@@ -61,8 +69,15 @@ void createPatches() {
     // Create patches
     size_t patchIdx = 0;
     for (Face &face : g_Faces) {
+        if (face.iFlags & FACE_SKY) {
+            continue;
+        }
+
         LightmapTexture &lightmap = g_Lightmaps[face.iLightmapIdx];
         glm::ivec2 lmSize = face.lmSize;
+
+        AFW_ASSERT(face.iNumPatches > 0);
+        face.iFirstPatch = patchIdx;
 
         for (int y = 0; y < lmSize.y; y++) {
             for (int x = 0; x < lmSize.x; x++) {
@@ -75,14 +90,14 @@ void createPatches() {
 
                 patch.vOrigin = face.vPlaneOrigin + face.vI * planePos.x + face.vJ * planePos.y;
                 patch.vNormal = face.vNormal;
-                // patch.pPlane = face.pPlane;
+                patch.pPlane = face.pPlane;
                 patch.pLMPixel = &lightmap.getPixel({x, y});
 
                 // TODO: Remove that, read lights from a file
                 if (face.iFlags & FACE_HACK) {
                     // Blue-ish color
                     patch.finalColor = getPatchBounce(patchIdx, 0) =
-                        glm::vec3(194 / 255.f, 218 / 255.f, 252 / 255.f) * 100.f;
+                        glm::vec3(194 / 255.f, 218 / 255.f, 252 / 255.f) * 10.f;
                 }
 
                 patchIdx++;
@@ -122,13 +137,15 @@ void calcViewFactors() {
                 continue;
             }
 
-#if 0
-            // FIXME: g_BSPTree.traceLine doesn't work properly.
-            if (g_BSPTree.traceLine(patch.vOrigin, other.vOrigin)) {
+            /*if (g_BSPTree.traceLine(patch.vOrigin, other.vOrigin)) {
+                // Patches can't see each other
+                continue;
+            }*/
+
+            if (!checkVisBit(i, j)) {
                 // Patches can't see each other
                 continue;
             }
-#endif
 
             dir = glm::normalize(dir);
             float cos1 = glm::dot(patch.vNormal, dir);

@@ -15,6 +15,7 @@
 
 #include "app.h"
 #include "demo.h"
+#include "bsp_tree.h"
 
 static ConCommand quit_cmd("quit", "Exits the app", [](auto &) { App::get().quit(); });
 
@@ -158,6 +159,8 @@ App::App() {
     m_pInputSystem->bindKey(SDL_SCANCODE_F3, "toggle_debug_text");
     m_pInputSystem->bindKey(SDL_SCANCODE_F8, "dem_stop");
     m_pInputSystem->bindKey(SDL_SCANCODE_GRAVE, "toggleconsole");
+    m_pInputSystem->bindKey(m_pInputSystem->getScancodeForKey("mouse1"), "trace1");
+    m_pInputSystem->bindKey(m_pInputSystem->getScancodeForKey("mouse2"), "trace2");
 
     loadMap("crossfire");
 
@@ -546,6 +549,9 @@ void App::loadMap(const std::string &name) {
     try {
         m_LoadedLevel.loadFromFile(path);
         m_pRenderer->setLevel(&m_LoadedLevel, path);
+
+        g_BSPTree.setLevel(&m_LoadedLevel);
+        g_BSPTree.createTree();
 
         m_Pos = {0.f, 0.f, 0.f};
         m_Rot = {0.f, 0.f, 0.f};

@@ -1,8 +1,28 @@
 #include <appfw/services.h>
 #include "bsp_tree.h"
-#include "utils.h"
+#include "app.h"
 
 BSPTree g_BSPTree;
+
+static glm::vec3 s_Points[2];
+
+static ConCommand cmd_trace1("trace1", "", [](const appfw::ParsedCommand &) {
+    s_Points[0] = App::get().getCameraPos();
+    logInfo("Trace: point 1 ({}; {}; {})", s_Points[1].x, s_Points[1].y, s_Points[1].z);
+});
+
+static ConCommand cmd_trace2("trace2", "", [](const appfw::ParsedCommand &) {
+    s_Points[1] = App::get().getCameraPos();
+    logInfo("Trace: point 2 ({}; {}; {})", s_Points[1].x, s_Points[1].y, s_Points[1].z);
+
+    logInfo("Trace: distance {}", glm::length(s_Points[1] - s_Points[0]));
+    bool traceRes = g_BSPTree.traceLine(s_Points[0], s_Points[1]);
+    if (traceRes) {
+        logError("HIT");
+    } else {
+        logWarn("CLEAR");
+    }
+});
 
 static inline float planeDiff(glm::vec3 point, const bsp::BSPPlane &plane) {
     float res = 0;
@@ -26,22 +46,24 @@ static inline float planeDiff(glm::vec3 point, const bsp::BSPPlane &plane) {
 }
 
 BSPTree::Node::Node(const bsp::BSPNode &bspNode) {
-    pPlane = &g_Planes.at(bspNode.iPlane);
+    pPlane = &BSPTree::m_pLevel->getPlanes().at(bspNode.iPlane);
     pChildren[0] = pChildren[1] = nullptr;
-    faces = appfw::span(g_Faces).subspan(bspNode.firstFace, bspNode.nFaces);
+    //faces = appfw::span(BSPTree::m_pLevel->getFaces()).subspan(bspNode.firstFace, bspNode.nFaces);
 }
 
 BSPTree::Leaf::Leaf(const bsp::BSPLeaf &bspLeaf) {
     AFW_ASSERT(bspLeaf.nContents < 0);
     nContents = bspLeaf.nContents;
 
-    if (bspLeaf.nVisOffset != -1 && !g_Level.getVisData().empty()) {
+    /*if (bspLeaf.nVisOffset != -1 && !g_Level.getVisData().empty()) {
         pCompressedVis = &g_Level.getVisData().at(bspLeaf.nVisOffset);
-    }
+    }*/
 }
 
 void BSPTree::createTree() {
     logDebug("Loading BSP tree");
+    m_Leaves.clear();
+    m_Nodes.clear();
     createLeaves();
     createNodes();
 }
@@ -52,7 +74,7 @@ bool BSPTree::traceLine(glm::vec3 from, glm::vec3 to) {
 
 void BSPTree::createLeaves() {
     AFW_ASSERT(m_Leaves.empty());
-    auto &lvlLeaves = g_Level.getLeaves();
+    auto &lvlLeaves = BSPTree::m_pLevel->getLeaves();
 
     m_Leaves.reserve(lvlLeaves.size());
 
@@ -63,7 +85,7 @@ void BSPTree::createLeaves() {
 
 void BSPTree::createNodes() {
     AFW_ASSERT(m_Nodes.empty());
-    auto &lvlNodes = g_Level.getNodes();
+    auto &lvlNodes = BSPTree::m_pLevel->getNodes();
 
     m_Nodes.reserve(lvlNodes.size());
 
@@ -113,7 +135,29 @@ bool BSPTree::recursiveTraceLine(NodeBase *pNode, const glm::vec3 &start, const 
 
     Node *pRealNode = static_cast<Node *>(pNode);
 
+#if 0
+    // Code from VDC
+    // Checks incorrectly
+    int fromSide = (planeDiff(from, *pRealNode->pPlane) >= 0.0f) ? 0 : 1;
+    int toSide = (planeDiff(from, *pRealNode->pPlane) >= 0.0f) ? 0 : 1;
+
+    if (fromSide == toSide) {
+        return recursiveTraceLine(pRealNode->pChildren[fromSide], from, to);
+    }
+
+    bool res1 = recursiveTraceLine(pRealNode->pChildren[fromSide], from, to);
+    bool res2 = recursiveTraceLine(pRealNode->pChildren[toSide], from, to);
+
+    if (res1 || res2) {
+        return true;
+    } else {
+        return false;
+    }
+#endif
+
+#if 1
     // Code from qrad/trace.c TestLine_r
+    constexpr float ON_EPSILON = 0.01f;
     float front, back;
     switch (pRealNode->pPlane->nType) {
     case bsp::PlaneType::PlaneX:
@@ -157,4 +201,5 @@ bool BSPTree::recursiveTraceLine(NodeBase *pNode, const glm::vec3 &start, const 
     if (r)
         return r;
     return recursiveTraceLine(pRealNode->pChildren[!side], mid, stop);
+#endif
 }

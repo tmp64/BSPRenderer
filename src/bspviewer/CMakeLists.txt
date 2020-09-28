@@ -2,6 +2,8 @@ add_executable(bspviewer
 	CMakeLists.txt
 	src/app.cpp
 	src/app.h
+	src/bsp_tree.cpp
+	src/bsp_tree.h
 	src/demo.cpp
 	src/demo.h
 	src/dev_console_dialog.cpp

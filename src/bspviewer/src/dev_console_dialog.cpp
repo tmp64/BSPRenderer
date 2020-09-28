@@ -315,7 +315,7 @@ void DevConsoleDialog::onAdd(appfw::console::ConsoleSystem &conSystem) {
     m_pConSystem = &conSystem;
 }
 
-void DevConsoleDialog::onRemove(appfw::console::ConsoleSystem &conSystem) {
+void DevConsoleDialog::onRemove([[maybe_unused]] appfw::console::ConsoleSystem &conSystem) {
     AFW_ASSERT(m_pConSystem == &conSystem);
     m_pConSystem = nullptr;
 }

@@ -6,6 +6,8 @@
 #include "utils.h"
 #include "patches.h"
 #include "bsp_tree.h"
+#include "vis.h"
+#include "plat.h"
 
 std::string g_LevelPath;
 bsp::Level g_Level;
@@ -32,11 +34,12 @@ int main(int, char **) {
         timer.start();
 
         // TODO: Read config from cmd line args
-        g_Config.flPatchSize = 16;
+        g_Config.flPatchSize = 32;
         g_Config.iBounceCount = 8;
 
-        loadLevel("maps/test2.bsp");
+        loadLevel("maps/crossfire.bsp");
         createPatches();
+        buildVisMatrix();
         calcViewFactors();
         bounceLight();
         applyColors();

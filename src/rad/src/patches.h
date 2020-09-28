@@ -34,6 +34,11 @@ void createPatches();
 void calcViewFactors();
 
 /**
+ * Calculates view factors between patches in O(n^2).
+ */
+void calcViewFactors2();
+
+/**
  * Bounces light around.
  */
 void bounceLight();

@@ -167,11 +167,11 @@ void InputSystem::bindKey(SDL_Scancode key, const appfw::ParsedCommand &cmd) {
 
 void InputSystem::createScancodeMap() {
     // Mouse buttons
-    for (int i = 0; i < MAX_MOUSE_BUTTONS; i++) {
-        char buf[16];
-        snprintf(buf, sizeof(buf), "mouse%d", i + 1);
-        m_ScancodeMap[buf] = (SDL_Scancode)(-(SDL_BUTTON_LEFT + i));
-    }
+    m_ScancodeMap["mouse1"] = (SDL_Scancode)(-SDL_BUTTON_LEFT);
+    m_ScancodeMap["mouse2"] = (SDL_Scancode)(-SDL_BUTTON_RIGHT);
+    m_ScancodeMap["mouse3"] = (SDL_Scancode)(-SDL_BUTTON_MIDDLE);
+    m_ScancodeMap["mouse4"] = (SDL_Scancode)(-SDL_BUTTON_X1);
+    m_ScancodeMap["mouse5"] = (SDL_Scancode)(-SDL_BUTTON_X2);
 
     // Individual keys
     m_ScancodeMap["return"] = SDL_SCANCODE_RETURN;

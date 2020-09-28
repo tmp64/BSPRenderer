@@ -23,7 +23,16 @@ appfw::console::ConVar<bool> r_novis("r_novis", false, "Ignore visibility data")
 appfw::console::ConVar<int> r_fullbright("r_fullbright", 0, "Disable lighting");
 appfw::console::ConVar<bool> r_no_frustum_culling("r_no_frustum_culling", true, "Disable frustum culling");
 
+static BaseRenderer *s_pInstance = nullptr;
 static uint8_t s_NoVis[bsp::MAX_MAP_LEAFS / 8];
+
+static ConCommand cmd_r_reloadlm("r_reloadlm", "Reloads lightmaps", [](const appfw::ParsedCommand &) {
+    if (!s_pInstance->isLevelLoaded()) {
+        logError("No level loaded.");
+        return;
+    }
+    s_pInstance->reloadLightmap();
+});
 
 static const char *r_fullbright_values[] = {
     "Lightmaps", "Fullbright", "No tex + lmaps", "Colored polys", "Basic lighting",
@@ -77,8 +86,15 @@ static inline float planeDiff(glm::vec3 point, const bsp::BSPPlane &plane) {
 }
 
 BaseRenderer::BaseRenderer() {
+    AFW_ASSERT(!s_pInstance);
+    s_pInstance = this;
     memset(getFrameVars().decompressedVis.data(), 0, getFrameVars().decompressedVis.size());
     memset(s_NoVis, 0xFF, sizeof(s_NoVis));
+}
+
+BaseRenderer::~BaseRenderer() {
+    AFW_ASSERT(s_pInstance == this);
+    s_pInstance = nullptr;
 }
 
 //----------------------------------------------------------------
@@ -86,6 +102,7 @@ BaseRenderer::BaseRenderer() {
 //----------------------------------------------------------------
 void BaseRenderer::setLevel(const bsp::Level *level, const std::string &mapPath) {
     if (m_pLevel) {
+        cleanUpLightmaps();
         destroySurfaces();
         getFrameVars() = FrameVars();
         getLevelVars() = LevelVars();
@@ -95,10 +112,11 @@ void BaseRenderer::setLevel(const bsp::Level *level, const std::string &mapPath)
 
     if (level) {
         try {
+            getLevelVars().lightmapPath = mapPath + ".lm";
             createBaseSurfaces();
             createLeaves();
             createNodes();
-            loadLightmapFile(mapPath + ".lm");
+            loadLightmapFile(getLevelVars().lightmapPath);
             createSurfaces();
         } catch (...) {
             // Clean up everything created
@@ -106,6 +124,11 @@ void BaseRenderer::setLevel(const bsp::Level *level, const std::string &mapPath)
             throw;
         }
     }
+}
+
+void BaseRenderer::reloadLightmap() {
+    AFW_ASSERT(m_pLevel);
+    loadLightmapFile(getLevelVars().lightmapPath);
 }
 
 void BaseRenderer::drawChildGui(const DrawStats &) {}
@@ -231,6 +254,8 @@ void BaseRenderer::updateNodeParents(LevelNodeBase *node, LevelNodeBase *parent)
 
 void BaseRenderer::loadLightmapFile(const std::string &filepath) {
     try {
+        cleanUpLightmaps();
+
         constexpr uint32_t LM_MAGIC = ('1' << 24) | ('0' << 16) | ('M' << 8) | ('L' << 0);
 
         struct LightmapFileHeader {
@@ -299,6 +324,15 @@ void BaseRenderer::loadLightmapFile(const std::string &filepath) {
     }
 }
 
+void BaseRenderer::cleanUpLightmaps() {
+    for (auto &i : m_LevelVars.baseSurfaces) {
+        if (i.nLightmapTex != 0) {
+            glDeleteTextures(1, &i.nLightmapTex);
+            i.nLightmapTex = 0;
+        }
+    }
+}
+
 //----------------------------------------------------------------
 // Rendering
 //----------------------------------------------------------------
@@ -352,6 +386,10 @@ void BaseRenderer::drawGui(const DrawStats &stats) {
 
         if (ImGui::Button("Reload shaders")) {
             appfw::getConsole().command("r_reloadshaders");
+        }
+
+        if (ImGui::Button("Reload lightmap")) {
+            appfw::getConsole().command("r_reloadlm");
         }
 
         drawChildGui(stats);

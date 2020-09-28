@@ -84,6 +84,16 @@ struct Face : public bsp::BSPFace {
     float flPatchSize = 0;
 
     /**
+     * Index of first patch
+     */
+    size_t iFirstPatch = 0;
+
+    /**
+     * Number of patches of this face
+     */
+    size_t iNumPatches = 0;
+
+    /**
      * Index of the lightmap in g_Lightmaps.
      */
     int iLightmapIdx = -1;
@@ -113,7 +123,7 @@ struct Patch {
     /**
      * Plane in which patch is located.
      */
-    //const Plane *pPlane = nullptr;
+    const Plane *pPlane = nullptr;
 
     /**
      * Final color of the patch.

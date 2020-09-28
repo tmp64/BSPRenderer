@@ -63,6 +63,8 @@ public:
 
     inline bool isDrawDebugTextEnabled() { return m_bDrawDebugText; }
 
+    inline glm::vec3 getCameraPos() { return m_Pos; }
+
 private:
     enum class DemoState {
         None = 0,

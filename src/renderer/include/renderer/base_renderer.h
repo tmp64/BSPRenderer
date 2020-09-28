@@ -107,6 +107,7 @@ public:
     };
 
     struct LevelVars {
+        std::string lightmapPath;
         std::vector<LevelLeaf> leaves;
         std::vector<LevelNode> nodes;
         std::vector<LevelSurface> baseSurfaces;
@@ -145,7 +146,7 @@ public:
     };
 
     BaseRenderer();
-    virtual ~BaseRenderer() = default;
+    virtual ~BaseRenderer();
 
     /**
      * Whether or not level is loaded.
@@ -167,6 +168,11 @@ public:
      * @param   mapPath Path to .bsp file (used for lightmap loading)
      */
     void setLevel(const bsp::Level *level, const std::string &mapPath = "");
+
+    /**
+     * Reloads lightmap.
+     */
+    void reloadLightmap();
 
     /**
      * Draws the world onto the screen.
@@ -223,6 +229,7 @@ private:
     void createNodes();
     void updateNodeParents(LevelNodeBase *node, LevelNodeBase *parent);
     void loadLightmapFile(const std::string &filepath);
+    void cleanUpLightmaps();
 
     //----------------------------------------------------------------
     // Visibility calculations
