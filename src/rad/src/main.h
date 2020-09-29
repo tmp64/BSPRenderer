@@ -106,43 +106,6 @@ struct Face : public bsp::BSPFace {
     glm::ivec2 lmSize;
 };
 
-struct Patch {
-    /**
-     * Length of a side of the square.
-     */
-    float flSize = 0;
-
-    /**
-     * Center point of the square in world-space.
-     */
-    glm::vec3 vOrigin;
-
-    /**
-     * Normal vector. Points away from front side.
-     */
-    glm::vec3 vNormal;
-
-    /**
-     * Plane in which patch is located.
-     */
-    const Plane *pPlane = nullptr;
-
-    /**
-     * Final color of the patch.
-     */
-    glm::vec3 finalColor = {0, 0, 0};
-
-    /**
-     * Pointer to lightmap pixel.
-     */
-    glm::vec3 *pLMPixel = nullptr;
-
-    /**
-     * View factors for visible patches.
-     */
-    std::map<size_t, float> viewFactors;
-};
-
 struct LightmapTexture {
     LightmapTexture() = default;
 
@@ -179,7 +142,6 @@ extern RADConfig g_Config;
 
 extern std::vector<Plane> g_Planes;
 extern std::vector<Face> g_Faces;
-extern std::vector<Patch> g_Patches;
 extern std::vector<LightmapTexture> g_Lightmaps;
 
 extern appfw::ThreadPool g_ThreadPool;

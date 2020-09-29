@@ -4,6 +4,8 @@ add_executable(rad
 	src/bsp_tree.h
 	src/main.cpp
 	src/main.h
+	src/patch_list.cpp
+	src/patch_list.h
 	src/patches.cpp
 	src/patches.h
 	src/plat_win.cpp

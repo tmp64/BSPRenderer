@@ -8,6 +8,7 @@
 #include "bsp_tree.h"
 #include "vis.h"
 #include "plat.h"
+#include "patch_list.h"
 
 std::string g_LevelPath;
 bsp::Level g_Level;
@@ -15,7 +16,6 @@ RADConfig g_Config;
 
 std::vector<Plane> g_Planes;
 std::vector<Face> g_Faces;
-std::vector<Patch> g_Patches;
 std::vector<LightmapTexture> g_Lightmaps;
 
 appfw::ThreadPool g_ThreadPool;
@@ -241,8 +241,8 @@ void loadFaces() {
 void applyColors() {
     logInfo("Applying colors...");
     
-    for (Patch &p : g_Patches) {
-        *p.pLMPixel = p.finalColor;
+    for (PatchRef p : g_Patches) {
+        *p.getLMPixel() = p.getFinalColor();
     }
 }
 

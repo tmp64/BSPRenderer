@@ -6,6 +6,7 @@
 #include "vis.h"
 #include "bsp_tree.h"
 #include "plat.h"
+#include "patch_list.h"
 
 // Decreases memory usage in half
 #define HALFBIT
@@ -176,16 +177,16 @@ Sets vis bits for all patches in the face
 ==============
 */
 void testPatchToFace(size_t patchnum, int facenum, size_t bitpos) {
-    Patch &patch = g_Patches[patchnum];
+    PatchRef patch(patchnum);
 
     for (size_t i = 0; i < g_Faces[facenum].iNumPatches; i++) {
         size_t m = g_Faces[facenum].iFirstPatch + i;
-        Patch &patch2 = g_Patches[m];
+        PatchRef patch2(m);
 
         // check vis between patch and patch2
         // if bit has not already been set
         // and p2 is visible from p1
-        if (m > patchnum && !g_BSPTree.traceLine(patch.vOrigin, patch2.vOrigin)) {
+        if (m > patchnum && !g_BSPTree.traceLine(patch.getOrigin(), patch2.getOrigin())) {
 
             // patchnum can see patch m
             size_t bitset = bitpos + m;

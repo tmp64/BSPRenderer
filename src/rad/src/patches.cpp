@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "bsp_tree.h"
 #include "vis.h"
+#include "patch_list.h"
 
 static std::vector<glm::vec3> s_PatchBounce;
 
@@ -60,11 +61,11 @@ void createPatches() {
         pixelCount += face.iNumPatches;
     }
 
-    g_Patches.resize(pixelCount);
+    g_Patches.allocate(pixelCount);
     s_PatchBounce.resize(pixelCount * (g_Config.iBounceCount + 1));
     logInfo("Total lightmap size: {:.3} megapixels ({:.3} MiB)", pixelCount / 1000000.0,
             pixelCount * sizeof(glm::vec3) / 1024.0 / 1024.0);
-    logInfo("Memory used by patches: {:.3} MiB", pixelCount * sizeof(Patch) / 1024.0 / 1024.0);
+    logInfo("Memory used by patches: {:.3} MiB", pixelCount * g_Patches.getPatchMemoryUsage() / 1024.0 / 1024.0);
 
     // Create patches
     size_t patchIdx = 0;
@@ -81,22 +82,22 @@ void createPatches() {
 
         for (int y = 0; y < lmSize.y; y++) {
             for (int x = 0; x < lmSize.x; x++) {
-                Patch &patch = g_Patches[patchIdx];
-                patch.flSize = face.flPatchSize;
+                PatchRef patch(patchIdx);
+                patch.getSize() = face.flPatchSize;
 
                 glm::vec2 planePos = {face.planeMaxBounds.x * x / lmSize.x, face.planeMaxBounds.y * y / lmSize.y};
-                planePos.x += patch.flSize * 0.5f;
-                planePos.y += patch.flSize * 0.5f;
+                planePos.x += patch.getSize() * 0.5f;
+                planePos.y += patch.getSize() * 0.5f;
 
-                patch.vOrigin = face.vPlaneOrigin + face.vI * planePos.x + face.vJ * planePos.y;
-                patch.vNormal = face.vNormal;
-                patch.pPlane = face.pPlane;
-                patch.pLMPixel = &lightmap.getPixel({x, y});
+                patch.getOrigin() = face.vPlaneOrigin + face.vI * planePos.x + face.vJ * planePos.y;
+                patch.getNormal() = face.vNormal;
+                patch.getPlane() = face.pPlane;
+                patch.getLMPixel() = &lightmap.getPixel({x, y});
 
                 // TODO: Remove that, read lights from a file
                 if (face.iFlags & FACE_HACK) {
                     // Blue-ish color
-                    patch.finalColor = getPatchBounce(patchIdx, 0) =
+                    patch.getFinalColor() = getPatchBounce(patchIdx, 0) =
                         glm::vec3(194 / 255.f, 218 / 255.f, 252 / 255.f) * 10.f;
                 }
 
@@ -115,7 +116,7 @@ void viewFactorWorker(appfw::ThreadPool::ThreadInfo &ti) {
     size_t patchCount = g_Patches.size();
 
     for (size_t i = g_Dispatcher.getWork(); i != g_Dispatcher.WORK_DONE; i = g_Dispatcher.getWork(), ti.iWorkDone++) {
-        Patch &patch = g_Patches[i];
+        PatchRef patch(i);
         float sum = 0;
 
         for (size_t j = 0; j < patchCount; j++) {
@@ -123,9 +124,9 @@ void viewFactorWorker(appfw::ThreadPool::ThreadInfo &ti) {
                 continue;
             }
 
-            Patch &other = g_Patches[j];
+            PatchRef other(j);
 
-            glm::vec3 dir = other.vOrigin - patch.vOrigin;
+            glm::vec3 dir = other.getOrigin() - patch.getOrigin();
             float dist = glm::length(dir);
 
             if (floatEquals(dist, 0)) {
@@ -143,8 +144,8 @@ void viewFactorWorker(appfw::ThreadPool::ThreadInfo &ti) {
             }
 
             dir = glm::normalize(dir);
-            float cos1 = glm::dot(patch.vNormal, dir);
-            float cos2 = -glm::dot(other.vNormal, dir);
+            float cos1 = glm::dot(patch.getNormal(), dir);
+            float cos2 = -glm::dot(other.getNormal(), dir);
 
             if (cos1 < 0 || cos2 < 0) {
                 continue;
@@ -159,13 +160,13 @@ void viewFactorWorker(appfw::ThreadPool::ThreadInfo &ti) {
                 continue;
             }
 
-            patch.viewFactors.insert({j, viewFactor});
+            patch.getViewFactors().insert({j, viewFactor});
             sum += viewFactor;
         }
 
         // Normalize view factors
         float k = 1 / sum;
-        for (auto &j : patch.viewFactors) {
+        for (auto &j : patch.getViewFactors()) {
             j.second *= k;
         }
     }
@@ -212,17 +213,17 @@ void bounceLight() {
     for (size_t bounce = 1; bounce <= g_Config.iBounceCount; bounce++) {
         logInfo("Bounce {}", bounce);
         for (size_t i = 0; i < patchCount; i++) {
-            Patch &patch = g_Patches[i];
+            PatchRef patch(i);
 
             float p = 0.9f;
             glm::vec3 sum = {0, 0, 0};
 
-            for (auto &j : patch.viewFactors) {
+            for (auto &j : patch.getViewFactors()) {
                 sum += getPatchBounce(j.first, bounce - 1) * j.second;
             }
 
             getPatchBounce(i, bounce) = sum * p;
-            g_Patches[i].finalColor += getPatchBounce(i, bounce);
+            patch.getFinalColor() += getPatchBounce(i, bounce);
         }
     }
 }
