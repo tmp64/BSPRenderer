@@ -137,6 +137,8 @@ struct LightmapTexture {
 struct RADConfig {
     float flPatchSize = 0;
     size_t iBounceCount = 0;
+    float flReflectivity = 0;
+    float flThatLightBrightness = 0;
 };
 
 extern bsp::Level g_Level;

@@ -101,7 +101,7 @@ void createPatches() {
                 if (face.iFlags & FACE_HACK) {
                     // Blue-ish color
                     patch.getFinalColor() = getPatchBounce(patchIdx, 0) =
-                        glm::vec3(194 / 255.f, 218 / 255.f, 252 / 255.f) * 10.f;
+                        glm::vec3(194 / 255.f, 218 / 255.f, 252 / 255.f) * g_Config.flThatLightBrightness;
                 }
 
                 patchIdx++;
@@ -250,6 +250,7 @@ void calcViewFactors() {
 void bounceLight() {
     logInfo("Bouncing light...");
 
+    float p = g_Config.flReflectivity;
     size_t patchCount = g_Patches.size();
 
     for (size_t bounce = 1; bounce <= g_Config.iBounceCount; bounce++) {
@@ -257,7 +258,6 @@ void bounceLight() {
         for (size_t i = 0; i < patchCount; i++) {
             PatchRef patch(i);
 
-            float p = 0.9f;
             glm::vec3 sum = {0, 0, 0};
 
             for (auto &j : patch.getViewFactors().subspan(0, s_ViewFactorCount[i])) {

@@ -38,7 +38,9 @@ int main(int, char **) {
 
         // TODO: Read config from cmd line args
         g_Config.flPatchSize = 32;
-        g_Config.iBounceCount = 8;
+        g_Config.iBounceCount = 32;
+        g_Config.flReflectivity = 0.6f;
+        g_Config.flThatLightBrightness = 50.0f;
 
         // Set up thread pool
         size_t threadCount = std::thread::hardware_concurrency();
