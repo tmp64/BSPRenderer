@@ -83,6 +83,13 @@ public:
 };
 
 template <>
+class ShaderUniform<float> : BaseShader::UniformBase {
+public:
+    inline ShaderUniform(BaseShader *pShader, const char *name) : BaseShader::UniformBase(pShader, name) {}
+    inline void set(float val) { glUniform1f(m_nLocation, val); }
+};
+
+template <>
 class ShaderUniform<glm::vec3> : BaseShader::UniformBase {
 public:
     inline ShaderUniform(BaseShader *pShader, const char *name) : BaseShader::UniformBase(pShader, name) {}

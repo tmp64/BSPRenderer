@@ -22,6 +22,8 @@ appfw::console::ConVar<bool> r_lockpvs("r_lockpvs", false, "Lock current PVS to 
 appfw::console::ConVar<bool> r_novis("r_novis", false, "Ignore visibility data");
 appfw::console::ConVar<int> r_fullbright("r_fullbright", 0, "Disable lighting");
 appfw::console::ConVar<bool> r_no_frustum_culling("r_no_frustum_culling", true, "Disable frustum culling");
+appfw::console::ConVar<float> r_gamma("r_gamma", 0.4f, "Gamma");
+appfw::console::ConVar<float> r_texgamma("r_texgamma", 2.2f, "Texture gamma");
 
 static BaseRenderer *s_pInstance = nullptr;
 static uint8_t s_NoVis[bsp::MAX_MAP_LEAFS / 8];

@@ -98,7 +98,9 @@ TexturedRenderer::Shader::Shader()
     , m_Color(this, "uColor")
     , m_FullBright(this, "uFullBright")
     , m_Texture(this, "uTexture")
-    , m_Lightmap(this, "uLightmap") {}
+    , m_Lightmap(this, "uLightmap")
+    , m_Gamma(this, "uGamma")
+    , m_TexGamma(this, "uTexGamma") {}
 
 void TexturedRenderer::Shader::create() {
     createProgram();
@@ -113,6 +115,10 @@ void TexturedRenderer::Shader::loadMatrices(const BaseRenderer::FrameVars &vars)
     m_FullBright.set(r_fullbright.getValue());
     m_Texture.set(0);
     m_Lightmap.set(1);
+    //m_Gamma.set(r_gamma.getValue());
+    //m_TexGamma.set(r_texgamma.getValue());
+    m_Gamma.set(2.2f / r_texgamma.getValue());
+    m_TexGamma.set(r_texgamma.getValue() * r_gamma.getValue());
 }
 
 void TexturedRenderer::Shader::setColor(const glm::vec3 &c) { m_Color.set(c); }

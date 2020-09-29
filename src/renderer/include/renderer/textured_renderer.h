@@ -19,6 +19,8 @@ public:
         ShaderUniform<int> m_FullBright;
         ShaderUniform<int> m_Texture;
         ShaderUniform<int> m_Lightmap;
+        ShaderUniform<float> m_Gamma;
+        ShaderUniform<float> m_TexGamma;
     };
 
     struct Vertex {

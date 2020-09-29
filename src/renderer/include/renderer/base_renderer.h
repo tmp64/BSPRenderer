@@ -9,6 +9,8 @@
 extern appfw::console::ConVar<int> r_cull;
 extern appfw::console::ConVar<bool> r_drawworld;
 extern appfw::console::ConVar<int> r_fullbright;
+extern appfw::console::ConVar<float> r_gamma;
+extern appfw::console::ConVar<float> r_texgamma;
 
 constexpr float BACKFACE_EPSILON = 0.01f;
 

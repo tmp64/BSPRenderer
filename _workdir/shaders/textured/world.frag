@@ -20,10 +20,14 @@ uniform vec3 uColor;
 uniform sampler2D uTexture;
 uniform sampler2D uLightmap;
 uniform int uFullBright;
+uniform float uGamma;
+uniform float uTexGamma;
 
 void main(void) {
 	vec3 objectColor = texture(uTexture, gTexCoord).xyz;
 	vec3 ligtmapColor = texture(uLightmap, gLMTexCoord).xyz;
+	
+	objectColor.rgb = pow(objectColor.rgb, vec3(uTexGamma));
 	
 	if (uFullBright == 1) {
 		// Disable lighting
@@ -61,4 +65,7 @@ void main(void) {
 	}
 	
 	outColor = vec4(objectColor.r * ligtmapColor.r, objectColor.g * ligtmapColor.g, objectColor.b * ligtmapColor.b, 1.0);
+	
+	// Apply gamma correction
+	outColor.rgb = pow(outColor.rgb, vec3(1.0/uGamma));
 }
