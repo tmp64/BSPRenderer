@@ -92,12 +92,13 @@ void buildVisLeaves(appfw::ThreadPool::ThreadInfo &ti) {
 
             for (int patchIdx = 0; patchIdx < face.iNumPatches; patchIdx++) {
                 size_t patchnum = face.iFirstPatch + patchIdx;
-                Patch &patch = g_Patches[patchnum];
 
                 // FIXME: Doesn't work properly. Discards way too many patches.
-                //const bsp::BSPLeaf *leaf = pointInLeaf(patch.vOrigin);
-                //if (leaf != srcleaf)
-                //    continue;
+                // Patch &patch = g_Patches[patchnum];
+                // const bsp::BSPLeaf *leaf = pointInLeaf(patch.vOrigin);
+                // if (leaf != srcleaf) {
+                //     continue;
+                // }
 
 #ifdef HALFBIT
                 size_t bitpos = patchnum * g_Patches.size() - (patchnum * (patchnum + 1)) / 2;
@@ -176,37 +177,19 @@ Sets vis bits for all patches in the face
 */
 void testPatchToFace(size_t patchnum, int facenum, size_t bitpos) {
     Patch &patch = g_Patches[patchnum];
-    Patch &firstFacePatch = g_Patches[g_Faces[facenum].iFirstPatch];
 
-    // if emitter is behind that face plane, skip all patches
+    for (size_t i = 0; i < g_Faces[facenum].iNumPatches; i++) {
+        size_t m = g_Faces[facenum].iFirstPatch + i;
+        Patch &patch2 = g_Patches[m];
 
-    if (/* glm::dot(patch.vOrigin, firstFacePatch.vNormal) > firstFacePatch.pPlane->fDist */ true) {
-        // we need to do a real test
-        for (size_t i = 0; i < g_Faces[facenum].iNumPatches; i++) {
-            size_t m = g_Faces[facenum].iFirstPatch + i;
-            Patch &patch2 = g_Patches[m];
+        // check vis between patch and patch2
+        // if bit has not already been set
+        // and p2 is visible from p1
+        if (m > patchnum && !g_BSPTree.traceLine(patch.vOrigin, patch2.vOrigin)) {
 
-            // check vis between patch and patch2
-            // if bit has not already been set
-            //  && v2 is not behind light plane
-            //  && v2 is visible from v1
-            if (/* m > patchnum && */ /*glm::dot(patch2.vOrigin, patch.vNormal) > patch.pPlane->fDist &&*/
-                !g_BSPTree.traceLine(patch.vOrigin + patch.vNormal * 0.1f, patch2.vOrigin + patch2.vNormal * 0.1f)) {
-
-                // patchnum can see patch m
-                //size_t bitset = bitpos + m;
-
-#ifdef HALFBIT
-                size_t bitset1 = patchnum * g_Patches.size() - (patchnum * (patchnum + 1)) / 2 + m;
-                size_t bitset2 = m * g_Patches.size() - (m * (m + 1)) / 2 + patchnum;
-#else
-                size_t bitset1 = patchnum * g_Patches.size() + m;
-                size_t bitset2 = m * g_Patches.size() + patchnum;
-#endif
-
-                plat::atomicSetBit(&s_VisMatrix[bitset1 >> 3], bitset1 & 7);
-                plat::atomicSetBit(&s_VisMatrix[bitset2 >> 3], bitset2 & 7);
-            }
+            // patchnum can see patch m
+            size_t bitset = bitpos + m;
+            plat::atomicSetBit(&s_VisMatrix[bitset >> 3], bitset & 7);
         }
     }
 }
