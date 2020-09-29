@@ -87,7 +87,7 @@ private:
     std::vector<const Plane *> m_pPlane;
     std::vector<glm::vec3> m_FinalColor;
     std::vector<glm::vec3 *> m_pLMPixel;
-    std::vector<std::map<size_t, float>> m_ViewFactors;
+    std::vector<appfw::span<ViewFactor>> m_ViewFactors;
 
     friend class PatchRef;
 };
@@ -131,7 +131,7 @@ public:
     /**
      * View factors for visible patches.
      */
-    inline std::map<size_t, float> &getViewFactors() { return g_Patches.m_ViewFactors[m_iIndex]; }
+    inline appfw::span<ViewFactor> &getViewFactors() { return g_Patches.m_ViewFactors[m_iIndex]; }
 
     inline PatchRef &operator++() {
         ++m_iIndex;

@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <map>
 
+using ViewFactor = std::tuple<size_t, float>;
+
 struct Plane : public bsp::BSPPlane {
     /**
      * Y axis for lightmap and patches.

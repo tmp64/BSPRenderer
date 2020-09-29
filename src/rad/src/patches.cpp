@@ -9,6 +9,8 @@
 #include "patch_list.h"
 
 static std::vector<glm::vec3> s_PatchBounce;
+static std::vector<ViewFactor> s_ViewFactors;
+static std::vector<size_t> s_ViewFactorCount;
 
 static inline glm::vec3 &getPatchBounce(size_t patch, size_t bounce) {
     AFW_ASSERT(patch < g_Patches.size() && bounce <= g_Config.iBounceCount);
@@ -63,6 +65,7 @@ void createPatches() {
 
     g_Patches.allocate(pixelCount);
     s_PatchBounce.resize(pixelCount * (g_Config.iBounceCount + 1));
+    logInfo("Patch count: {}", pixelCount);
     logInfo("Total lightmap size: {:.3} megapixels ({:.3} MiB)", pixelCount / 1000000.0,
             pixelCount * sizeof(glm::vec3) / 1024.0 / 1024.0);
     logInfo("Memory used by patches: {:.3} MiB", pixelCount * g_Patches.getPatchMemoryUsage() / 1024.0 / 1024.0);
@@ -118,6 +121,7 @@ void viewFactorWorker(appfw::ThreadPool::ThreadInfo &ti) {
     for (size_t i = g_Dispatcher.getWork(); i != g_Dispatcher.WORK_DONE; i = g_Dispatcher.getWork(), ti.iWorkDone++) {
         PatchRef patch(i);
         float sum = 0;
+        size_t viewFactorIdx = 0;
 
         for (size_t j = 0; j < patchCount; j++) {
             if (i == j) {
@@ -160,19 +164,57 @@ void viewFactorWorker(appfw::ThreadPool::ThreadInfo &ti) {
                 continue;
             }
 
-            patch.getViewFactors().insert({j, viewFactor});
+            patch.getViewFactors()[viewFactorIdx] = {j, viewFactor};
             sum += viewFactor;
+            viewFactorIdx++;
         }
+
+        s_ViewFactorCount[i] = viewFactorIdx;
 
         // Normalize view factors
         float k = 1 / sum;
-        for (auto &j : patch.getViewFactors()) {
-            j.second *= k;
+        for (size_t j = 0; j < viewFactorIdx; j++) {
+            std::get<1>(patch.getViewFactors()[j]) *= k;
         }
     }
 }
 
 void calcViewFactors() {
+    logInfo("Gathering data for view factors...");
+    {
+        appfw::Timer timer;
+        timer.start();
+
+        size_t totalCount = 0;
+        s_ViewFactorCount.resize(g_Patches.size());
+
+        for (size_t i = 0; i < g_Patches.size(); i++) {
+            for (size_t j = i + 1; j < g_Patches.size(); j++) {
+                if (checkVisBit(i, j)) {
+                    s_ViewFactorCount[i] += 1;
+                    s_ViewFactorCount[j] += 1;
+                    totalCount += 2;
+                }
+            }
+        }
+
+        timer.stop();
+        logInfo("        ... {:.3} s", timer.elapsedSeconds());
+        logInfo("Memory required for viewfactor list: {:.3f} MiB", sizeof(ViewFactor) * totalCount / 1024.0 / 1024.0);
+
+        logInfo("Allocating memory...");
+        s_ViewFactors.resize(totalCount);
+        appfw::span<ViewFactor> span(s_ViewFactors);
+
+        logInfo("Writing pointers into patches...");
+        size_t nextIdx = 0;
+        for (size_t i = 0; i < g_Patches.size(); i++) {
+            PatchRef patch(i);
+            patch.getViewFactors() = span.subspan(nextIdx, s_ViewFactorCount[i]);
+            nextIdx += s_ViewFactorCount[i];
+        }
+    }
+
     logInfo("Calculating view factors...");
 
     appfw::Timer timer;
@@ -218,8 +260,8 @@ void bounceLight() {
             float p = 0.9f;
             glm::vec3 sum = {0, 0, 0};
 
-            for (auto &j : patch.getViewFactors()) {
-                sum += getPatchBounce(j.first, bounce - 1) * j.second;
+            for (auto &j : patch.getViewFactors().subspan(0, s_ViewFactorCount[i])) {
+                sum += getPatchBounce(std::get<0>(j), bounce - 1) * std::get<1>(j);
             }
 
             getPatchBounce(i, bounce) = sum * p;
