@@ -99,9 +99,7 @@ void createPatches() {
 
                 // TODO: Remove that, read lights from a file
                 if (face.iFlags & FACE_HACK) {
-                    // Blue-ish color
-                    patch.getFinalColor() = getPatchBounce(patchIdx, 0) =
-                        glm::vec3(194 / 255.f, 218 / 255.f, 252 / 255.f) * g_Config.flThatLightBrightness;
+                    patch.getFinalColor() = getPatchBounce(patchIdx, 0) = g_Config.flThatLight;
                 }
 
                 patchIdx++;

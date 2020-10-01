@@ -185,7 +185,10 @@ public:
 
     void drawGui(const DrawStats &stats);
 
+    virtual void updateScreenSize(glm::ivec2 size);
+
 protected:
+    glm::ivec2 m_ScreenSize = {1, 1};
     DrawStats m_DrawStats;
 
     inline LevelVars &getLevelVars() { return m_LevelVars; }

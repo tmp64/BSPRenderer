@@ -22,7 +22,7 @@ appfw::console::ConVar<bool> r_lockpvs("r_lockpvs", false, "Lock current PVS to 
 appfw::console::ConVar<bool> r_novis("r_novis", false, "Ignore visibility data");
 appfw::console::ConVar<int> r_fullbright("r_fullbright", 0, "Disable lighting");
 appfw::console::ConVar<bool> r_no_frustum_culling("r_no_frustum_culling", true, "Disable frustum culling");
-appfw::console::ConVar<float> r_gamma("r_gamma", 0.4f, "Gamma");
+appfw::console::ConVar<float> r_gamma("r_gamma", 2.2f, "Gamma");
 appfw::console::ConVar<float> r_texgamma("r_texgamma", 2.2f, "Texture gamma");
 
 static BaseRenderer *s_pInstance = nullptr;
@@ -398,6 +398,8 @@ void BaseRenderer::drawGui(const DrawStats &stats) {
     }
     ImGui::End();
 }
+
+void BaseRenderer::updateScreenSize(glm::ivec2 size) { m_ScreenSize = size; }
 
 bool BaseRenderer::cullBox(glm::vec3 mins, glm::vec3 maxs) noexcept {
     if (r_cull.getValue() == 0 || r_no_frustum_culling.getValue()) {

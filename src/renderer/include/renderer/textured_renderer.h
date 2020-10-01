@@ -19,7 +19,6 @@ public:
         ShaderUniform<int> m_FullBright;
         ShaderUniform<int> m_Texture;
         ShaderUniform<int> m_Lightmap;
-        ShaderUniform<float> m_Gamma;
         ShaderUniform<float> m_TexGamma;
     };
 
@@ -28,6 +27,16 @@ public:
         glm::vec3 normal;
         glm::vec2 texture;
         glm::vec2 lmTexture;
+    };
+
+    class PostProcessShader : public BaseShader {
+    public:
+        PostProcessShader();
+        virtual void create() override;
+        void loadUniforms();
+
+    private:
+        ShaderUniform<float> m_Gamma;
     };
 
     struct Surface : appfw::utils::NoCopy {
@@ -44,6 +53,11 @@ public:
         void draw() noexcept;
     };
 
+    TexturedRenderer();
+    virtual ~TexturedRenderer();
+
+    virtual void updateScreenSize(glm::ivec2 size) override;
+
 protected:
     virtual void createSurfaces() override;
     virtual void destroySurfaces() override;
@@ -51,6 +65,14 @@ protected:
 
 private:
     std::vector<Surface> m_Surfaces;
+    GLuint m_nHdrFramebuffer = 0;
+    GLuint m_nColorBuffer = 0;
+    GLuint m_nRenderBuffer = 0;
+    GLuint m_nQuadVao = 0;
+    GLuint m_nQuadVbo = 0;
+
+    void createBuffers();
+    void destroyBuffers();
 
 };
 

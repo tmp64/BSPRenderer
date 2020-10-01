@@ -40,7 +40,12 @@ int main(int, char **) {
         g_Config.flPatchSize = 32;
         g_Config.iBounceCount = 32;
         g_Config.flReflectivity = 0.4f;
-        g_Config.flThatLightBrightness = 60.0f;
+
+        // Blue-ish color
+        //g_Config.flThatLight = glm::vec3(194 / 255.f, 218 / 255.f, 252 / 255.f) * 100.f;
+
+        // White
+        g_Config.flThatLight = glm::vec3(1.f, 1.f, 1.f) * 100.f;
 
         // Set up thread pool
         size_t threadCount = std::thread::hardware_concurrency();

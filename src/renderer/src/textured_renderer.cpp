@@ -5,6 +5,7 @@
 static_assert(sizeof(TexturedRenderer::Vertex) == sizeof(float) * 10, "Size of Vertex is invalid");
 
 static TexturedRenderer::Shader s_Shader;
+static TexturedRenderer::PostProcessShader s_PostShader;
 
 //-----------------------------------------------------------------------------
 
@@ -99,7 +100,6 @@ TexturedRenderer::Shader::Shader()
     , m_FullBright(this, "uFullBright")
     , m_Texture(this, "uTexture")
     , m_Lightmap(this, "uLightmap")
-    , m_Gamma(this, "uGamma")
     , m_TexGamma(this, "uTexGamma") {}
 
 void TexturedRenderer::Shader::create() {
@@ -115,13 +115,28 @@ void TexturedRenderer::Shader::loadMatrices(const BaseRenderer::FrameVars &vars)
     m_FullBright.set(r_fullbright.getValue());
     m_Texture.set(0);
     m_Lightmap.set(1);
-    //m_Gamma.set(r_gamma.getValue());
-    //m_TexGamma.set(r_texgamma.getValue());
-    m_Gamma.set(2.2f / r_texgamma.getValue());
-    m_TexGamma.set(r_texgamma.getValue() * r_gamma.getValue());
+    m_TexGamma.set(r_texgamma.getValue());
 }
 
 void TexturedRenderer::Shader::setColor(const glm::vec3 &c) { m_Color.set(c); }
+
+//-----------------------------------------------------------------------------
+// Post-Process Shader
+//-----------------------------------------------------------------------------
+TexturedRenderer::PostProcessShader::PostProcessShader()
+    : BaseShader("TexturedRendererPostProcessShader")
+    , m_Gamma(this, "uGamma") {}
+
+void TexturedRenderer::PostProcessShader::create() {
+    createProgram();
+    createVertexShader("shaders/textured/post_processing.vert");
+    createFragmentShader("shaders/textured/post_processing.frag");
+    linkProgram();
+}
+
+void TexturedRenderer::PostProcessShader::loadUniforms() {
+    m_Gamma.set(r_gamma.getValue());
+}
 
 //-----------------------------------------------------------------------------
 // Surface
@@ -244,9 +259,51 @@ void TexturedRenderer::Surface::draw() noexcept {
     glBindVertexArray(0);
 }
 
+
+
 //-----------------------------------------------------------------------------
 // TexturedRenderer
 //-----------------------------------------------------------------------------
+TexturedRenderer::TexturedRenderer() {
+    float quadVertices[] = {
+        // positions        // texture Coords
+        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+         1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+         1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+    };
+    // setup plane VAO
+    glGenVertexArrays(1, &m_nQuadVao);
+    glGenBuffers(1, &m_nQuadVbo);
+
+    glBindVertexArray(m_nQuadVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_nQuadVbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
+}
+
+TexturedRenderer::~TexturedRenderer() {
+    destroyBuffers();
+
+    if (m_nQuadVao != 0) {
+        glDeleteVertexArrays(1, &m_nQuadVao);
+        m_nQuadVao = 0;
+    }
+
+    if (m_nQuadVbo != 0) {
+        glDeleteBuffers(1, &m_nQuadVbo);
+        m_nQuadVbo = 0;
+    }
+}
+
+void TexturedRenderer::updateScreenSize(glm::ivec2 size) {
+    BaseRenderer::updateScreenSize(size);
+    createBuffers();
+}
+
 void TexturedRenderer::createSurfaces() {
     AFW_ASSERT(m_Surfaces.empty());
     m_Surfaces.reserve(getLevelVars().baseSurfaces.size());
@@ -275,6 +332,10 @@ void TexturedRenderer::drawWorldSurfaces(const std::vector<size_t> &surfaceIdxs)
         glCullFace(r_cull.getValue() == 1 ? GL_BACK : GL_FRONT);
     }
 
+    // Draw into framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, m_nHdrFramebuffer);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
+
     s_Shader.enable();
     s_Shader.loadMatrices(getFrameVars());
 
@@ -285,11 +346,67 @@ void TexturedRenderer::drawWorldSurfaces(const std::vector<size_t> &surfaceIdxs)
     }
 
     s_Shader.disable();
-    glDisable(GL_CULL_FACE);
 
     if constexpr (PointRenderer::ENABLE) {
         s_pPoints->draw(getFrameVars());
     }
 
+    glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Apply post-processing, draw on the screen
+    s_PostShader.enable();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
+    s_PostShader.loadUniforms();
+
+    glBindVertexArray(m_nQuadVao);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+
+    s_PostShader.disable();
+}
+
+void TexturedRenderer::createBuffers() {
+    destroyBuffers();
+
+    glGenFramebuffers(1, &m_nHdrFramebuffer);
+
+    // Create FP color buffer
+    glGenTextures(1, &m_nColorBuffer);
+    glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_ScreenSize.x, m_ScreenSize.y, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // Create depth buffer (renderbuffer)
+    glGenRenderbuffers(1, &m_nRenderBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, m_nRenderBuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, m_ScreenSize.x, m_ScreenSize.y);
+
+    // Attach buffers
+    glBindFramebuffer(GL_FRAMEBUFFER, m_nHdrFramebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_nColorBuffer, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_nRenderBuffer);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        throw std::runtime_error("Framebuffer not complete");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void TexturedRenderer::destroyBuffers() {
+    if (m_nHdrFramebuffer) {
+        glDeleteFramebuffers(1, &m_nHdrFramebuffer);
+        m_nHdrFramebuffer = 0;
+    }
+
+    if (m_nColorBuffer) {
+        glDeleteTextures(1, &m_nColorBuffer);
+        m_nColorBuffer = 0;
+    }
+
+    if (m_nRenderBuffer) {
+        glDeleteRenderbuffers(1, &m_nRenderBuffer);
+        m_nRenderBuffer = 0;
+    }
 }

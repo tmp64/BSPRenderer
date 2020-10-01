@@ -66,6 +66,7 @@ static ConVar<float> fps_max("fps_max", 100, "Maximum FPS",
 static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
 static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
 static ConVar<float> fov("fov", 120.f, "Horizontal field of view");
+static ConVar<bool> gl_break_on_error("gl_break_on_error", false, "Break in debugger on OpenGL error");
 
 //----------------------------------------------------------------
 
@@ -91,7 +92,9 @@ static void gladPostCallback(const char *name, void *, int, ...) {
 
     if (errorCode != GL_NO_ERROR) {
         logError("OpenGL Error: {} (0x{:X}) in {}", getGlErrorString(errorCode), (int)errorCode, name);
-        AFW_DEBUG_BREAK();
+        if (gl_break_on_error.getValue()) {
+            AFW_DEBUG_BREAK();
+        }
     }
 }
 
@@ -153,6 +156,7 @@ App::App() {
     MaterialManager::get().addWadFile("halflife.wad");
 
     m_pRenderer = new TexturedRenderer();
+    updateViewportSize();
 
     // Init input
     m_pInputSystem = new InputSystem();
@@ -163,8 +167,6 @@ App::App() {
     m_pInputSystem->bindKey(m_pInputSystem->getScancodeForKey("mouse2"), "trace2");
 
     loadMap("crossfire");
-
-    updateViewportSize();
 }
 
 App::~App() {
@@ -569,6 +571,7 @@ void App::updateViewportSize() {
 
     m_flAspectRatio = (float)wide / tall;
     glViewport(0, 0, wide, tall);
+    m_pRenderer->updateScreenSize({wide, tall});
 }
 
 void fatalError(const std::string &msg) {
