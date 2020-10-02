@@ -1,9 +1,120 @@
 #include <fstream>
 #include <vector>
+#include <appfw/services.h>
 #include <bsp/level.h>
 #include <fmt/format.h>
 
 using namespace std::literals::string_literals;
+
+bsp::Level::EntityList::EntityList(const std::vector<char> &entityLump) {
+    size_t i = 0;
+
+    auto fnSkipWhitespace = [&]() {
+        auto &c = entityLump;
+        while (c[i] == ' ' || c[i] == '\r' || c[i] == '\n' || c[i] == '\t') {
+            i++;
+        }
+    };
+
+    auto fnCheckEOF = [&]() {
+        if (i >= entityLump.size()) {
+            throw LevelFormatException("Entity lump: unexpected end of file at position " + std::to_string(i));
+        }
+    };
+
+    while (i < entityLump.size()) {
+        fnSkipWhitespace();
+
+        if (entityLump[i] == '\0') {
+            // Finished parsing
+            break;
+        }
+
+        if (entityLump[i] != '{') {
+            throw LevelFormatException("Entity lump: expected '{' at position " + std::to_string(i));
+        }
+        i++;
+
+        EntityListItem item;
+
+        while (i < entityLump.size()) {
+            fnSkipWhitespace();
+
+            // "key"
+            if (entityLump[i] != '}' && entityLump[i] != '"') {
+                throw LevelFormatException("Entity lump: expected '\"' at position " + std::to_string(i));
+            }
+
+            if (entityLump[i] == '}') {
+                break;
+            }
+
+            i++;
+            size_t keyBegin = i;
+
+            while (entityLump[i] != '"' && i < entityLump.size()) {
+                i++;
+            }
+
+            fnCheckEOF();
+            size_t keyEnd = i;
+            i++;
+            
+            // "value"
+            fnSkipWhitespace();
+            if (entityLump[i] != '"') {
+                throw LevelFormatException("Entity lump: expected '\"' at position " + std::to_string(i));
+            }
+
+            i++;
+            size_t valueBegin = i;
+
+            while (entityLump[i] != '"' && i < entityLump.size()) {
+                i++;
+            }
+
+            fnCheckEOF();
+            size_t valueEnd = i;
+            i++;
+
+            // Add into the item
+            std::string_view key(&entityLump[keyBegin], keyEnd - keyBegin);
+            std::string_view value(&entityLump[valueBegin], valueEnd - valueBegin);
+            item.m_Keys.insert({std::string(key), std::string(value)});
+        }
+
+        fnCheckEOF();
+
+        if (entityLump[i] != '}') {
+            throw LevelFormatException("Entity lump: expected '}' at position " + std::to_string(i));
+        }
+        i++;
+
+        // Add item into the list
+        m_Items.push_back(std::move(item));
+    }
+
+    // Find worldspawn
+    for (EntityListItem &item : m_Items) {
+        if (item.getValue<std::string>("classname") == "worldspawn") {
+            if (m_pWorldspawn) {
+                throw LevelFormatException("Multiple worldspawns found");
+            } else {
+                m_pWorldspawn = &item;
+            }
+        }
+    }
+}
+
+const bsp::Level::EntityListItem *bsp::Level::EntityList::findEntityByName(const std::string &targetname) const {
+    for (const EntityListItem &i : m_Items) {
+        if (i.getValue<std::string>("targetname") == targetname) {
+            return &i;
+        }
+    }
+
+    return nullptr;
+}
 
 bsp::Level::Level(appfw::span<uint8_t> data) { loadFromBytes(data); }
 
@@ -115,7 +226,6 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
         }
     };
 
-    //fnLoadLump(LUMP_ENTITIES, ???);
     fnLoadLump(LUMP_PLANES, m_Planes);
     fnLoadTextures();
     fnLoadLump(LUMP_VERTICES, m_Vertices);
@@ -133,4 +243,10 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
     if (m_Lightmaps.size() % 3 != 0) {
         throw LevelFormatException(fmt::format("LUMP_LIGHTING: invalid size"));
     }
+
+    // Load entities
+    std::vector<char> entLump;
+    fnLoadLump(LUMP_ENTITIES, entLump);
+    entLump.push_back('\0');
+    m_Entities = EntityList(entLump);
 }
