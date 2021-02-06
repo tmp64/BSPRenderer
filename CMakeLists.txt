@@ -27,6 +27,7 @@ add_subdirectory(external/fmt)
 message(STATUS ">>> FMT library end")
 add_subdirectory(external/glad_debug)
 add_subdirectory(external/imgui)
+add_subdirectory(external/sdl_net)
 
 # Libraries
 add_subdirectory(src/appfw)
