@@ -38,12 +38,22 @@ void BaseShader::createProgram() {
 //---------------------------------------------------------------
 // Shader loading
 //---------------------------------------------------------------
-static void loadFileToString(const char *path, std::string &string) {
+static void loadFileToString(const fs::path &path, std::string &string) {
     string.clear();
 
     std::ifstream input(path);
     if (!input.is_open())
-        throw std::runtime_error(std::string("open ") + path + " failed: " + strerror(errno));
+        throw std::runtime_error(std::string("open ") + path.u8string() + " failed: " + strerror(errno));
+
+    // Add version
+#ifdef GLAD_OPENGL
+    string += "#version 330 core\n";
+#elif defined(GLAD_OPENGL_ES)
+    string += "#version 300 es\n";
+#else
+#error
+#endif
+    string += "#line 1\n";
 
     std::string line;
     while (std::getline(input, line)) {
@@ -52,7 +62,7 @@ static void loadFileToString(const char *path, std::string &string) {
     input.close();
 }
 
-void BaseShader::createVertexShader(const char *filepath) {
+void BaseShader::createVertexShader(const fs::path &filepath) {
     AFW_ASSERT(m_nProgId);
     AFW_ASSERT(!m_nVertexShaderId);
 
@@ -77,7 +87,7 @@ void BaseShader::createVertexShader(const char *filepath) {
     }
 }
 
-void BaseShader::createFragmentShader(const char *filepath) {
+void BaseShader::createFragmentShader(const fs::path &filepath) {
     AFW_ASSERT(m_nProgId);
     AFW_ASSERT(!m_nFragShaderId);
 
@@ -129,6 +139,14 @@ void BaseShader::linkProgram() {
     // Load uniforms
     for (auto i : m_UniformList)
         i->loadLocation();
+}
+
+void BaseShader::createVertexShader(const std::string &filepath, const char *tag) {
+    createVertexShader(getFileSystem().findFile(filepath, tag));
+}
+
+void BaseShader::createFragmentShader(const std::string &filepath, const char *tag) {
+    createFragmentShader(getFileSystem().findFile(filepath, tag));
 }
 
 std::forward_list<BaseShader *> &BaseShader::getUnregItems() {

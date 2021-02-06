@@ -27,10 +27,12 @@ add_subdirectory(external/fmt)
 message(STATUS ">>> FMT library end")
 add_subdirectory(external/glad_debug)
 add_subdirectory(external/imgui)
+add_subdirectory(external/nlohmann_json)
 add_subdirectory(external/sdl_net)
 
 # Libraries
 add_subdirectory(src/appfw)
+add_subdirectory(src/gui_app)
 add_subdirectory(src/bsp)
 add_subdirectory(src/renderer)
 

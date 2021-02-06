@@ -16,3 +16,4 @@ add_library(glad STATIC
 )
 
 target_include_directories(glad PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(glad PUBLIC GLAD_OPENGL_ES IMGUI_IMPL_OPENGL_ES2)

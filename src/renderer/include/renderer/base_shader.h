@@ -1,6 +1,7 @@
 #ifndef RENDERER_BASESHADER_H
 #define RENDERER_BASESHADER_H
 #include <appfw/utils.h>
+#include <appfw/services.h>
 #include <forward_list>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
@@ -54,9 +55,12 @@ protected:
     GLuint m_nProgId = 0;
 
     void createProgram();
-    void createVertexShader(const char *filepath);
-    void createFragmentShader(const char *filepath);
+    void createVertexShader(const fs::path &filename);
+    void createFragmentShader(const fs::path &filename);
     void linkProgram();
+
+    void createVertexShader(const std::string &filepath, const char *tag);
+    void createFragmentShader(const std::string &filepath, const char *tag);
 
 private:
     std::vector<BaseShader::UniformBase *> m_UniformList;
