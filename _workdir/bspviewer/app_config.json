@@ -11,6 +11,10 @@
 		"extcon_port": 27333
 	},
 	
+	"commands": [
+		"app_sync_rates 1"
+	],
+	
 	"filesystem": {
 		"assets": [
 			"bspviewer",

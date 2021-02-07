@@ -53,31 +53,53 @@ AppConfig::AppConfig() {
         fs::path cfgPath = getFileSystem().findFile(app_getInitInfo().appDirName + "/app_config.json", "base");
         
         loadJsonFile(cfgPath);
-
-        // Add FS paths
-        Item fs = getItem("filesystem");
-
-        for (auto &item : fs.getJson().get<nlohmann::json::object_t>()) {
-            const nlohmann::json &array = item.second.get<nlohmann::json>();
-
-            for (auto &i : array) {
-                const std::string &pathStr = i.get<std::string>();
-                fs::path path = fs::u8path(pathStr);
-
-                if (path.is_absolute()) {
-                    getFileSystem().addSearchPath(path, item.first.c_str());
-                } else {
-                    fs::path p = getFileSystem().findFile(pathStr, "base");
-                    getFileSystem().addSearchPath(p, item.first.c_str());
-                }
-            }
-        }
     } catch (const std::exception &e) {
         app_fatalError("AppConfig: {}", e.what());
     }
 }
 
+bool AppConfig::itemExists(const std::string &key) {
+    auto it = m_pData->find(key);
+    return it != m_pData->end();
+}
+
 AppConfig::Item AppConfig::getItem(const std::string &key) { return Item(&m_pData->at(key)); }
+
+void AppConfig::mountFilesystem() {
+    Item fs = getItem("filesystem");
+
+    for (auto &item : fs.getJson().get<nlohmann::json::object_t>()) {
+        const nlohmann::json &array = item.second.get<nlohmann::json>();
+
+        for (auto &i : array) {
+            const std::string &pathStr = i.get<std::string>();
+            fs::path path = fs::u8path(pathStr);
+
+            if (path.is_absolute()) {
+                getFileSystem().addSearchPath(path, item.first.c_str());
+            } else {
+                fs::path p = getFileSystem().findFile(pathStr, "base");
+                getFileSystem().addSearchPath(p, item.first.c_str());
+            }
+        }
+    }
+}
+
+void AppConfig::executeCommands() {
+    if (!itemExists("commands")) {
+        return;
+    }
+
+    auto &item = getItem("commands").getJson();
+
+    if (!item.is_array()) {
+        throw std::logic_error("AppConfig: commands is not an array");
+    }
+
+    for (auto &i : item) {
+        appfw::getConsole().command(i.get<std::string>());
+    }
+}
 
 void AppConfig::loadJsonFile(const fs::path &path) {
     using nlohmann::json;

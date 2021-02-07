@@ -57,9 +57,24 @@ public:
     AppConfig();
 
     /**
+     * Returns whether item exists in the root.
+     */
+    bool itemExists(const std::string &key);
+
+    /**
      * Returns an item with specified key.
      */
     Item getItem(const std::string &key);
+
+    /**
+     * Mounts filesystems listed in "filesystem" object.
+     */
+    void mountFilesystem();
+
+    /**
+     * Executes commands listed in "commands" array.
+     */
+    void executeCommands();
 
 private:
     std::shared_ptr<nlohmann::json> m_pData;

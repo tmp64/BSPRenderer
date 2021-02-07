@@ -66,6 +66,9 @@ BSPViewer::BSPViewer() {
     AFW_ASSERT(!m_sSingleton);
     m_sSingleton = this;
 
+    setAutoClearEnabled(true);
+    setAutoClearColor({0, 0.5f, 0, 1});
+
     // Init renderer
     MaterialManager::get().addWadFile(getFileSystem().findFile("halflife.wad", "assets"));
 
@@ -73,7 +76,6 @@ BSPViewer::BSPViewer() {
 
     // Init input
     InputSystem::get().bindKey(SDL_SCANCODE_F3, "toggle_debug_text");
-    InputSystem::get().bindKey(SDL_SCANCODE_F8, "dem_stop");
     InputSystem::get().bindKey(SDL_SCANCODE_GRAVE, "toggleconsole");
     InputSystem::get().bindKey(InputSystem::get().getScancodeForKey("mouse1"), "trace1");
     InputSystem::get().bindKey(InputSystem::get().getScancodeForKey("mouse2"), "trace2");
@@ -97,13 +99,10 @@ void BSPViewer::tick() {
     //
 
     processUserInput();
-    drawDebugText();
+    showInfoDialog();
 }
 
 void BSPViewer::draw() {
-    glClearColor(0, 0.5f, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
     BaseRenderer::DrawOptions options;
     options.viewOrigin = m_vPos;
     options.viewAngles = m_vRot;
@@ -118,7 +117,7 @@ void BSPViewer::onWindowSizeChange(int wide, int tall) {
     m_pRenderer->updateScreenSize({wide, tall});
 }
 
-void BSPViewer::drawDebugText() {
+void BSPViewer::showInfoDialog() {
     static bool open = true;
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize |
                                     ImGuiWindowFlags_NoFocusOnAppearing |
@@ -131,7 +130,9 @@ void BSPViewer::drawDebugText() {
     ImColor red = ImColor(FrameConsole::Red.r(), FrameConsole::Red.g(), FrameConsole::Red.b(), FrameConsole::Red.a());
 
     if (ImGui::Begin("BSPViewer Stats", nullptr, window_flags)) {
+        showStatsUI();
 
+        ImGui::Separator();
         ImGui::Text("Pos: X: %9.3f / Y: %9.3f / Z: %9.3f", m_vPos.x, m_vPos.y, m_vPos.z);
         ImGui::Text("Rot: P: %9.3f / Y: %9.3f / R: %9.3f", m_vRot.x, m_vRot.y, m_vRot.z);
 

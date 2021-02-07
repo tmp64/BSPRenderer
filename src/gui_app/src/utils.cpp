@@ -53,6 +53,11 @@ FileSystemAppComponent::FileSystemAppComponent() {
     getFileSystem().addSearchPath(m_BaseAppPath, "base");
 }
 
+AppConfigInitAppComponent::AppConfigInitAppComponent(AppConfig &cfg) {
+    cfg.mountFilesystem();
+    cfg.executeCommands();
+}
+
 OpenGLAppComponent::OpenGLAppComponent() {
     if (SDL_GL_LoadLibrary(nullptr)) {
         app_fatalError("Failed to load OpenGL library: {}", SDL_GetError());

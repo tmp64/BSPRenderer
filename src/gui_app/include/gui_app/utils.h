@@ -42,6 +42,11 @@ public:
     fs::path m_BaseAppPath;
 };
 
+class AppConfigInitAppComponent : appfw::utils::NoCopy {
+public:
+    AppConfigInitAppComponent(AppConfig &cfg);
+};
+
 /**
  * SDL2 OpenGL RAII wrapper.
  */

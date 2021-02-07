@@ -23,9 +23,9 @@ public:
     void loadMap(const std::string &name);
 
     /**
-     * Draw text info
+     * Shows dialog with framerates and position.
      */
-    void drawDebugText();
+    void showInfoDialog();
 
     /**
      * Moves and rotates the camera if input is grabbed.

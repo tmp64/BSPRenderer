@@ -86,17 +86,17 @@ public:
     /**
      * Whether automatically call glClear.
      */
-    bool isAutoClearEnabled();
+    inline bool isAutoClearEnabled() { return m_bAutoClear; }
 
     /**
      * Enable/disable autoclear.
      */
-    void setAutoClearEnabled(bool state);
+    inline void setAutoClearEnabled(bool state) { m_bAutoClear = state; }
 
     /**
      * Sets autoclear color.
      */
-    void setAutoClearColor(glm::vec4 color);
+    inline void setAutoClearColor(glm::vec4 color) { m_vAutoClearColor = color; }
 
     /**
      * Returns base path of the app.
@@ -113,10 +113,16 @@ public:
      */
     inline glm::ivec2 getWindowSize() { return m_vWindowSize; }
 
+    /**
+     * Shows framerate stats. Must be called inside an ImGui frame.
+     */
+    void showStatsUI();
+
 protected:
     AppFWAppComponent m_AppFWComponent;
     FileSystemAppComponent m_FSComponent;
     AppConfig m_AppConfig;
+    AppConfigInitAppComponent m_AppConfigInit;
     OpenGLAppComponent m_OpenGLComponent;
     MainWindowAppComponent m_Window;
     ImGuiAppComponent m_ImGui;

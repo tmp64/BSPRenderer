@@ -5,6 +5,7 @@
 
 ConVar<double> app_tps_max("app_tps_max", 100, "Application tickrate");
 ConVar<double> app_fps_max("app_fps_max", 60, "Application framerate");
+ConVar<bool> app_sync_rates("app_sync_rates", false, "Syncs TPS and FPS, uses value from app_fps_max for the rate.");
 
 static ConCommand cmd_toggleconsole("toggleconsole", "Toggles console dialog", [](const appfw::ParsedCommand &) {
     GuiAppBase::getBaseInstance().setConsoleVisible(!GuiAppBase::getBaseInstance().isConsoleVisible());
@@ -15,7 +16,8 @@ static ConCommand cmd_quit("quit", "Quits the app", [](const appfw::ParsedComman
 });
 
 GuiAppBase::GuiAppBase()
-    : m_Window(m_AppConfig)
+    : m_AppConfigInit(m_AppConfig)
+    , m_Window(m_AppConfig)
     , m_ImGui(m_Window) {
     AFW_ASSERT(!m_sBaseInstance);
     m_sBaseInstance = this;
@@ -74,32 +76,54 @@ int GuiAppBase::run() {
     SDL_GetWindowSize(m_Window.getWindow(), &wide, &tall);
     onWindowSizeChange(wide, tall);
 
+    // Execute pending commands
+    appfw::getConsole().processAllCommands();
+    appfw::getConsole().processAllCommands();
+    appfw::getConsole().processAllCommands();
+
     appfw::Timer waitTimer;
 
     while (m_bIsRunning) {
         double targetTicktime = 1 / app_tps_max.getValue();
         double targetFrametime = 1 / app_fps_max.getValue();
+        bool syncRates = app_sync_rates.getValue();
+        long long timeToWait = 0;
 
-        if (m_TickTimer.elapsedSeconds() >= targetTicktime) {
+        if (syncRates) {
             m_flLastTickTime = m_TickTimer.elapsedSeconds();
             m_TickTimer.start();
             internalTick();
-            m_flTime += m_flLastTickTime;
-        }
 
-        if (m_DrawTimer.elapsedSeconds() >= targetFrametime) {
-            m_flLastFrameTime = m_DrawTimer.elapsedSeconds();
-            m_DrawTimer.start();
+            m_flLastFrameTime = m_flLastTickTime;
             internalDraw();
+
+            m_flTime += m_flLastTickTime;
+
+            double timeLeft = targetFrametime - m_TickTimer.elapsedSeconds();
+            timeToWait = (long long)(timeLeft * 1000000);
+        } else {
+            if (m_TickTimer.elapsedSeconds() >= targetTicktime) {
+                m_flLastTickTime = m_TickTimer.elapsedSeconds();
+                m_TickTimer.start();
+                internalTick();
+                m_flTime += m_flLastTickTime;
+            }
+
+            if (m_DrawTimer.elapsedSeconds() >= targetFrametime) {
+                m_flLastFrameTime = m_DrawTimer.elapsedSeconds();
+                m_DrawTimer.start();
+                internalDraw();
+            }
+
+            double tickTimeLeft = targetTicktime - m_TickTimer.elapsedSeconds();
+            double frameTimeLeft = targetFrametime - m_DrawTimer.elapsedSeconds();
+
+            timeToWait = (long long)(std::min(tickTimeLeft, frameTimeLeft) * 1000000);
         }
 
-        double tickTimeLeft = targetTicktime - m_TickTimer.elapsedSeconds();
-        double frameTimeLeft = targetFrametime - m_DrawTimer.elapsedSeconds();
-
-        long long timeToWait = (long long)(std::min(tickTimeLeft, frameTimeLeft) * 1000000);
         waitTimer.start();
 
-        while (waitTimer.elapsedMicroseconds() < timeToWait - 0.004) {
+        while (waitTimer.elapsedMicroseconds() < timeToWait - 4000) {
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
 
@@ -151,6 +175,12 @@ bool GuiAppBase::handleSDLEvent(SDL_Event event) {
 fs::path GuiAppBase::getBaseAppPath() { return m_FSComponent.m_BaseAppPath; }
 
 AppConfig &GuiAppBase::getConfig() { return m_AppConfig; }
+
+void GuiAppBase::showStatsUI() {
+    ImColor cyan = ImColor(0, 255, 255, 255);
+    ImGui::TextColored(cyan, "FPS: %4.0f (%.3f ms)", 1.f / m_flLastFrameTime, m_flLastFrameTime * 1000.f);
+    ImGui::TextColored(cyan, "TPS: %4.0f (%.3f ms)", 1.f / m_flLastTickTime, m_flLastTickTime * 1000.f);
+}
 
 void GuiAppBase::onWindowSizeChange(int wide, int tall) {
     m_vWindowSize.x = wide;
