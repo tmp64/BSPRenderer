@@ -59,9 +59,19 @@ public:
     virtual bool handleSDLEvent(SDL_Event event);
 
     /**
+     * Called when window size is changed.
+     */
+    virtual void onWindowSizeChange(int wide, int tall);
+
+    /**
      * Quits the app.
      */
     void quit();
+
+    /**
+     * Returns time since app startup in seconds, updated every tick.
+     */
+    inline double getCurrentTime() { return m_flTime; }
 
     /**
      * Returns whether developer console is visible.
@@ -103,16 +113,6 @@ public:
      */
     inline glm::ivec2 getWindowSize() { return m_vWindowSize; }
 
-    /**
-     * Called when windows size is changed.
-     */
-    virtual void onWindowsSizeChange(int wide, int tall);
-
-    /**
-     * Called when mouse grabbed and moved.
-     */
-    virtual void onMouseMoved(int dx, int dy);
-
 protected:
     AppFWAppComponent m_AppFWComponent;
     FileSystemAppComponent m_FSComponent;
@@ -136,6 +136,7 @@ protected:
     unsigned long long m_iFrameCount = 0;
     double m_flLastTickTime = 0;
     double m_flLastFrameTime = 0;
+    double m_flTime = 0;    // Current time in seconds, updated every tick, starts with zero.
 
     /**
      * Called every event loop iteration.

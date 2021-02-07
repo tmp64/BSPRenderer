@@ -1,0 +1,23 @@
+{
+	"gui": {
+		"win_title": "BSP Viewer",
+		"win_width": 1600,
+		"win_height": 900,
+		
+		"imgui_font_scale": 0.0
+	},
+	
+	"appfw": {
+		"extcon_port": 27333
+	},
+	
+	"filesystem": {
+		"assets": [
+			"bspviewer",
+			"base"
+		],
+		"config": [
+			"bspviewer/cfg"
+		]
+	}
+}

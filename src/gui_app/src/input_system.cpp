@@ -91,8 +91,9 @@ bool InputSystem::handleSDLEvent(SDL_Event event) {
     }
     case SDL_MOUSEMOTION: {
         if (isInputGrabbed()) {
-            GuiAppBase::getBaseInstance().onMouseMoved(event.motion.xrel, event.motion.yrel);
-        } else {
+            m_iMouseRelX += event.motion.xrel;
+            m_iMouseRelY += event.motion.yrel;
+            return true;
         }
 
         fnProcessImGui();
@@ -104,6 +105,8 @@ bool InputSystem::handleSDLEvent(SDL_Event event) {
             if (!keyCmd.empty()) {
                 appfw::getConsole().command(keyCmd);
             }
+
+            return true;
         }
 
         fnProcessImGui();
@@ -157,6 +160,19 @@ void InputSystem::bindKey(SDL_Scancode key, const appfw::ParsedCommand &cmd) {
     } else {
         m_KeyBinds[key] = cmd;
     }
+}
+
+void InputSystem::getMouseMovement(int &x, int &y) {
+    AFW_ASSERT(isInputGrabbed());
+    peekMouseMovement(x, y);
+    m_iMouseRelX = 0;
+    m_iMouseRelY = 0;
+}
+
+void InputSystem::peekMouseMovement(int &x, int &y) {
+    AFW_ASSERT(isInputGrabbed());
+    x = m_iMouseRelX;
+    y = m_iMouseRelY;
 }
 
 void InputSystem::createScancodeMap() {

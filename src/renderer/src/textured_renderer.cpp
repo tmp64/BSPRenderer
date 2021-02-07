@@ -20,8 +20,8 @@ public:
 
     virtual void create() override {
         createProgram();
-        createVertexShader("shaders/points.vert");
-        createFragmentShader("shaders/points.frag");
+        createVertexShader("shaders/points.vert", "assets");
+        createFragmentShader("shaders/points.frag", "assets");
         linkProgram();
     }
 
@@ -104,8 +104,8 @@ TexturedRenderer::Shader::Shader()
 
 void TexturedRenderer::Shader::create() {
     createProgram();
-    createVertexShader("shaders/textured/world.vert");
-    createFragmentShader("shaders/textured/world.frag");
+    createVertexShader("shaders/textured/world.vert", "assets");
+    createFragmentShader("shaders/textured/world.frag", "assets");
     linkProgram();
 }
 
@@ -129,8 +129,8 @@ TexturedRenderer::PostProcessShader::PostProcessShader()
 
 void TexturedRenderer::PostProcessShader::create() {
     createProgram();
-    createVertexShader("shaders/textured/post_processing.vert");
-    createFragmentShader("shaders/textured/post_processing.frag");
+    createVertexShader("shaders/textured/post_processing.vert", "assets");
+    createFragmentShader("shaders/textured/post_processing.frag", "assets");
     linkProgram();
 }
 

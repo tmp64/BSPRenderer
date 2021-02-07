@@ -72,7 +72,7 @@ int GuiAppBase::run() {
     // Update window size
     int wide, tall;
     SDL_GetWindowSize(m_Window.getWindow(), &wide, &tall);
-    onWindowsSizeChange(wide, tall);
+    onWindowSizeChange(wide, tall);
 
     appfw::Timer waitTimer;
 
@@ -84,6 +84,7 @@ int GuiAppBase::run() {
             m_flLastTickTime = m_TickTimer.elapsedSeconds();
             m_TickTimer.start();
             internalTick();
+            m_flTime += m_flLastTickTime;
         }
 
         if (m_DrawTimer.elapsedSeconds() >= targetFrametime) {
@@ -126,7 +127,7 @@ bool GuiAppBase::handleSDLEvent(SDL_Event event) {
             case SDL_WINDOWEVENT_SIZE_CHANGED: {
                 int wide, tall;
                 SDL_GetWindowSize(m_Window.getWindow(), &wide, &tall);
-                onWindowsSizeChange(wide, tall);
+                onWindowSizeChange(wide, tall);
                 return true;
             }
             case SDL_WINDOWEVENT_CLOSE: {
@@ -151,12 +152,10 @@ fs::path GuiAppBase::getBaseAppPath() { return m_FSComponent.m_BaseAppPath; }
 
 AppConfig &GuiAppBase::getConfig() { return m_AppConfig; }
 
-void GuiAppBase::onWindowsSizeChange(int wide, int tall) {
+void GuiAppBase::onWindowSizeChange(int wide, int tall) {
     m_vWindowSize.x = wide;
     m_vWindowSize.y = tall;
 }
-
-void GuiAppBase::onMouseMoved(int, int) {}
 
 void GuiAppBase::quit() {
     logInfo("Quitting the app");

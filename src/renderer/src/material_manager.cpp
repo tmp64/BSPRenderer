@@ -119,7 +119,7 @@ void MaterialManager::shutdown() {
     m_Materials.clear();
 }
 
-void MaterialManager::addWadFile(const std::string &name) {
+void MaterialManager::addWadFile(const fs::path &name) {
     try {
         bsp::WADFile wad(name);
 
@@ -129,7 +129,7 @@ void MaterialManager::addWadFile(const std::string &name) {
         }
     }
     catch (const std::exception &e) {
-        logError("Failed to load WAD {}: {}", name, e.what());
+        logError("Failed to load WAD {}: {}", name.filename().u8string(), e.what());
     }
 }
 

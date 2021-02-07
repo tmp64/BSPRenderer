@@ -57,10 +57,29 @@ public:
      */
     void bindKey(SDL_Scancode key, const appfw::ParsedCommand &cmd);
 
+    /**
+     * Returns how much mouse has moved since last call to getMouseMovement.
+     * Only valid if input is grabbed.
+     * @param   x   X realtive movement, px
+     * @param   y   Y realtive movement, px
+     */
+    void getMouseMovement(int &x, int &y);
+
+    /**
+     * Returns how much mouse has moved since last call to getMouseMovement.
+     * Doesn't reset it to zero.
+     * Only valid if input is grabbed.
+     * @param   x   X realtive movement, px
+     * @param   y   Y realtive movement, px
+     */
+    void peekMouseMovement(int &x, int &y);
+
 private:
     static inline InputSystem *m_sInstance = nullptr;
 
     bool m_bGrabInput = false;
+    int m_iMouseRelX = 0;
+    int m_iMouseRelY = 0;
     std::unordered_map<std::string, SDL_Scancode> m_ScancodeMap;
     std::array<appfw::ParsedCommand, SDL_NUM_SCANCODES> m_KeyBinds;
     std::array<appfw::ParsedCommand, MAX_MOUSE_BUTTONS + 1> m_MouseBinds;

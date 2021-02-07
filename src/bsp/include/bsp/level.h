@@ -7,6 +7,7 @@
 #include <optional>
 #include <memory>
 #include <appfw/utils.h>
+#include <appfw/services.h>
 #include <bsp/bsp_types.h>
 
 namespace bsp {
@@ -105,7 +106,7 @@ public:
     /**
      * Loads BSP from a .bsp file.
      */
-    void loadFromFile(const std::string &path);
+    void loadFromFile(const fs::path &path);
 
     /**
      * Loads BSP from supplied contents of .bsp.

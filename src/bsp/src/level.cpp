@@ -120,7 +120,7 @@ bsp::Level::Level(appfw::span<uint8_t> data) { loadFromBytes(data); }
 
 bsp::Level::Level(const std::string &filename) { loadFromFile(filename); }
 
-void bsp::Level::loadFromFile(const std::string &filename) {
+void bsp::Level::loadFromFile(const fs::path &filename) {
     std::ifstream file(filename, std::ios::in | std::ios::binary);
     if (file.fail()) {
         throw std::runtime_error(std::string("Failed to open file: ") + strerror(errno));

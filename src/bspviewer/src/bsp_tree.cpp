@@ -1,18 +1,18 @@
 #include <appfw/services.h>
 #include "bsp_tree.h"
-#include "app.h"
+#include "bspviewer.h"
 
 BSPTree g_BSPTree;
 
 static glm::vec3 s_Points[2];
 
 static ConCommand cmd_trace1("trace1", "", [](const appfw::ParsedCommand &) {
-    s_Points[0] = App::get().getCameraPos();
+    s_Points[0] = BSPViewer::get().getCameraPos();
     logInfo("Trace: point 1 ({}; {}; {})", s_Points[1].x, s_Points[1].y, s_Points[1].z);
 });
 
 static ConCommand cmd_trace2("trace2", "", [](const appfw::ParsedCommand &) {
-    s_Points[1] = App::get().getCameraPos();
+    s_Points[1] = BSPViewer::get().getCameraPos();
     logInfo("Trace: point 2 ({}; {}; {})", s_Points[1].x, s_Points[1].y, s_Points[1].z);
 
     logInfo("Trace: distance {}", glm::length(s_Points[1] - s_Points[0]));

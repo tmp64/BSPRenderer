@@ -70,7 +70,7 @@ public:
     /**
      * Loads a WAD file into the manager.
      */
-    void addWadFile(const std::string &name);
+    void addWadFile(const fs::path &name);
 
     /**
      * Returns an index of specified material or NULL_MATERIAL if not found.

@@ -255,6 +255,13 @@ void BaseRenderer::updateNodeParents(LevelNodeBase *node, LevelNodeBase *parent)
 }
 
 void BaseRenderer::loadLightmapFile(const std::string &filepath) {
+    fs::path realfilepath = getFileSystem().findFileOrEmpty(filepath, "assets");
+
+    if (realfilepath.empty()) {
+        r_fullbright.setValue(4);
+        return;
+    }
+
     try {
         cleanUpLightmaps();
 
@@ -270,7 +277,7 @@ void BaseRenderer::loadLightmapFile(const std::string &filepath) {
             glm::ivec2 lmSize;
         };
 
-        appfw::BinaryReader file(filepath);
+        appfw::BinaryReader file(realfilepath);
 
         LightmapFileHeader lmHeader;
         file.read(lmHeader);

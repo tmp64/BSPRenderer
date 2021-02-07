@@ -27,12 +27,12 @@ public:
     /**
      * Loads WAD from specified .wad file.
      */
-    WADFile(const std::string &path);
+    WADFile(const fs::path &path);
 
     /**
      * Loads WAD from a .wad file.
      */
-    void loadFromFile(const std::string &path);
+    void loadFromFile(const fs::path &path);
 
     /**
      * Loads WAD from supplied contents of .wad.
