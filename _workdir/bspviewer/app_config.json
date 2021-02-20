@@ -12,7 +12,8 @@
 	},
 	
 	"commands": [
-		"app_sync_rates 1"
+		"app_sync_rates 1",
+		"app_fps_max 300"
 	],
 	
 	"filesystem": {

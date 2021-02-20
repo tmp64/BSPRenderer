@@ -11,7 +11,6 @@
 #include <renderer/shader_manager.h>
 #include <renderer/material_manager.h>
 #include <renderer/frame_console.h>
-#include <renderer/textured_renderer.h>
 
 #include "bspviewer.h"
 #include "demo.h"
@@ -72,8 +71,6 @@ BSPViewer::BSPViewer() {
     // Init renderer
     MaterialManager::get().addWadFile(getFileSystem().findFile("halflife.wad", "assets"));
 
-    m_pRenderer = new TexturedRenderer();
-
     // Init input
     InputSystem::get().bindKey(SDL_SCANCODE_F3, "toggle_debug_text");
     InputSystem::get().bindKey(SDL_SCANCODE_GRAVE, "toggleconsole");
@@ -87,8 +84,7 @@ BSPViewer::~BSPViewer() {
     AFW_ASSERT(m_sSingleton);
 
     // Shutdown renderer
-    delete m_pRenderer;
-    m_pRenderer = nullptr;
+    m_Renderer.setLevel(nullptr, "");
 
     m_sSingleton = nullptr;
 }
@@ -103,18 +99,15 @@ void BSPViewer::tick() {
 }
 
 void BSPViewer::draw() {
-    BaseRenderer::DrawOptions options;
-    options.viewOrigin = m_vPos;
-    options.viewAngles = m_vRot;
-    options.fov = fov.getValue();
-    options.aspect = m_flAspectRatio;
-    m_LastDrawStats = m_pRenderer->draw(options);
+    m_Renderer.setPerspective(fov.getValue(), m_flAspectRatio, 4, 4096);
+    m_Renderer.setPerspViewOrigin(m_vPos, m_vRot);
+    m_Renderer.renderScene(0);
 }
 
 void BSPViewer::onWindowSizeChange(int wide, int tall) {
     m_flAspectRatio = (float)wide / tall;
     glViewport(0, 0, wide, tall);
-    m_pRenderer->updateScreenSize({wide, tall});
+    m_Renderer.setViewportSize({wide, tall});
 }
 
 void BSPViewer::showInfoDialog() {
@@ -219,14 +212,15 @@ void BSPViewer::processUserInput() {
 void BSPViewer::setDrawDebugTextEnabled(bool state) { m_bDrawDebugText = state; }
 
 void BSPViewer::loadMap(const std::string &name) {
-    m_pRenderer->setLevel(nullptr);
+    m_Renderer.setLevel(nullptr, "");
 
     std::string path = "maps/" + name + ".bsp";    
     logInfo("Loading map {}", path);
 
     try {
-        m_LoadedLevel.loadFromFile(getFileSystem().findFile(path, "assets"));
-        m_pRenderer->setLevel(&m_LoadedLevel, path);
+        fs::path bspPath = getFileSystem().findFile(path, "assets");
+        m_LoadedLevel.loadFromFile(bspPath);
+        m_Renderer.setLevel(&m_LoadedLevel, bspPath);
 
         g_BSPTree.setLevel(&m_LoadedLevel);
         g_BSPTree.createTree();

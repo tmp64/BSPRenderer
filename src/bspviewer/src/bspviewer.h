@@ -1,9 +1,7 @@
 #ifndef APP_H
 #define APP_H
 #include <gui_app/gui_app_base.h>
-#include <renderer/base_renderer.h>
-
-class BaseRenderer;
+#include <renderer/scene_renderer.h>
 
 class BSPViewer : public GuiAppBase {
 public:
@@ -37,9 +35,8 @@ public:
     inline glm::vec3 getCameraPos() { return m_vPos; }
 
 private:
-    BaseRenderer *m_pRenderer = nullptr;
     bsp::Level m_LoadedLevel;
-    BaseRenderer::DrawStats m_LastDrawStats;
+    SceneRenderer m_Renderer;
     glm::vec3 m_vPos = {0.f, 0.f, 0.f};
     glm::vec3 m_vRot = {0.f, 0.f, 0.f};
     float m_flAspectRatio = 1.f;

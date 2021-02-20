@@ -1,12 +1,12 @@
 set(RNDR_PUBLIC_HEADERS
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/base_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/base_shader.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/font_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/frame_console.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/material_manager.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/polygon_renderer.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/raii.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/shader_manager.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/textured_renderer.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/surface_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/utils.h
 )
 
@@ -15,14 +15,13 @@ set(RNDR_PRIVATE_HEADERS
 )
 
 set(RNDR_PRIVATE_SOURCES
-	${CMAKE_CURRENT_SOURCE_DIR}/src/base_renderer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_shader.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/font_renderer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/frame_console.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/material_manager.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/polygon_renderer.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_renderer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/shader_manager.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/textured_renderer.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/surface_renderer.cpp
 )
 
 add_library(renderer STATIC

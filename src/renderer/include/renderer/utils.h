@@ -1,8 +1,10 @@
 #ifndef RENDERER_UTILS_H
 #define RENDERER_UTILS_H
-#include <appfw/color.h>
 #include <cmath>
 #include <glm/glm.hpp>
+#include <bsp/bsp_types.h>
+#include <appfw/color.h>
+#include <appfw/utils.h>
 
 enum { ANGLE_PITCH = 0, ANGLE_YAW = 1, ANGLE_ROLL = 2 };
 
@@ -104,9 +106,9 @@ inline glm::vec3 rotatePointAroundVector(glm::vec3 dir, glm::vec3 point, float d
  * Fast box on planeside test
  */
 inline uint8_t signbitsForPlane(glm::vec3 normal) {
-    uint8_t bits, i;
+    uint8_t bits = 0;
 
-    for (bits = i = 0; i < 3; i++)
+    for (int i = 0; i < 3; i++)
         if (normal[i] < 0.0f)
             bits |= 1 << i;
     return bits;
@@ -136,6 +138,27 @@ inline glm::mat4 Matrix4x4_CreateProjection(float xMax, float xMin, float yMax, 
     out[2][3] = -(2.0f * zFar * zNear) / (zFar - zNear);
 
     return out;
+}
+
+inline float planeDiff(glm::vec3 point, const bsp::BSPPlane &plane) {
+    float res = 0;
+
+    switch (plane.nType) {
+    case bsp::PlaneType::PlaneX:
+        res = point[0];
+        break;
+    case bsp::PlaneType::PlaneY:
+        res = point[1];
+        break;
+    case bsp::PlaneType::PlaneZ:
+        res = point[2];
+        break;
+    default:
+        res = glm::dot(point, plane.vNormal);
+        break;
+    }
+
+    return res - plane.fDist;
 }
 
 #endif
