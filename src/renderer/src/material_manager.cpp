@@ -1,16 +1,20 @@
 #include <appfw/services.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ASSERT(x) AFW_ASSERT(x)
+
 #include <bsp/wad_file.h>
+#include <renderer/stb_image.h>
 #include <renderer/material_manager.h>
 
 //----------------------------------------------------------------
-// Material
+// CheckerboardImage
 //----------------------------------------------------------------
-Material::Material(std::nullptr_t) {
+CheckerboardImage::CheckerboardImage() {
     constexpr size_t TEX_SIZE = 64;
+    size = TEX_SIZE;
 
-    m_iWide = m_iTall = TEX_SIZE;
-
-    std::vector<uint8_t> data(TEX_SIZE * TEX_SIZE * 3);
+    data.resize(TEX_SIZE * TEX_SIZE * 3);
     uint8_t color[2][3] = {{0, 0, 0}, {255, 0, 255}};
 
     for (size_t i = 0; i < TEX_SIZE * 3; i += 6) {
@@ -34,6 +38,19 @@ Material::Material(std::nullptr_t) {
     for (size_t i = 2; i < TEX_SIZE; i += 2) {
         memcpy(data.data() + TEX_SIZE * 3 * i, data.data(), TEX_SIZE * 3 * 2);
     }
+}
+
+const CheckerboardImage &CheckerboardImage::get() {
+    static CheckerboardImage img;
+    return img;
+}
+
+//----------------------------------------------------------------
+// Material
+//----------------------------------------------------------------
+Material::Material(std::nullptr_t) {
+    const CheckerboardImage &img = CheckerboardImage::get();
+    m_iWide = m_iTall = img.size;
 
     glGenTextures(1, &m_nTexture);
     glBindTexture(GL_TEXTURE_2D, m_nTexture);
@@ -41,8 +58,7 @@ Material::Material(std::nullptr_t) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TEX_SIZE, TEX_SIZE, 0, GL_RGB, GL_UNSIGNED_BYTE,
-                 data.data());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_iWide, m_iTall, 0, GL_RGB, GL_UNSIGNED_BYTE, img.data.data());
     glGenerateMipmap(GL_TEXTURE_2D);
 }
 

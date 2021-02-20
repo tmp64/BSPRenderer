@@ -128,6 +128,10 @@ void SurfaceRenderer::calcWorldSurfaces() {
     m_pContext->getWorldSurfaces().reserve(m_Data.surfaces.size());
     m_pContext->getSkySurfaces().clear();
 
+    if (!m_pLevel) {
+        return;
+    }
+
     AFW_ASSERT(m_pContext->m_iVisFrame != 0 || m_pContext->m_NodeVisFrame.empty());
     AFW_ASSERT(m_pContext->m_iVisFrame != 0 || m_pContext->m_LeafVisFrame.empty());
 

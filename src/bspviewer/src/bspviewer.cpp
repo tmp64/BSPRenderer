@@ -99,7 +99,7 @@ void BSPViewer::tick() {
 }
 
 void BSPViewer::draw() {
-    m_Renderer.setPerspective(fov.getValue(), m_flAspectRatio, 4, 4096);
+    m_Renderer.setPerspective(fov.getValue(), m_flAspectRatio, 4, 8192);
     m_Renderer.setPerspViewOrigin(m_vPos, m_vRot);
     m_Renderer.renderScene(0);
 }

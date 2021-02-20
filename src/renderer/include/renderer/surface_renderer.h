@@ -78,6 +78,11 @@ public:
         inline void setCulling(Cull cull) { m_Cull = cull; }
 
         /**
+         * Returns view position in the world.
+         */
+        inline const glm::vec3 getViewOrigin() { return m_vViewOrigin; }
+
+        /**
          * Returns projection matrix.
          */
         inline const glm::mat4 &getProjectionMatrix() { return m_ProjMat; }

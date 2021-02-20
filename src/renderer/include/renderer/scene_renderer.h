@@ -71,6 +71,20 @@ private:
         ShaderUniform<float> m_TexGamma;
     };
 
+    class SkyBoxShader : public BaseShader {
+    public:
+        SkyBoxShader();
+        virtual void create() override;
+        void setupUniforms(SceneRenderer &scene);
+
+    private:
+        ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
+        ShaderUniform<int> m_Texture;
+        ShaderUniform<float> m_TexGamma;
+        ShaderUniform<float> m_Brightness;
+        ShaderUniform<glm::vec3> m_ViewOrigin;
+    };
+
     class PostProcessShader : public BaseShader {
     public:
         PostProcessShader();
@@ -109,6 +123,7 @@ private:
         SurfaceRenderer::Context viewContext;
         std::vector<Surface> surfaces;
         bool bCustomLMLoaded = false;
+        GLTexture skyboxCubemap;
     };
 
     bsp::Level *m_pLevel = nullptr;
@@ -132,6 +147,9 @@ private:
     void createSurfaces();
     void loadCustomLightmaps(const fs::path &bspPath);
     void createSurfaceObjects();
+    void loadSkyBox();
+    std::vector<uint8_t> rotateImage90CW(uint8_t *data, int wide, int tall);
+    std::vector<uint8_t> rotateImage90CCW(uint8_t *data, int wide, int tall);
 
     /**
      * Binds and clears HDB framebuffer
@@ -148,12 +166,18 @@ private:
      */
     void drawWorldSurfaces();
 
+     /**
+     * Draws BSP faces with SKY texture.
+     */
+    void drawSkySurfaces();
+
     /**
      * Post-processes HDB framebuffer (tonemapping, gamma correction) and draws it into active framebuffer.
      */
     void doPostProcessing();
 
     static inline WorldShader m_sWorldShader;
+    static inline SkyBoxShader m_sSkyShader;
     static inline PostProcessShader m_sPostProcessShader;
 };
 

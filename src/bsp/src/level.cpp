@@ -104,6 +104,10 @@ bsp::Level::EntityList::EntityList(const std::vector<char> &entityLump) {
             }
         }
     }
+
+    if (!m_pWorldspawn) {
+        throw LevelFormatException("Entity lump: no worldspawn found");
+    }
 }
 
 const bsp::Level::EntityListItem *bsp::Level::EntityList::findEntityByName(const std::string &targetname) const {

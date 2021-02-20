@@ -19,7 +19,9 @@
 	"filesystem": {
 		"assets": [
 			"bspviewer",
-			"base"
+			"base",
+			"E:\\Steam\\steamapps\\common\\Half-Life\\valve",
+			"E:\\Steam\\steamapps\\common\\Half-Life\\valve_downloads"
 		],
 		"config": [
 			"bspviewer/cfg"

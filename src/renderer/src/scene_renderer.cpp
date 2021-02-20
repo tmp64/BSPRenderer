@@ -1,4 +1,5 @@
 #include <appfw/binary_file.h>
+#include <renderer/stb_image.h>
 #include <renderer/scene_renderer.h>
 
 appfw::console::ConVar<int> r_cull("r_cull", 1,
@@ -13,6 +14,7 @@ appfw::console::ConVar<int> r_cull("r_cull", 1,
                                    });
 
 ConVar<bool> r_drawworld("r_drawworld", true, "Draw world polygons");
+ConVar<bool> r_drawsky("r_drawsky", true, "Draw skybox");
 ConVar<float> r_gamma("r_gamma", 2.2f, "Gamma");
 ConVar<float> r_texgamma("r_texgamma", 2.2f, "Texture gamma");
 ConVar<int> r_texture("r_texture", 2,
@@ -21,6 +23,7 @@ ConVar<int> r_lighting("r_lighting", 3,
                        "Lighting method:\n  0 - fullbright, 1 - shaded, 2 - HL lightmaps, 3 - custom lightmaps");
 ConVar<int> r_tonemap("r_tonemap", 2, "HDR tonemapping method:\n  0 - none (clamp to 1), 1 - Reinhard, 2 - exposure");
 ConVar<float> r_exposure("r_exposure", 0.5f, "Picture exposure");
+ConVar<float> r_skybright("r_skybright", 3.f, "Sky brightness");
 
 //----------------------------------------------------------------
 // WorldShader
@@ -54,6 +57,34 @@ void SceneRenderer::WorldShader::setupUniforms(SceneRenderer &scene) {
 }
 
 void SceneRenderer::WorldShader::setColor(const glm::vec3 &c) { m_Color.set(c); }
+
+//----------------------------------------------------------------
+// SkyBoxShader
+//----------------------------------------------------------------
+SceneRenderer::SkyBoxShader::SkyBoxShader()
+    : BaseShader("SceneRenderer_WorldShader")
+    , m_ViewMat(this, "uViewMatrix")
+    , m_ProjMat(this, "uProjMatrix")
+    , m_Texture(this, "uTexture")
+    , m_TexGamma(this, "uTexGamma")
+    , m_Brightness(this, "uBrightness")
+    , m_ViewOrigin(this, "uViewOrigin") {}
+
+void SceneRenderer::SkyBoxShader::create() {
+    createProgram();
+    createVertexShader("shaders/scene/skybox.vert", "assets");
+    createFragmentShader("shaders/scene/skybox.frag", "assets");
+    linkProgram();
+}
+
+void SceneRenderer::SkyBoxShader::setupUniforms(SceneRenderer &scene) {
+    m_ProjMat.set(scene.m_Data.viewContext.getProjectionMatrix());
+    m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
+    m_Texture.set(0);
+    m_TexGamma.set(r_texgamma.getValue());
+    m_Brightness.set(r_skybright.getValue());
+    m_ViewOrigin.set(scene.m_Data.viewContext.getViewOrigin());
+}
 
 //----------------------------------------------------------------
 // PostProcessShader
@@ -96,9 +127,13 @@ void SceneRenderer::setLevel(bsp::Level *level, const fs::path &bspPath) {
 
     try {
         m_Surf.setLevel(level);
-        createSurfaces();
-        loadCustomLightmaps(bspPath);
-        createSurfaceObjects();
+        
+        if (level) {
+            createSurfaces();
+            loadCustomLightmaps(bspPath);
+            createSurfaceObjects();
+            loadSkyBox();
+        }
     } catch (...) {
         m_Surf.setLevel(nullptr);
         m_pLevel = nullptr;
@@ -135,6 +170,10 @@ void SceneRenderer::renderScene(GLint targetFb) {
 
     if (r_drawworld.getValue()) {
         drawWorldSurfaces();
+
+        if (r_drawsky.getValue()) {
+            drawSkySurfaces();
+        }
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, targetFb);
@@ -368,6 +407,106 @@ void SceneRenderer::createSurfaceObjects() {
     }
 }
 
+void SceneRenderer::loadSkyBox() {
+    m_Data.skyboxCubemap.create();
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_Data.skyboxCubemap);
+
+    // Filename suffix for side
+    constexpr const char *suffixes[] = {"rt", "lf", "up", "dn", "bk", "ft"};
+
+    // Get sky name
+    const bsp::Level::EntityListItem &worldspawn = m_pLevel->getEntities().getWorldspawn();
+    std::string skyname = worldspawn.getValue<std::string>("skyname", "desert");
+
+    // Load images
+    for (int i = 0; i < 6; i++) {
+        // Try TGA first
+        fs::path path = getFileSystem().findFileOrEmpty("gfx/env/" + skyname + suffixes[i] + ".tga", "assets");
+
+        if (path.empty()) {
+            // Try BMP instead
+            path = getFileSystem().findFileOrEmpty("gfx/env/" + skyname + suffixes[i] + ".bmp", "assets");
+        }
+
+        if (!path.empty()) {
+            int width, height, channelNum;
+            uint8_t *data = stbi_load(path.u8string().c_str(), &width, &height, &channelNum, 3);
+
+            if (data) {
+                if (i == 2) {
+                    // Top sky texture needs to be rotated CCW
+                    std::vector<uint8_t> rot = rotateImage90CCW(data, width, height);
+                    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, height, width, 0, GL_RGB,
+                                 GL_UNSIGNED_BYTE, rot.data());
+                } else if (i == 3) {
+                    // Bottom sky texture needs to be rotated CW
+                    std::vector<uint8_t> rot = rotateImage90CW(data, width, height);
+                    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, height, width, 0, GL_RGB,
+                                 GL_UNSIGNED_BYTE, rot.data());
+                } else {
+                    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB,
+                                 GL_UNSIGNED_BYTE, data);
+                }
+
+                stbi_image_free(data);
+                continue;
+            } else {
+                logError("Failed to load {}: ", path.u8string(), stbi_failure_reason());
+            }
+        } else {
+            logError("Sky {}{} not found", skyname, suffixes[i]);
+        }
+
+        // Set purple checkerboard sky
+        const CheckerboardImage &img = CheckerboardImage::get();
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, img.size, img.size, 0, GL_RGB, GL_UNSIGNED_BYTE,
+                     img.data.data());
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+}
+
+std::vector<uint8_t> SceneRenderer::rotateImage90CW(uint8_t *data, int wide, int tall) {
+    std::vector<uint8_t> newData(3 * wide * tall);
+
+    auto fnGetPixelPtr = [](uint8_t *data, int wide, [[maybe_unused]] int tall, int col, int row) {
+        return data + row * wide * 3 + col * 3;
+    };
+
+    for (int col = 0; col < wide; col++) {
+        for (int row = 0; row < tall; row++) {
+            uint8_t *pold = fnGetPixelPtr(data, wide, tall, col, tall - row - 1);
+            uint8_t *pnew = fnGetPixelPtr(newData.data(), tall, wide, row, col);
+            memcpy(pnew, pold, 3);
+        }
+    }
+
+    return newData;
+}
+
+std::vector<uint8_t> SceneRenderer::rotateImage90CCW(uint8_t *data, int wide, int tall) {
+    std::vector<uint8_t> newData(3 * wide * tall);
+
+    auto fnGetPixelPtr = [](uint8_t *data, int wide, [[maybe_unused]] int tall, int col, int row) {
+        return data + row * wide * 3 + col * 3;
+    };
+
+    for (int col = 0; col < wide; col++) {
+        for (int row = 0; row < tall; row++) {
+            uint8_t *pold = fnGetPixelPtr(data, wide, tall, wide - col - 1, row);
+            uint8_t *pnew = fnGetPixelPtr(newData.data(), tall, wide, row, col);
+            memcpy(pnew, pold, 3);
+        }
+    }
+
+    return newData;
+}
+
 void SceneRenderer::prepareHdrFramebuffer() {
     glBindFramebuffer(GL_FRAMEBUFFER, m_nHdrFramebuffer);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -419,6 +558,37 @@ void SceneRenderer::drawWorldSurfaces() {
     glBindVertexArray(0);
     m_sWorldShader.disable();
 
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+}
+
+void SceneRenderer::drawSkySurfaces() {
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+
+    if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
+        glEnable(GL_CULL_FACE);
+        glFrontFace(GL_CCW);
+        glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
+    }
+
+    m_sSkyShader.enable();
+    m_sSkyShader.setupUniforms(*this);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_Data.skyboxCubemap);
+
+    for (unsigned i : m_Data.viewContext.getSkySurfaces()) {
+        Surface &surf = m_Data.surfaces[i];
+
+        glBindVertexArray(surf.m_Vao);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei)surf.m_iVertexCount);
+    }
+
+    glBindVertexArray(0);
+    m_sSkyShader.disable();
+
+    glDepthFunc(GL_LESS);
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
 }
