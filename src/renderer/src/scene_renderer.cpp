@@ -2,16 +2,16 @@
 #include <renderer/stb_image.h>
 #include <renderer/scene_renderer.h>
 
-appfw::console::ConVar<int> r_cull("r_cull", 1,
-                                   "Backface culling:\n"
-                                   "0 - none\n"
-                                   "1 - back\n"
-                                   "2 - front",
-                                   [](const int &, const int &newVal) {
-                                       if (newVal < 0 || newVal > 2)
-                                           return false;
-                                       return true;
-                                   });
+ConVar<int> r_cull("r_cull", 1,
+                   "Backface culling:\n"
+                   "0 - none\n"
+                   "1 - back\n"
+                   "2 - front",
+                   [](const int &, const int &newVal) {
+                       if (newVal < 0 || newVal > 2)
+                           return false;
+                       return true;
+                   });
 
 ConVar<bool> r_drawworld("r_drawworld", true, "Draw world polygons");
 ConVar<bool> r_drawsky("r_drawsky", true, "Draw skybox");
@@ -117,7 +117,7 @@ SceneRenderer::SceneRenderer() {
 
 SceneRenderer::~SceneRenderer() {}
 
-void SceneRenderer::setLevel(bsp::Level *level, const fs::path &bspPath) {
+void SceneRenderer::setLevel(bsp::Level *level, const std::string &path, const char *tag) {
     if (m_pLevel == level) {
         return;
     }
@@ -130,7 +130,7 @@ void SceneRenderer::setLevel(bsp::Level *level, const fs::path &bspPath) {
         
         if (level) {
             createSurfaces();
-            loadCustomLightmaps(bspPath);
+            loadCustomLightmaps(path, tag);
             createSurfaceObjects();
             loadSkyBox();
         }
@@ -261,11 +261,16 @@ void SceneRenderer::createSurfaces() {
     }
 }
 
-void SceneRenderer::loadCustomLightmaps([[maybe_unused]] const fs::path &bspPath) {
-    m_Data.bCustomLMLoaded = false;
-    fs::path lmPath = fs::u8path(bspPath.u8string() + ".lm");
+void SceneRenderer::loadCustomLightmaps(const std::string &path, const char *tag) {
+    if (path.empty() || !tag) {
+        logInfo("No path to BSP - custom lightmaps not loaded.");
+        return;
+    }
 
-    if (!fs::exists(lmPath)) {
+    m_Data.bCustomLMLoaded = false;
+    fs::path lmPath = getFileSystem().findFileOrEmpty(path + ".lm", tag);
+
+    if (lmPath.empty()) {
         logInfo("Custom lightmap file not found - not loading.");
         return;
     }

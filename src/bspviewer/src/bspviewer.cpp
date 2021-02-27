@@ -84,7 +84,7 @@ BSPViewer::~BSPViewer() {
     AFW_ASSERT(m_sSingleton);
 
     // Shutdown renderer
-    m_Renderer.setLevel(nullptr, "");
+    m_Renderer.setLevel(nullptr, "", "");
 
     m_sSingleton = nullptr;
 }
@@ -212,7 +212,7 @@ void BSPViewer::processUserInput() {
 void BSPViewer::setDrawDebugTextEnabled(bool state) { m_bDrawDebugText = state; }
 
 void BSPViewer::loadMap(const std::string &name) {
-    m_Renderer.setLevel(nullptr, "");
+    m_Renderer.setLevel(nullptr, "", nullptr);
 
     std::string path = "maps/" + name + ".bsp";    
     logInfo("Loading map {}", path);
@@ -220,7 +220,7 @@ void BSPViewer::loadMap(const std::string &name) {
     try {
         fs::path bspPath = getFileSystem().findFile(path, "assets");
         m_LoadedLevel.loadFromFile(bspPath);
-        m_Renderer.setLevel(&m_LoadedLevel, bspPath);
+        m_Renderer.setLevel(&m_LoadedLevel, path, "assets");
 
         g_BSPTree.setLevel(&m_LoadedLevel);
         g_BSPTree.createTree();
