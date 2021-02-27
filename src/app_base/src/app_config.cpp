@@ -107,8 +107,9 @@ void AppConfig::loadJsonFile(const fs::path &path) {
         throw std::runtime_error(fmt::format("failed to open: {}", strerror(errno)));
     }
 
-    json obj;
-    file >> obj;
+    std::vector<char> fileData = appfw::readFileContents(file);
+    fileData.push_back('\0');
+    json obj = json::parse(fileData.data(), nullptr, true, true);
 
     if (!obj.is_object()) {
         throw std::runtime_error("JSON file is not an object");

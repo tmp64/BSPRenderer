@@ -139,6 +139,7 @@ struct RADConfig {
     size_t iBounceCount = 0;
     float flReflectivity = 0;
     glm::vec3 flThatLight;
+    std::string mapName;
 };
 
 extern bsp::Level g_Level;

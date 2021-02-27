@@ -19,5 +19,6 @@ target_include_directories(rad PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(rad
 	appfw
+	app_base
 	bsp
 )

@@ -1,7 +1,9 @@
+#include <nlohmann/json.hpp>
 #include <appfw/binary_file.h>
 #include <appfw/timer.h>
 #include <appfw/init.h>
 #include <appfw/services.h>
+#include <app_base/app_config.h>
 #include "main.h"
 #include "utils.h"
 #include "patches.h"
@@ -9,9 +11,9 @@
 #include "plat.h"
 #include "patch_list.h"
 
-std::string g_LevelPath;
 bsp::Level g_Level;
 RADConfig g_Config;
+AppConfig g_AppConfig;
 
 std::vector<Plane> g_Planes;
 std::vector<Face> g_Faces;
@@ -20,7 +22,8 @@ std::vector<LightmapTexture> g_Lightmaps;
 appfw::ThreadPool g_ThreadPool;
 appfw::ThreadDispatcher g_Dispatcher;
 
-void loadLevel(const std::string &levelPath);
+void initApp();
+void loadLevel();
 void loadPlanes();
 void loadFaces();
 
@@ -31,20 +34,16 @@ int main(int, char **) {
     int returnCode = 0;
     appfw::init::init();
 
+    conPrintStrong("---------------------------------------------------");
+    conPrintStrong("Radiosity simulator for Half-Life BSP Renderer");
+    conPrintStrong("https://github.com/tmp64/BSPRenderer");
+    conPrintStrong("---------------------------------------------------");
+
     try {
         appfw::Timer timer;
         timer.start();
 
-        // TODO: Read config from cmd line args
-        g_Config.flPatchSize = 32;
-        g_Config.iBounceCount = 32;
-        g_Config.flReflectivity = 0.4f;
-
-        // Blue-ish color
-        //g_Config.flThatLight = glm::vec3(194 / 255.f, 218 / 255.f, 252 / 255.f) * 100.f;
-
-        // White
-        g_Config.flThatLight = glm::vec3(1.f, 1.f, 1.f) * 100.f;
+        initApp();
 
         // Set up thread pool
         size_t threadCount = std::thread::hardware_concurrency();
@@ -56,7 +55,7 @@ int main(int, char **) {
         g_ThreadPool.setThreadCount(threadCount);
         logInfo("Using {} thread(s).", threadCount);
 
-        loadLevel("maps/crossfire.bsp");
+        loadLevel();
         createPatches();
         buildVisMatrix();
         calcViewFactors();
@@ -77,10 +76,42 @@ int main(int, char **) {
     return returnCode;
 }
 
-void loadLevel(const std::string &levelPath) {
-    logInfo("Loading level from {}", levelPath);
+void initApp() {
+    // Init file system
+    fs::path baseAppPath = fs::current_path();
+    logInfo("Base app path: {}", baseAppPath.u8string());
+    getFileSystem().addSearchPath(baseAppPath, "base");
+
+    // Load app config
+    g_AppConfig.loadJsonFile(getFileSystem().findFile("bspviewer/app_config.json", "base"));
+    g_AppConfig.mountFilesystem();
+
+    // Parse app config
+    g_Config.flPatchSize = g_AppConfig.getItem("rad").get<float>("patch_size");
+    g_Config.iBounceCount = g_AppConfig.getItem("rad").get<int>("bounce_count");
+    g_Config.flReflectivity = g_AppConfig.getItem("rad").get<float>("reflectivity");
+
+    nlohmann::json lightColor = g_AppConfig.getItem("rad").getSubItem("light_color").getJson();
+    g_Config.flThatLight.r = lightColor.at(0) / 255.f;
+    g_Config.flThatLight.g = lightColor.at(1) / 255.f;
+    g_Config.flThatLight.b = lightColor.at(2) / 255.f;
+    g_Config.flThatLight *= g_AppConfig.getItem("rad").get<float>("light_brightness");
+
+    g_Config.mapName = g_AppConfig.getItem("rad").get<std::string>("map");
+
+    conPrint("");
+    conPrintStrong("Configuration:");
+    conPrint("Patch size: {} units", g_Config.flPatchSize);
+    conPrint("Bounce count: {}", g_Config.iBounceCount);
+    conPrint("Surface reflectivity: {}", g_Config.flReflectivity);
+    conPrint("Light brightness: [{}, {}, {}]", g_Config.flThatLight.r, g_Config.flThatLight.g, g_Config.flThatLight.b);
+    conPrint("Map: {}", g_Config.mapName);
+    conPrint("");
+}
+
+void loadLevel() {
+    fs::path levelPath = getFileSystem().findFile("maps/" + g_Config.mapName + ".bsp", "assets");
     g_Level.loadFromFile(levelPath);
-    g_LevelPath = levelPath;
     loadPlanes();
     loadFaces();
 }
@@ -267,7 +298,7 @@ void writeLightmaps() {
         glm::ivec2 lmSize;
     };
 
-    appfw::BinaryWriter file(g_LevelPath + ".lm");
+    appfw::BinaryWriter file(getFileSystem().getFile("maps/" + g_Config.mapName + ".bsp.lm", "assets"));
     LightmapFileHeader lmHeader;
     file.write(lmHeader);
 

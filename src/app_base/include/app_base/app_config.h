@@ -18,14 +18,6 @@ public:
          */
         Item(nlohmann::json *pJson);
 
-        
-        // Getters for items. If not found or invalid type, throws an exception.
-        /*int getInt(const std::string &key, const std::optional<int> &defVal = std::nullopt) const;
-        float getFloat(const std::string &key, const std::optional<float> &defVal = std::nullopt) const;
-        double getDouble(const std::string &key, const std::optional<double> &defVal = std::nullopt) const;
-        bool getBool(const std::string &key, const std::optional<bool> &defVal = std::nullopt) const;
-        std::string getString(const std::string &key, const std::optional<std::string> &defVal = std::nullopt) const;*/
-
         /**
          * Returns value for a key. If not found or invalid type, throws an exception.
          */
@@ -52,9 +44,19 @@ public:
     };
 
     /**
+     * Constructs empty AppConfig.
+     */
+    AppConfig() = default;
+
+    /**
      * Constructs AppConfig, loads base and app-specific configs.
      */
     AppConfig(const fs::path &path);
+
+    /**
+     * Loads a JSON object file.
+     */
+    void loadJsonFile(const fs::path &path);
 
     /**
      * Returns whether item exists in the root.
@@ -78,11 +80,6 @@ public:
 
 private:
     std::shared_ptr<nlohmann::json> m_pData;
-
-    /**
-     * Loads a JSON object file.
-     */
-    void loadJsonFile(const fs::path &path);
 };
 
 #endif

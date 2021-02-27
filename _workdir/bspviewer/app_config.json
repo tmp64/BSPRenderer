@@ -11,6 +11,24 @@
 		"extcon_port": 27333
 	},
 	
+	"rad": {
+		// Size of the patch in units
+		"patch_size": 48,
+		
+		// Bounce count
+		"bounce_count": 32,
+		
+		// Base surface reflectivity
+		"reflectivity": 0.4,
+		
+		// The light color
+		// "light_color": [194, 218, 252]
+		"light_color": [255, 255, 255],
+		"light_brightness": 100,
+		
+		"map": "crossfire"
+	},
+	
 	"commands": [
 		"app_sync_rates 1",
 		"app_fps_max 300"
