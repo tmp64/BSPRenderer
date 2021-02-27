@@ -37,6 +37,7 @@ public:
     bool traceLine(glm::vec3 from, glm::vec3 to);
 
     static inline void setLevel(bsp::Level *lvl) { m_pLevel = lvl; }
+    static inline bsp::Level *getLevel() { return m_pLevel; }
 
 private:
     static inline bsp::Level *m_pLevel = nullptr;

@@ -254,3 +254,67 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
     entLump.push_back('\0');
     m_Entities = EntityList(entLump);
 }
+
+int bsp::Level::traceLine(glm::vec3 from, glm::vec3 to) {
+    return recursiveTraceLine(0, from, to);
+}
+
+int bsp::Level::recursiveTraceLine(int nodeidx, const glm::vec3 &start, const glm::vec3 &stop) const {
+    // Based on VDC article:
+    // https://developer.valvesoftware.com/wiki/BSP#How_are_BSP_trees_used_for_collision_detection.3F
+    // and qrad code from HLSDK.
+    constexpr float ON_EPSILON = 0.01f;
+
+    if (nodeidx < 0) {
+        const BSPLeaf &leaf = getLeaves()[~nodeidx];
+
+        if (leaf.nContents == CONTENTS_SOLID) {
+            return CONTENTS_SOLID;
+        } else if (leaf.nContents == CONTENTS_SKY) {
+            return CONTENTS_SKY;
+        } else {
+            return CONTENTS_EMPTY;
+        }
+    }
+
+    const BSPNode &node = getNodes()[nodeidx];
+    const BSPPlane &plane = getPlanes()[node.iPlane];
+
+    // Code from qrad/trace.c TestLine_r
+    float front, back;
+    switch (plane.nType) {
+    case bsp::PlaneType::PlaneX:
+        front = start[0] - plane.fDist;
+        back = stop[0] - plane.fDist;
+        break;
+    case bsp::PlaneType::PlaneY:
+        front = start[1] - plane.fDist;
+        back = stop[1] - plane.fDist;
+        break;
+    case bsp::PlaneType::PlaneZ:
+        front = start[2] - plane.fDist;
+        back = stop[2] - plane.fDist;
+        break;
+    default:
+        front = glm::dot(start, plane.vNormal) - plane.fDist;
+        back = glm::dot(stop, plane.vNormal) - plane.fDist;
+        break;
+    }
+
+    if (front >= -ON_EPSILON && back >= -ON_EPSILON)
+        return recursiveTraceLine(node.iChildren[0], start, stop);
+
+    if (front < ON_EPSILON && back < ON_EPSILON)
+        return recursiveTraceLine(node.iChildren[1], start, stop);
+
+    int side = front < 0;
+
+    float frac = front / (front - back);
+    glm::vec3 mid = start + (stop - start) * frac;
+
+    int r = recursiveTraceLine(node.iChildren[side], start, mid);
+    if (r != CONTENTS_EMPTY) {
+        return r;
+    }
+    return recursiveTraceLine(node.iChildren[!side], mid, stop);
+}

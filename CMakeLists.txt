@@ -32,6 +32,7 @@ add_subdirectory(external/sdl_net)
 
 # Libraries
 add_subdirectory(src/appfw)
+add_subdirectory(src/app_base)
 add_subdirectory(src/gui_app)
 add_subdirectory(src/bsp)
 add_subdirectory(src/renderer)

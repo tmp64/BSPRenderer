@@ -1,7 +1,5 @@
 add_executable(rad
 	CMakeLists.txt
-	src/bsp_tree.cpp
-	src/bsp_tree.h
 	src/main.cpp
 	src/main.h
 	src/patch_list.cpp

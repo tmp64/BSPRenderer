@@ -113,6 +113,12 @@ public:
      */
     void loadFromBytes(appfw::span<uint8_t> data);
 
+    /**
+     * Traces a line and returns contents of hit leaf
+     * (CONTENTS_SOLID or CONTENTS_SKY) or CONTENTS_EMPTY if didn't hit.
+     */
+    int traceLine(glm::vec3 from, glm::vec3 to);
+
     inline const std::vector<BSPPlane> &getPlanes() const { return m_Planes; }
     inline const std::vector<BSPMipTex> &getTextures() const { return m_Textures; }
     inline const std::vector<glm::vec3> &getVertices() const { return m_Vertices; }
@@ -143,6 +149,8 @@ private:
     std::vector<BSPSurfEdge> m_SurfEdges;
     std::vector<BSPModel> m_Models;
     EntityList m_Entities;
+
+    int recursiveTraceLine(int node, const glm::vec3 &from, const glm::vec3 &to) const;
 };
 
 } // namespace bsp

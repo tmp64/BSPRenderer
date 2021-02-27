@@ -54,7 +54,7 @@ public:
     /**
      * Constructs AppConfig, loads base and app-specific configs.
      */
-    AppConfig();
+    AppConfig(const fs::path &path);
 
     /**
      * Returns whether item exists in the root.

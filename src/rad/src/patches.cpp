@@ -4,7 +4,6 @@
 #include "patches.h"
 #include "main.h"
 #include "utils.h"
-#include "bsp_tree.h"
 #include "vis.h"
 #include "patch_list.h"
 

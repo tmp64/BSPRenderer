@@ -16,7 +16,8 @@ static ConCommand cmd_quit("quit", "Quits the app", [](const appfw::ParsedComman
 });
 
 GuiAppBase::GuiAppBase()
-    : m_AppConfigInit(m_AppConfig)
+    : m_AppConfig(getFileSystem().findFile(app_getInitInfo().appDirName + "/app_config.json", "base"))
+    , m_AppConfigInit(m_AppConfig)
     , m_Window(m_AppConfig)
     , m_ImGui(m_Window) {
     AFW_ASSERT(!m_sBaseInstance);

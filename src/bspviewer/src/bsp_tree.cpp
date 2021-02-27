@@ -16,9 +16,10 @@ static ConCommand cmd_trace2("trace2", "", [](const appfw::ParsedCommand &) {
     logInfo("Trace: point 2 ({}; {}; {})", s_Points[1].x, s_Points[1].y, s_Points[1].z);
 
     logInfo("Trace: distance {}", glm::length(s_Points[1] - s_Points[0]));
-    bool traceRes = g_BSPTree.traceLine(s_Points[0], s_Points[1]);
-    if (traceRes) {
-        logError("HIT");
+    bsp::Level *lvl = g_BSPTree.getLevel();
+    int traceRes = lvl->traceLine(s_Points[0], s_Points[1]);
+    if (traceRes != bsp::CONTENTS_EMPTY) {
+        logError("HIT {}", traceRes);
     } else {
         logWarn("CLEAR");
     }

@@ -18,7 +18,7 @@ bsp::WADTexture::WADTexture(const BSPMipTex &texture, const appfw::span<uint8_t>
 
     m_TexData = file.subspan(texture.nOffsets[0], dataSize);
 
-    // Just after the last mipmap entry
+    // 2 bytes after the last mipmap entry
     int colorTableOffset =
         texture.nOffsets[MIP_LEVELS - 1] + (m_iWide >> (MIP_LEVELS - 1)) * (m_iTall >> (MIP_LEVELS - 1)) + 2;
 

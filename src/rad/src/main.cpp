@@ -5,7 +5,6 @@
 #include "main.h"
 #include "utils.h"
 #include "patches.h"
-#include "bsp_tree.h"
 #include "vis.h"
 #include "plat.h"
 #include "patch_list.h"
@@ -84,7 +83,6 @@ void loadLevel(const std::string &levelPath) {
     g_LevelPath = levelPath;
     loadPlanes();
     loadFaces();
-    g_BSPTree.createTree();
 }
 
 void loadPlanes() {

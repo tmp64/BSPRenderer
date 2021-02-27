@@ -1,5 +1,4 @@
 set(PUBLIC_HEADERS
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/app_config.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/base_view.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/base_view_2d.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/dev_console_dialog.h
@@ -14,7 +13,6 @@ set(PRIVATE_HEADERS
 )
 
 set(PRIVATE_SOURCES
-	${CMAKE_CURRENT_SOURCE_DIR}/src/app_config.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view_2d.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.cpp
@@ -36,6 +34,7 @@ target_include_directories(gui_app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_link_libraries(gui_app
 	appfw
+	app_base
 	glad
 	glm::glm
 	imgui

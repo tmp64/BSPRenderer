@@ -4,7 +4,6 @@
 #include <appfw/binary_file.h>
 #include "main.h"
 #include "vis.h"
-#include "bsp_tree.h"
 #include "plat.h"
 #include "patch_list.h"
 
@@ -13,12 +12,9 @@
 
 static std::vector<uint8_t> s_VisMatrix;
 
-static appfw::BinaryWriter s_BinFile;
-
 void buildVisMatrix() {
     logInfo("Building visibility matrix...");
     appfw::Timer timer;
-    s_BinFile.open("test.dat");
     timer.start();
 
 #ifdef HALFBIT
@@ -186,7 +182,7 @@ void testPatchToFace(size_t patchnum, int facenum, size_t bitpos) {
         // check vis between patch and patch2
         // if bit has not already been set
         // and p2 is visible from p1
-        if (m > patchnum && !g_BSPTree.traceLine(patch.getOrigin(), patch2.getOrigin())) {
+        if (m > patchnum && g_Level.traceLine(patch.getOrigin(), patch2.getOrigin()) == bsp::CONTENTS_EMPTY) {
 
             // patchnum can see patch m
             size_t bitset = bitpos + m;

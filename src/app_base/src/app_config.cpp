@@ -1,8 +1,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <appfw/services.h>
-#include <gui_app/app_config.h>
-#include <gui_app/gui_app_base.h>
+#include <app_base/app_config.h>
 
 //------------------------------------------------------
 // Item
@@ -48,13 +47,11 @@ bool AppConfig::Item::contains(const std::string &key) const { return m_pValue->
 //------------------------------------------------------
 // AppConfig
 //------------------------------------------------------
-AppConfig::AppConfig() {
+AppConfig::AppConfig(const fs::path &path) {
     try {
-        fs::path cfgPath = getFileSystem().findFile(app_getInitInfo().appDirName + "/app_config.json", "base");
-        
-        loadJsonFile(cfgPath);
+        loadJsonFile(path);
     } catch (const std::exception &e) {
-        app_fatalError("AppConfig: {}", e.what());
+        throw std::runtime_error(fmt::format("AppConfig: {}", e.what()));
     }
 }
 

@@ -6,7 +6,7 @@
 #include <appfw/services.h>
 #include <appfw/timer.h>
 #include <appfw/compiler.h>
-#include <gui_app/app_config.h>
+#include <app_base/app_config.h>
 #include <gui_app/utils.h>
 #include <gui_app/input_system.h>
 #include <gui_app/dev_console_dialog.h>
