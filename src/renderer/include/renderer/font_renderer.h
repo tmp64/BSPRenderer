@@ -7,7 +7,7 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-class FontRenderer : appfw::utils::NoCopy {
+class FontRenderer : appfw::NoCopy {
 public:
     class FontShader : public BaseShader {
     public:

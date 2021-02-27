@@ -31,7 +31,7 @@ constexpr int SURF_PLANEBACK = (1 << 1);
  */
 constexpr int SURF_DRAWSKY = (1 << 2);
 
-class SurfaceRenderer : appfw::utils::NoCopy {
+class SurfaceRenderer : appfw::NoCopy {
 public:
     enum class ProjType {
         None = 0,

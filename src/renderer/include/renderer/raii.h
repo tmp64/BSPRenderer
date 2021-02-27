@@ -61,7 +61,7 @@ public:
  * Keeps an array of objects.
  */
 template <GLGenFunction *GEN_FUNC, GLDeleteFunction *DEL_FUNC>
-class GLRaiiVectorWrapper : appfw::utils::NoCopy {
+class GLRaiiVectorWrapper : appfw::NoCopy {
 public:
     GLRaiiVectorWrapper() noexcept = default;
 
@@ -122,7 +122,7 @@ using GLVao = GLRaiiWrapper<&glGenVertexArrays, &glDeleteVertexArrays>;
  */
 using GLBuffer = GLRaiiWrapper<&glGenBuffers, &glDeleteBuffers>;
 
-/*class GLTexture : appfw::utils::NoCopy {
+/*class GLTexture : appfw::NoCopy {
 public:
     GLTexture() noexcept = default;
     GLTexture(GLTexture &&other) noexcept;
@@ -142,7 +142,7 @@ public:
 /**
  * RAII wrapper for a number of OpenGL textures.
  */
-/*class GLTextureVector : appfw::utils::NoCopy {
+/*class GLTextureVector : appfw::NoCopy {
 public:
     GLTextureVector() noexcept = default;
     GLTextureVector(GLTextureVector &&other) noexcept;

@@ -39,7 +39,7 @@ public:
         ShaderUniform<float> m_Gamma;
     };
 
-    struct Surface : appfw::utils::NoCopy {
+    struct Surface : appfw::NoCopy {
         GLuint m_nVao = 0, m_nVbo = 0;
         glm::vec3 m_Color;
         GLuint m_nLightmapTex = 0;

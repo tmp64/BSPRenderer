@@ -35,7 +35,7 @@ public:
                 }
             } else {
                 T ret;
-                if (appfw::utils::stringToVal(it->second, ret)) {
+                if (appfw::convertStringToVal(it->second, ret)) {
                     return ret;
                 } else {
                     throw std::runtime_error(std::string("key '") + key + "' is in wrong format");

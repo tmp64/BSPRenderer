@@ -6,7 +6,7 @@
 #include <SDL.h>
 #include <appfw/utils.h>
 
-class InputSystem : appfw::utils::NoCopy {
+class InputSystem : appfw::NoCopy {
 public:
     static constexpr size_t MAX_MOUSE_BUTTONS = 5;
 

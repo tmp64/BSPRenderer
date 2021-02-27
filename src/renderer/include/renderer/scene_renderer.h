@@ -5,7 +5,7 @@
 #include <renderer/base_shader.h>
 #include <renderer/raii.h>
 
-class SceneRenderer : appfw::utils::NoCopy {
+class SceneRenderer : appfw::NoCopy {
 public:
     SceneRenderer();
     ~SceneRenderer();
@@ -18,9 +18,10 @@ public:
     /**
      * Sets the level.
      * @param   level   Loaded bsp::Level
-     * @param   bspPath Path to the .bsp file to load lightmap from (can be empty)
+     * @param   path    Path to the .bsp file to load lightmap from (can be empty)
+     * @param   tag     Tag of .bsp
      */
-    void setLevel(bsp::Level *level, const fs::path &bspPath);
+    void setLevel(bsp::Level *level, const std::string &path, const char *tag);
 
     /**
      * Sets perspective projection.
@@ -145,7 +146,7 @@ private:
     void destroyFramebuffer();
 
     void createSurfaces();
-    void loadCustomLightmaps(const fs::path &bspPath);
+    void loadCustomLightmaps(const std::string &path, const char *tag);
     void createSurfaceObjects();
     void loadSkyBox();
     std::vector<uint8_t> rotateImage90CW(uint8_t *data, int wide, int tall);

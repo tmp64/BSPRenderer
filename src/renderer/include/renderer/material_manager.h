@@ -9,7 +9,7 @@
 
 constexpr size_t NULL_MATERIAL = 0;
 
-struct CheckerboardImage : appfw::utils::NoCopy {
+struct CheckerboardImage : appfw::NoCopy {
     std::vector<uint8_t> data;
     int size;
 
@@ -21,7 +21,7 @@ struct CheckerboardImage : appfw::utils::NoCopy {
 /**
  * A material that can have multiple textures.
  */
-class Material : appfw::utils::NoCopy {
+class Material : appfw::NoCopy {
 public:
     Material() = default;
     Material(std::nullptr_t);

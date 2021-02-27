@@ -18,7 +18,7 @@ public:
         ShaderUniform<glm::vec3> m_Color;
     };
 
-    struct Surface : appfw::utils::NoCopy {
+    struct Surface : appfw::NoCopy {
         GLuint m_Vao = 0, m_Vbo = 0;
         glm::vec3 m_Color;
         size_t m_VertexCount = 0;

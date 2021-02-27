@@ -197,7 +197,7 @@ void DevConsoleDialog::Draw(const char *title, bool *p_open) {
 }
 
 void DevConsoleDialog::ExecCommand(const char *command_line) {
-    appfw::console::ConsoleMsgInfo msgInfo(appfw::console::ConsoleMsgType::ConInput);
+    appfw::ConsoleMsgInfo msgInfo(appfw::ConsoleMsgType::ConInput);
     msgInfo.moduleName = "imgui console";
     m_pConSystem->print(msgInfo,
                         std::string("> ") + command_line);
@@ -312,22 +312,22 @@ int DevConsoleDialog::TextEditCallback(ImGuiInputTextCallbackData *data) {
     return 0;
 }
 
-void DevConsoleDialog::onAdd(appfw::console::IConsoleSystem *conSystem) {
+void DevConsoleDialog::onAdd(appfw::IConsoleSystem *conSystem) {
     AFW_ASSERT(!m_pConSystem);
-    m_pConSystem = static_cast <appfw::console::ConsoleSystem *>(conSystem);
+    m_pConSystem = static_cast <appfw::ConsoleSystem *>(conSystem);
     m_pConSystem->printPreviousMessages(this);
 }
 
-void DevConsoleDialog::onRemove([[maybe_unused]] appfw::console::IConsoleSystem *conSystem) {
+void DevConsoleDialog::onRemove([[maybe_unused]] appfw::IConsoleSystem *conSystem) {
     AFW_ASSERT(m_pConSystem == conSystem);
     m_pConSystem = nullptr;
 }
 
-void DevConsoleDialog::print(const appfw::console::ConsoleMsgInfo &msgInfo, const std::string &msg) {
+void DevConsoleDialog::print(const appfw::ConsoleMsgInfo &msgInfo, const std::string &msg) {
     appfw::Color color = msgInfo.color;
 
     if (color.a() == 0) {
-        static appfw::Color colors[(int)appfw::console::ConsoleMsgType::TypeCount] = {
+        static appfw::Color colors[(int)appfw::ConsoleMsgType::TypeCount] = {
             appfw::Color(128, 0, 0),     // Fatal
             appfw::Color(255, 0, 0),     // Error
             appfw::Color(255, 255, 0),   // Warn

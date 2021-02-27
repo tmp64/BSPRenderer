@@ -5,7 +5,7 @@
 #include <glm/gtx/quaternion.hpp>
 #include <appfw/utils.h>
 
-class BaseView : appfw::utils::NoCopy {
+class BaseView : appfw::NoCopy {
 public:
     BaseView();
     ~BaseView();

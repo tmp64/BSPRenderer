@@ -10,7 +10,7 @@ class AppConfig;
 /**
  * SDL2 RAII wrapper.
  */
-class SDLAppComponent : appfw::utils::NoCopy {
+class SDLAppComponent : appfw::NoCopy {
 public:
     SDLAppComponent();
     ~SDLAppComponent();
@@ -24,7 +24,7 @@ private:
 /**
  * AppFW RAII wrapper.
  */
-class AppFWAppComponent : appfw::utils::NoCopy {
+class AppFWAppComponent : appfw::NoCopy {
 public:
     AppFWAppComponent();
     ~AppFWAppComponent();
@@ -35,14 +35,14 @@ public:
 /**
  * Initializes appfw::FileSystem.
  */
-class FileSystemAppComponent : appfw::utils::NoCopy {
+class FileSystemAppComponent : appfw::NoCopy {
 public:
     FileSystemAppComponent();
 
     fs::path m_BaseAppPath;
 };
 
-class AppConfigInitAppComponent : appfw::utils::NoCopy {
+class AppConfigInitAppComponent : appfw::NoCopy {
 public:
     AppConfigInitAppComponent(AppConfig &cfg);
 };
@@ -50,7 +50,7 @@ public:
 /**
  * SDL2 OpenGL RAII wrapper.
  */
-class OpenGLAppComponent : appfw::utils::NoCopy {
+class OpenGLAppComponent : appfw::NoCopy {
 public:
     OpenGLAppComponent();
     ~OpenGLAppComponent();
@@ -59,7 +59,7 @@ public:
 /**
  * SDL2 window and OpenGL context RAII wrapper.
  */
-class MainWindowAppComponent : appfw::utils::NoCopy {
+class MainWindowAppComponent : appfw::NoCopy {
 public:
     MainWindowAppComponent(AppConfig &config);
     ~MainWindowAppComponent();
@@ -78,7 +78,7 @@ private:
 /**
  * ImGui RAII wrapper.
  */
-class ImGuiAppComponent : appfw::utils::NoCopy {
+class ImGuiAppComponent : appfw::NoCopy {
 public:
     ImGuiAppComponent(MainWindowAppComponent &window);
     ~ImGuiAppComponent();
@@ -100,7 +100,7 @@ private:
 /**
  * Renderer system RAII wrapper.
  */
-class RendererSystemAppComponent : appfw::utils::NoCopy {
+class RendererSystemAppComponent : appfw::NoCopy {
 public:
     RendererSystemAppComponent();
     ~RendererSystemAppComponent();

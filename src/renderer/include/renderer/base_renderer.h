@@ -6,11 +6,11 @@
 #include <bsp/level.h>
 #include <renderer/material_manager.h>
 
-extern appfw::console::ConVar<int> r_cull;
-extern appfw::console::ConVar<bool> r_drawworld;
-extern appfw::console::ConVar<int> r_fullbright;
-extern appfw::console::ConVar<float> r_gamma;
-extern appfw::console::ConVar<float> r_texgamma;
+extern ConVar<int> r_cull;
+extern ConVar<bool> r_drawworld;
+extern ConVar<int> r_fullbright;
+extern ConVar<float> r_gamma;
+extern ConVar<float> r_texgamma;
 
 constexpr float BACKFACE_EPSILON = 0.01f;
 
@@ -71,7 +71,7 @@ struct Plane : public bsp::BSPPlane {
     uint8_t signbits; // signx + (signy<<1) + (signz<<1)
 };
 
-class BaseRenderer : appfw::utils::NoCopy {
+class BaseRenderer : appfw::NoCopy {
 public:
     /**
      * Contains rendering settings.

@@ -21,7 +21,7 @@ static ConCommand cmd_bind("bind", "Binds a key to a command", [](const appfw::P
         if (keyCmd.empty()) {
             logInfo("Key {} is unbound.", cmd[1]);
         } else {
-            logInfo("Key {} is bound to {}", cmd[1], appfw::utils::commandToString(keyCmd));
+            logInfo("Key {} is bound to {}", cmd[1], appfw::convertCommandToString(keyCmd));
         }
 
         return;
@@ -150,7 +150,7 @@ const appfw::ParsedCommand &InputSystem::getKeyBind(SDL_Scancode key) {
 }
 
 void InputSystem::bindKey(SDL_Scancode key, const std::string &cmd) {
-    appfw::ParsedCommand pcmd = appfw::utils::parseCommand(cmd);
+    appfw::ParsedCommand pcmd = appfw::parseCommand(cmd);
     bindKey(key, pcmd);
 }
 

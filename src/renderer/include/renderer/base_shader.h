@@ -11,9 +11,9 @@
 
 class UniformCommon;
 
-class BaseShader : appfw::utils::NoCopy {
+class BaseShader : appfw::NoCopy {
 public:
-    class UniformBase : appfw::utils::NoCopy {
+    class UniformBase : appfw::NoCopy {
     protected:
         UniformBase(BaseShader *pShader, const char *name);
         // virtual ~CUniformCommon();

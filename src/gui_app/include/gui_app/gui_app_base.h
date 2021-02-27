@@ -27,7 +27,7 @@ public:
 /**
  * A base class for GUI OpenGL apps.
  */
-class GuiAppBase : appfw::utils::NoCopy {
+class GuiAppBase : appfw::NoCopy {
 public:
     static constexpr float NORMAL_DPI = 96;
 

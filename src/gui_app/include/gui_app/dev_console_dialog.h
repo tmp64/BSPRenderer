@@ -7,7 +7,7 @@
 #include <appfw/utils.h>
 #include <appfw/console/console_system.h>
 
-class DevConsoleDialog : appfw::utils::NoCopy, public appfw::console::IConsoleReceiver {
+class DevConsoleDialog : appfw::NoCopy, public appfw::IConsoleReceiver {
 public:
     DevConsoleDialog();
     ~DevConsoleDialog();
@@ -33,9 +33,9 @@ public:
     int TextEditCallback(ImGuiInputTextCallbackData *data);
 
     // IConsoleReceiver
-    virtual void onAdd(appfw::console::IConsoleSystem *conSystem) override;
-    virtual void onRemove(appfw::console::IConsoleSystem *conSystem) override;
-    virtual void print(const appfw::console::ConsoleMsgInfo &msgInfo, const std::string &msg) override;
+    virtual void onAdd(appfw::IConsoleSystem *conSystem) override;
+    virtual void onRemove(appfw::IConsoleSystem *conSystem) override;
+    virtual void print(const appfw::ConsoleMsgInfo &msgInfo, const std::string &msg) override;
 
 private:
     struct LogEntry {
@@ -50,7 +50,7 @@ private:
     ImGuiTextFilter Filter;
     bool AutoScroll;
     bool ScrollToBottom;
-    appfw::console::ConsoleSystem *m_pConSystem = nullptr;
+    appfw::ConsoleSystem *m_pConSystem = nullptr;
 };
 
 #endif

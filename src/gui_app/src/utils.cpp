@@ -29,11 +29,7 @@ SDLAppComponent::~SDLAppComponent() {
 
 AppFWAppComponent::AppFWAppComponent() {
     using namespace appfw::init;
-    InitOptions opts;
-    
-    opts.iExtConPort = 0;
-
-    init(opts);
+    init();
 }
 
 AppFWAppComponent::~AppFWAppComponent() { appfw::init::shutdown(); }

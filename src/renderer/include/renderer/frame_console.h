@@ -7,7 +7,7 @@
  * A console that draws directly to the framebuffer.
  * Any written data is only valid for one frame.
  */
-class FrameConsole : appfw::utils::NoCopy {
+class FrameConsole : appfw::NoCopy {
 public:
     static constexpr char FONT_NAME[] = "fonts/courbd.ttf";
     static constexpr int FONT_SIZE = 20;
