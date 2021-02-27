@@ -8,7 +8,7 @@ static glm::vec3 s_Points[2];
 
 static ConCommand cmd_trace1("trace1", "", [](const appfw::ParsedCommand &) {
     s_Points[0] = BSPViewer::get().getCameraPos();
-    logInfo("Trace: point 1 ({}; {}; {})", s_Points[1].x, s_Points[1].y, s_Points[1].z);
+    logInfo("Trace: point 1 ({}; {}; {})", s_Points[0].x, s_Points[0].y, s_Points[0].z);
 });
 
 static ConCommand cmd_trace2("trace2", "", [](const appfw::ParsedCommand &) {

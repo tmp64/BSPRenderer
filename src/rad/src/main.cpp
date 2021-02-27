@@ -15,6 +15,8 @@ bsp::Level g_Level;
 RADConfig g_Config;
 AppConfig g_AppConfig;
 
+EnvLight g_EnvLight;
+
 std::vector<Plane> g_Planes;
 std::vector<Face> g_Faces;
 std::vector<LightmapTexture> g_Lightmaps;
@@ -26,6 +28,7 @@ void initApp();
 void loadLevel();
 void loadPlanes();
 void loadFaces();
+void loadEnvLight();
 
 void applyColors();
 void writeLightmaps();
@@ -59,6 +62,7 @@ int main(int, char **) {
         createPatches();
         buildVisMatrix();
         calcViewFactors();
+        applyEnvLighting();
         bounceLight();
         applyColors();
         writeLightmaps();
@@ -114,6 +118,7 @@ void loadLevel() {
     g_Level.loadFromFile(levelPath);
     loadPlanes();
     loadFaces();
+    loadEnvLight();
 }
 
 void loadPlanes() {
@@ -222,33 +227,33 @@ void loadFaces() {
 
         // Calculate plane bounds
         {
-            float minX = 999999, minY = 999999;
-            float maxX = -999999, maxY = -999999;
+        float minX = 999999, minY = 999999;
+        float maxX = -999999, maxY = -999999;
 
-            for (Face::Vertex &v : face.vertices) {
-                minX = std::min(minX, v.vPlanePos.x);
-                minY = std::min(minY, v.vPlanePos.y);
+        for (Face::Vertex &v : face.vertices) {
+            minX = std::min(minX, v.vPlanePos.x);
+            minY = std::min(minY, v.vPlanePos.y);
 
-                maxX = std::max(maxX, v.vPlanePos.x);
-                maxY = std::max(maxY, v.vPlanePos.y);
-            }
+            maxX = std::max(maxX, v.vPlanePos.x);
+            maxY = std::max(maxY, v.vPlanePos.y);
+        }
 
-            face.planeMinBounds.x = minX;
-            face.planeMinBounds.y = minY;
+        face.planeMinBounds.x = minX;
+        face.planeMinBounds.y = minY;
 
-            face.planeMaxBounds.x = maxX;
-            face.planeMaxBounds.y = maxY;
+        face.planeMaxBounds.x = maxX;
+        face.planeMaxBounds.y = maxY;
 
-            AFW_ASSERT(floatEquals(minX, 0));
-            AFW_ASSERT(floatEquals(minY, 0));
+        AFW_ASSERT(floatEquals(minX, 0));
+        AFW_ASSERT(floatEquals(minY, 0));
 
-            // Also set lightmap coords
-            float flTexMaxX = (float)texFloatToInt(maxX);
-            float flTexMaxY = (float)texFloatToInt(maxY);
-            for (Face::Vertex &v : face.vertices) {
-                v.vLMCoord.x = v.vPlanePos.x / flTexMaxX;
-                v.vLMCoord.y = v.vPlanePos.y / flTexMaxY;
-            }
+        // Also set lightmap coords
+        float flTexMaxX = (float)texFloatToInt(maxX);
+        float flTexMaxY = (float)texFloatToInt(maxY);
+        for (Face::Vertex &v : face.vertices) {
+            v.vLMCoord.x = v.vPlanePos.x / flTexMaxX;
+            v.vLMCoord.y = v.vPlanePos.y / flTexMaxY;
+        }
         }
 
         face.flPatchSize = g_Config.flPatchSize;
@@ -259,7 +264,8 @@ void loadFaces() {
             const bsp::BSPMipTex &mipTex = g_Level.getTextures().at(texInfo.iMiptex);
             if (!strncmp(mipTex.szName, "SKY", 3) || !strncmp(mipTex.szName, "sky", 3)) {
                 face.iFlags |= FACE_SKY;
-            } else if (mipTex.szName[0] == '~') {
+            }
+            else if (mipTex.szName[0] == '~') {
                 // FIXME: Remove that later
                 face.iFlags |= FACE_HACK;
             }
@@ -269,6 +275,65 @@ void loadFaces() {
     }
 
     g_Faces.shrink_to_fit();
+}
+
+void loadEnvLight() {
+    const bsp::Level::EntityListItem *pLight = g_Level.getEntities().findEntityByClassname("light_environment");
+
+    if (!pLight) {
+        return;
+    }
+
+    // Read color
+    int color[4];
+    if (sscanf(pLight->getValue<std::string>("_light").c_str(), "%d %d %d %d", &color[0], &color[1], &color[2],
+        &color[3]) != 4) {
+        throw std::runtime_error(
+            fmt::format("light_environment _light = {} is invalid", pLight->getValue<std::string>("_light")));
+    }
+
+    g_EnvLight.vColor.r = color[0] / 255.f;
+    g_EnvLight.vColor.g = color[1] / 255.f;
+    g_EnvLight.vColor.b = color[2] / 255.f;
+    g_EnvLight.vColor *= color[3];
+    g_EnvLight.vColor /= g_AppConfig.getItem("rad").get<float>("light_env_brightness_divisor");
+
+    // Read yaw
+    float yaw = pLight->getValue<float>("angle");
+
+    if (yaw == -1) {
+        // ANGLE_UP
+        g_EnvLight.vDirection.x = 0;
+        g_EnvLight.vDirection.y = 0;
+        g_EnvLight.vDirection.z = 1;
+    }
+    else if (yaw == -2) {
+        // ANGLE_DOWN
+        g_EnvLight.vDirection.x = 0;
+        g_EnvLight.vDirection.y = 0;
+        g_EnvLight.vDirection.z = -1;
+    }
+    else {
+        g_EnvLight.vDirection.x = cos(glm::radians(yaw));
+        g_EnvLight.vDirection.y = sin(glm::radians(yaw));
+        g_EnvLight.vDirection.z = 0;
+    }
+
+    // Read pitch
+    float pitch = pLight->getValue<float>("pitch");
+    g_EnvLight.vDirection.x *= cos(glm::radians(pitch));
+    g_EnvLight.vDirection.y *= cos(glm::radians(pitch));
+    g_EnvLight.vDirection.z = sin(glm::radians(pitch));
+
+    g_EnvLight.vDirection = glm::normalize(g_EnvLight.vDirection);
+
+    logInfo("Envlight direction: [{}, {}, {}]", g_EnvLight.vDirection.x, g_EnvLight.vDirection.y,
+            g_EnvLight.vDirection.z);
+
+    // Check if there are multiple suns
+    if (g_Level.getEntities().findEntityByClassname("light_environment", pLight)) {
+        logWarn("Level has multiple light_environment. Only first one is used.");
+    }
 }
 
 /**

@@ -98,7 +98,7 @@ void createPatches() {
 
                 // TODO: Remove that, read lights from a file
                 if (face.iFlags & FACE_HACK) {
-                    patch.getFinalColor() = getPatchBounce(patchIdx, 0) = g_Config.flThatLight;
+                    getPatchBounce(patchIdx, 0) = g_Config.flThatLight;
                 }
 
                 patchIdx++;
@@ -244,12 +244,40 @@ void calcViewFactors() {
     logInfo("        ... {:.3} s", timer.elapsedSeconds());
 }
 
+void applyEnvLighting() {
+    for (size_t patchIdx = 0; patchIdx < g_Patches.size(); patchIdx++) {
+        PatchRef patch(patchIdx);
+        // Check if patch can be hit by the sky
+        float cosangle = -glm::dot(patch.getNormal(), g_EnvLight.vDirection);
+
+        if (cosangle < 0.001f) {
+            continue;
+        }
+
+        // Cast a ray to the sky and check if it hits
+        glm::vec3 from = patch.getOrigin();
+        glm::vec3 to = from + (g_EnvLight.vDirection * -10000.f);
+
+        if (g_Level.traceLine(from, to) == bsp::CONTENTS_SKY) {
+            // Hit the sky, add the sun color
+            getPatchBounce(patchIdx, 0) += g_EnvLight.vColor * cosangle;
+        }
+    }
+}
+
 void bounceLight() {
     logInfo("Bouncing light...");
 
     float p = g_Config.flReflectivity;
     size_t patchCount = g_Patches.size();
 
+    // Set initial color of patches
+    for (size_t i = 0; i < patchCount; i++) {
+        PatchRef patch(i);
+        patch.getFinalColor() = getPatchBounce(i, 0);
+    }
+
+    // Bounce light
     for (size_t bounce = 1; bounce <= g_Config.iBounceCount; bounce++) {
         logInfo("Bounce {}", bounce);
         for (size_t i = 0; i < patchCount; i++) {

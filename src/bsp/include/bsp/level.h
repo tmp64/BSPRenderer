@@ -66,7 +66,13 @@ public:
         /**
          * Returns pointer to an entity with specified targetname or nullptr.
          */
-        const EntityListItem *findEntityByName(const std::string &targetname) const;
+        const EntityListItem *findEntityByName(const std::string &targetname, const EntityListItem *pPrev = nullptr) const;
+
+        /**
+         * Returns pointer to an entity with specified classname or nullptr.
+         */
+        const EntityListItem *findEntityByClassname(const std::string &classname,
+                                                    const EntityListItem *pPrev = nullptr) const;
 
         inline auto begin() { return m_Items.begin(); }
         inline auto end() { return m_Items.begin(); }

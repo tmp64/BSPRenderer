@@ -13,7 +13,7 @@
 	
 	"rad": {
 		// Size of the patch in units
-		"patch_size": 48,
+		"patch_size": 32,
 		
 		// Bounce count
 		"bounce_count": 32,
@@ -25,6 +25,8 @@
 		// "light_color": [194, 218, 252]
 		"light_color": [255, 255, 255],
 		"light_brightness": 100,
+		
+		"light_env_brightness_divisor": 20,
 		
 		"map": "crossfire"
 	},

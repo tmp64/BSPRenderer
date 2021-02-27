@@ -27,16 +27,14 @@ inline int texFloatToInt(float flVal) {
 void createPatches();
 
 /**
- * Calculates view factors between patches in O(n^2). Takes a LONG time even for small maps.
- * TODO: Optimize with VIS data.
- * TODO: Check visibility of patches.
+ * Calculates view factors between patches in O(n^2). Takes a long time when patch size is small.
  */
 void calcViewFactors();
 
 /**
- * Calculates view factors between patches in O(n^2).
+ * Adds sunlight to patches.
  */
-void calcViewFactors2();
+void applyEnvLighting();
 
 /**
  * Bounces light around.

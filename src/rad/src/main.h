@@ -138,12 +138,18 @@ struct RADConfig {
     float flPatchSize = 0;
     size_t iBounceCount = 0;
     float flReflectivity = 0;
-    glm::vec3 flThatLight;
+    glm::vec3 flThatLight = glm::vec3(0, 0, 0);
     std::string mapName;
+};
+
+struct EnvLight {
+    glm::vec3 vColor = glm::vec3(0, 0, 0);      // color * brightness
+    glm::vec3 vDirection = glm::vec3(0, 0, 0);  // Direction of sun rays
 };
 
 extern bsp::Level g_Level;
 extern RADConfig g_Config;
+extern EnvLight g_EnvLight;
 
 extern std::vector<Plane> g_Planes;
 extern std::vector<Face> g_Faces;

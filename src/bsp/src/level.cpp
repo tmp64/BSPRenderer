@@ -110,10 +110,28 @@ bsp::Level::EntityList::EntityList(const std::vector<char> &entityLump) {
     }
 }
 
-const bsp::Level::EntityListItem *bsp::Level::EntityList::findEntityByName(const std::string &targetname) const {
-    for (const EntityListItem &i : m_Items) {
-        if (i.getValue<std::string>("targetname") == targetname) {
-            return &i;
+const bsp::Level::EntityListItem *bsp::Level::EntityList::findEntityByName(const std::string &targetname,
+                                                                           const EntityListItem *pPrev) const {
+    const EntityListItem *pFirst = pPrev ? (pPrev + 1) : m_Items.data();
+    const EntityListItem *pEnd = m_Items.data() + m_Items.size();
+
+    for (const EntityListItem *pItem = pFirst; pItem != pEnd; pItem++) {
+        if (pItem->getValue<std::string>("targetname") == targetname) {
+            return pItem;
+        }
+    }
+
+    return nullptr;
+}
+
+const bsp::Level::EntityListItem *bsp::Level::EntityList::findEntityByClassname(const std::string &classname,
+                                                                                const EntityListItem *pPrev) const {
+    const EntityListItem *pFirst = pPrev ? (pPrev + 1) : m_Items.data();
+    const EntityListItem *pEnd = m_Items.data() + m_Items.size();
+
+    for (const EntityListItem *pItem = pFirst; pItem != pEnd; pItem++) {
+        if (pItem->getValue<std::string>("classname") == classname) {
+            return pItem;
         }
     }
 
