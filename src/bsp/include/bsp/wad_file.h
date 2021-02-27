@@ -42,10 +42,13 @@ public:
     /**
      * List of textures from the WAD file.
      */
-    inline const std::vector<WADTexture> getTextures() const { return m_Textures; }
+    inline const std::vector<WADTexture> &getTextures() const { return m_Textures; }
 
 private:
+    std::vector<uint8_t> m_WadData;
     std::vector<WADTexture> m_Textures;
+
+    void loadFromBytesInternal();
 };
 
 } // namespace bsp

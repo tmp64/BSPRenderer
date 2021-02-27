@@ -35,23 +35,23 @@ public:
 
     /**
      * Returns pixels as an RGB array. It's an expensive operation.
-     * @param   mipLevel    Mipmap level (0 - original image, up to MIP_LEVELS - 1).
+     * @param   buffer  A buffer to put the image into
      */
-    std::vector<uint8_t> getRGBPixels(size_t mipLevel) const;
+    void getRGBPixels(std::vector<uint8_t> &buffer) const;
 
     /**
      * Returns pixels as an RGBA array. It's an expensive operation.
      * Only for transparent textures.
-     * @param   mipLevel    Mipmap level (0 - original image, up to MIP_LEVELS - 1).
+     * @param   buffer  A buffer to put the image into
      */
-    std::vector<uint8_t> getRGBAPixels(size_t mipLevel) const;
+    void getRGBAPixels(std::vector<uint8_t> &buffer) const;
 
 private:
     int m_iWide = 0;
     int m_iTall = 0;
     std::string m_Name;
-    std::array<uint8_t, 3 * 256> m_ColorTable;
-    std::array<std::vector<uint8_t>, MIP_LEVELS> m_TexData;
+    appfw::span<uint8_t> m_ColorTable;  // size = 3 * 256 bytes
+    appfw::span<uint8_t> m_TexData;     // size = wide * tall, index into the color table
 };
 
 } // namespace bsp

@@ -3,6 +3,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ASSERT(x) AFW_ASSERT(x)
 
+#include <appfw/timer.h>
 #include <bsp/wad_file.h>
 #include <renderer/stb_image.h>
 #include <renderer/material_manager.h>
@@ -52,8 +53,8 @@ Material::Material(std::nullptr_t) {
     const CheckerboardImage &img = CheckerboardImage::get();
     m_iWide = m_iTall = img.size;
 
-    glGenTextures(1, &m_nTexture);
-    glBindTexture(GL_TEXTURE_2D, m_nTexture);
+    m_Texture.create();
+    glBindTexture(GL_TEXTURE_2D, m_Texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -62,58 +63,28 @@ Material::Material(std::nullptr_t) {
     glGenerateMipmap(GL_TEXTURE_2D);
 }
 
-Material::Material(const bsp::WADTexture &texture) {
+Material::Material(const bsp::WADTexture &texture, std::vector<uint8_t> &buffer) {
     m_Name = texture.getName();
     m_iWide = texture.getWide();
     m_iTall = texture.getTall();
 
-    glGenTextures(1, &m_nTexture);
-    glBindTexture(GL_TEXTURE_2D, m_nTexture);
+    m_Texture.create();
+    glBindTexture(GL_TEXTURE_2D, m_Texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     if (texture.isTransparent()) {
-        std::vector<uint8_t> data = texture.getRGBAPixels(0);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texture.getWide(), texture.getTall(), 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                     data.data());
+        texture.getRGBAPixels(buffer);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture.getWide(), texture.getTall(), 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                     buffer.data());
         glGenerateMipmap(GL_TEXTURE_2D);
     } else {
-        /*std::array<std::vector<uint8_t>, bsp::MIP_LEVELS> data;
-        
-        for (size_t i = 0; i < bsp::MIP_LEVELS; i++) {
-            data[i] = texture.getRGBPixels(i);
-        }*/
-        std::vector<uint8_t> data = texture.getRGBPixels(0);
+        texture.getRGBPixels(buffer);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texture.getWide(), texture.getTall(), 0, GL_RGB, GL_UNSIGNED_BYTE,
-                     data.data());
+                     buffer.data());
         glGenerateMipmap(GL_TEXTURE_2D);
-    }
-}
-
-Material::Material(Material &&from) noexcept {
-    if (m_nTexture != 0) {
-        glDeleteTextures(1, &m_nTexture);
-        m_nTexture = 0;
-    }
-
-    m_iWide = from.m_iWide;
-    m_iTall = from.m_iTall;
-
-    from.m_iWide = from.m_iTall = 0;
-
-    m_nTexture = from.m_nTexture;
-    from.m_nTexture = 0;
-
-    m_Name = from.m_Name;
-    from.m_Name.clear();
-}
-
-Material::~Material() {
-    if (m_nTexture != 0) {
-        glDeleteTextures(1, &m_nTexture);
-        m_nTexture = 0;
     }
 }
 
@@ -137,12 +108,21 @@ void MaterialManager::shutdown() {
 
 void MaterialManager::addWadFile(const fs::path &name) {
     try {
+        appfw::Timer timer;
+        timer.start();
+
         bsp::WADFile wad(name);
+        std::vector<uint8_t> buffer;
+        buffer.reserve(512 * 512);  // Reserver up to 512x512 px
+        m_Materials.reserve(m_Materials.size() + wad.getTextures().size());
 
         for (const bsp::WADTexture &tex : wad.getTextures()) {
-            m_Materials.emplace_back(tex);
+            m_Materials.emplace_back(tex, buffer);
             m_Map[tex.getName()] = m_Materials.size() - 1;
         }
+        
+        timer.stop();
+        logInfo("Loaded {} in {:.3f} s", name.filename().u8string(), timer.elapsedSeconds());
     }
     catch (const std::exception &e) {
         logError("Failed to load WAD {}: {}", name.filename().u8string(), e.what());

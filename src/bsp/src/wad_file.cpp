@@ -20,7 +20,8 @@ void bsp::WADFile::loadFromFile(const fs::path &path) {
     data.resize(size);
     file.read((char *)data.data(), size);
 
-    loadFromBytes(data);
+    m_WadData = std::move(data);
+    loadFromBytesInternal();
 }
 
 void bsp::WADFile::loadFromBytes(appfw::span<uint8_t> data) {
@@ -28,36 +29,45 @@ void bsp::WADFile::loadFromBytes(appfw::span<uint8_t> data) {
         throw WADFormatException("File is empty");
     }
 
+    m_WadData.resize(data.size());
+    std::copy(data.begin(), data.end(), m_WadData.begin());
+}
+
+void bsp::WADFile::loadFromBytesInternal() {
+    if (m_WadData.empty()) {
+        throw WADFormatException("File is empty");
+    }
+
     // Read WAD header
     WADHeader wadHeader;
 
-    if (data.size() < sizeof(WADHeader)) {
+    if (m_WadData.size() < sizeof(WADHeader)) {
         throw WADFormatException("File is too small for header");
     }
 
-    memcpy(&wadHeader, data.data(), sizeof(wadHeader));
+    memcpy(&wadHeader, m_WadData.data(), sizeof(wadHeader));
 
     if (memcmp(wadHeader.szMagic, WAD3_MAGIC, sizeof(wadHeader.szMagic)) &&
         memcmp(wadHeader.szMagic, WAD2_MAGIC, sizeof(wadHeader.szMagic))) {
-        throw WADFormatException(fmt::format("Magic is invalid. Expected WAD3/WAD2, got {}",
-            std::string_view(wadHeader.szMagic, 4)));
+        throw WADFormatException(
+            fmt::format("Magic is invalid. Expected WAD3/WAD2, got {}", std::string_view(wadHeader.szMagic, 4)));
     }
 
-    if (data.size() < wadHeader.nDirOffset ||
-        data.size() - wadHeader.nDirOffset < wadHeader.nDir * sizeof(WADDirEntry)) {
+    if (m_WadData.size() < wadHeader.nDirOffset ||
+        m_WadData.size() - wadHeader.nDirOffset < wadHeader.nDir * sizeof(WADDirEntry)) {
         throw WADFormatException("Invalid dir offset");
     }
 
     std::vector<WADDirEntry> dirArray;
     dirArray.resize(wadHeader.nDir);
-    memcpy(dirArray.data(), data.data() + wadHeader.nDirOffset, wadHeader.nDir * sizeof(WADDirEntry));
+    memcpy(dirArray.data(), m_WadData.data() + wadHeader.nDirOffset, wadHeader.nDir * sizeof(WADDirEntry));
 
     for (WADDirEntry &dirEntry : dirArray) {
         if (dirEntry.nSize != dirEntry.nDiskSize) {
             throw WADFormatException("Directory has compressed entries");
         }
 
-        if (dirEntry.nFilePos + dirEntry.nDiskSize > (int)data.size()) {
+        if (dirEntry.nFilePos + dirEntry.nDiskSize > (int)m_WadData.size()) {
             throw WADFormatException("Invalid dir entry offset/size");
         }
 
@@ -67,8 +77,8 @@ void bsp::WADFile::loadFromBytes(appfw::span<uint8_t> data) {
         }
 
         BSPMipTex bspTex;
-        memcpy(&bspTex, data.data() + dirEntry.nFilePos, sizeof(BSPMipTex));
+        memcpy(&bspTex, m_WadData.data() + dirEntry.nFilePos, sizeof(BSPMipTex));
 
-        m_Textures.emplace_back(bspTex, data.subspan(dirEntry.nFilePos, data.size() - dirEntry.nFilePos));
+        m_Textures.emplace_back(bspTex, appfw::span(m_WadData).subspan(dirEntry.nFilePos, dirEntry.nSize));
     }
 }

@@ -36,9 +36,9 @@ public:
         return *this;
     }
 
-    inline GLuint id() { return m_nId; }
+    inline GLuint id() const { return m_nId; }
 
-    inline operator GLuint() { return m_nId; }
+    inline operator GLuint() const { return m_nId; }
 
     void create() noexcept {
         destroy();

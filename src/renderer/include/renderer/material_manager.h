@@ -6,6 +6,7 @@
 #include <glad/glad.h>
 #include <vector>
 #include <unordered_map>
+#include <renderer/raii.h>
 
 constexpr size_t NULL_MATERIAL = 0;
 
@@ -25,9 +26,7 @@ class Material : appfw::NoCopy {
 public:
     Material() = default;
     Material(std::nullptr_t);
-    Material(const bsp::WADTexture &texture);
-    Material(Material &&from) noexcept;
-    ~Material();
+    Material(const bsp::WADTexture &texture, std::vector<uint8_t> &buffer);
 
     /**
      * Returns name of the material.
@@ -39,7 +38,7 @@ public:
      */
     inline void bindTextures() const {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_nTexture);
+        glBindTexture(GL_TEXTURE_2D, m_Texture);
     }
 
     /**
@@ -54,7 +53,7 @@ public:
 
 private:
     std::string m_Name;
-    GLuint m_nTexture = 0;
+    GLTexture m_Texture;
     int m_iWide = 0;
     int m_iTall = 0;
 };
