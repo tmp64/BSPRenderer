@@ -2,14 +2,19 @@
 #define PATCH_LIST_H
 #include <vector>
 #include <map>
-#include "main.h"
+#include <limits>
+#include <appfw/utils.h>
+#include <rad/types.h>
+
+namespace rad {
 
 class PatchRef;
 
 class PatchList {
 public:
     struct Iterator {
-        size_t m_iIndex;
+        PatchList *m_pList;
+        PatchIndex m_iIndex;
         PatchRef operator*();
 
         inline Iterator &operator++() {
@@ -38,12 +43,13 @@ public:
     /**
      * Returns patch count.
      */
-    inline size_t size() { return m_iSize; }
+    inline PatchIndex size() { return (PatchIndex)m_iSize;
+    }
 
     /**
      * Allocates N patches.
      */
-    void allocate(size_t size);
+    void allocate(PatchIndex size);
 
     /**
      * Removes all patches.
@@ -53,33 +59,28 @@ public:
     /**
      * Returns iterator to first patch.
      */
-    inline Iterator begin() { return Iterator{0}; };
+    inline Iterator begin() { return Iterator{this, 0}; };
 
     /**
      * Returns iterator to patch after the last one.
      */
-    inline Iterator end() { return Iterator{m_iSize}; };
+    inline Iterator end() { return Iterator{this, m_iSize}; };
 
     /**
      * Returns memory usage of one patch.
      */
     inline size_t getPatchMemoryUsage() {
-        //
         auto fn = [](auto &i) {
             using Type = std::remove_reference<decltype(i)>::type::value_type;
             return sizeof(Type);
         };
-        return fn(m_flSize) +
-            fn(m_vOrigin) +
-            fn(m_vNormal) +
-            fn(m_pPlane) +
-            fn(m_FinalColor) +
-            fn(m_pLMPixel) +
-            fn(m_ViewFactors);
+
+        return fn(m_flSize) + fn(m_vOrigin) + fn(m_vNormal) + fn(m_pPlane) + fn(m_FinalColor) + fn(m_pLMPixel) +
+               fn(m_ViewFactors);
     }
 
 private:
-    size_t m_iSize = 0;
+    PatchIndex m_iSize = 0;
 
     std::vector<float> m_flSize;
     std::vector<glm::vec3> m_vOrigin;
@@ -92,46 +93,44 @@ private:
     friend class PatchRef;
 };
 
-extern PatchList g_Patches;
-
 class PatchRef {
 public:
-    inline explicit PatchRef(size_t idx) : m_iIndex(idx) {}
+    inline explicit PatchRef(PatchList &list, PatchIndex idx) : m_List(list), m_iIndex(idx) {}
 
     /**
      * Length of a side of the square.
      */
-    inline float &getSize() { return g_Patches.m_flSize[m_iIndex]; }
+    inline float &getSize() { return m_List.m_flSize[m_iIndex]; }
 
     /**
      * Center point of the square in world-space.
      */
-    inline glm::vec3 &getOrigin() { return g_Patches.m_vOrigin[m_iIndex]; }
+    inline glm::vec3 &getOrigin() { return m_List.m_vOrigin[m_iIndex]; }
 
     /**
      * Normal vector. Points away from front side.
      */
-    inline glm::vec3 &getNormal() { return g_Patches.m_vNormal[m_iIndex]; }
+    inline glm::vec3 &getNormal() { return m_List.m_vNormal[m_iIndex]; }
 
     /**
      * Plane in which patch is located.
      */
-    inline const Plane * &getPlane() { return g_Patches.m_pPlane[m_iIndex]; }
+    inline const Plane *&getPlane() { return m_List.m_pPlane[m_iIndex]; }
 
     /**
      * Final color of the patch.
      */
-    inline glm::vec3 &getFinalColor() { return g_Patches.m_FinalColor[m_iIndex]; }
+    inline glm::vec3 &getFinalColor() { return m_List.m_FinalColor[m_iIndex]; }
 
     /**
      * Pointer to lightmap pixel.
      */
-    inline glm::vec3 * &getLMPixel() { return g_Patches.m_pLMPixel[m_iIndex]; }
+    inline glm::vec3 *&getLMPixel() { return m_List.m_pLMPixel[m_iIndex]; }
 
     /**
      * View factors for visible patches.
      */
-    inline appfw::span<ViewFactor> &getViewFactors() { return g_Patches.m_ViewFactors[m_iIndex]; }
+    inline appfw::span<ViewFactor> &getViewFactors() { return m_List.m_ViewFactors[m_iIndex]; }
 
     inline PatchRef &operator++() {
         ++m_iIndex;
@@ -140,7 +139,7 @@ public:
     inline PatchRef operator++(int) {
         PatchRef t(*this);
         ++m_iIndex;
-        return t; 
+        return t;
     }
 
     inline PatchRef &operator--() {
@@ -154,7 +153,10 @@ public:
     }
 
 private:
-    size_t m_iIndex = std::numeric_limits<size_t>::max();
+    PatchList &m_List;
+    PatchIndex m_iIndex = std::numeric_limits<PatchIndex>::max();
 };
+
+} // namespace rad
 
 #endif

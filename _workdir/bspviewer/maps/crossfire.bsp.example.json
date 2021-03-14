@@ -1,0 +1,27 @@
+{
+	"base_patch_size": 64,	// size of patch
+	"base_reflectivity": 0.4,	// reflectivity multiplier
+	"bounce_count": 64,
+	
+	"envlight": {
+		"color": [255, 0, 0],
+		"brightness": 500,
+		"pitch": 70,
+		"yaw": -45
+	},
+	
+	"faces": {
+		"0": {
+			"patch_scale": 1,
+			"reflectivity_scale": 1
+		}
+	},
+	
+	"entlights": {
+		"123": {
+			"type": "point",
+			"color": [128, 128, 128],
+			"brightness": 1000
+		}
+	}
+}

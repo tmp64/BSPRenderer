@@ -35,9 +35,10 @@ add_subdirectory(src/appfw)
 add_subdirectory(src/app_base)
 add_subdirectory(src/gui_app)
 add_subdirectory(src/bsp)
+add_subdirectory(src/rad)
 add_subdirectory(src/renderer)
 
 # Executables
 add_subdirectory(src/bspviewer)
 add_subdirectory(src/playground)
-add_subdirectory(src/rad)
+add_subdirectory(src/rad_launcher)

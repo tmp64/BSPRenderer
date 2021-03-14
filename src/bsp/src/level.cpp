@@ -273,7 +273,7 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
     m_Entities = EntityList(entLump);
 }
 
-int bsp::Level::traceLine(glm::vec3 from, glm::vec3 to) {
+int bsp::Level::traceLine(glm::vec3 from, glm::vec3 to) const {
     return recursiveTraceLine(0, from, to);
 }
 

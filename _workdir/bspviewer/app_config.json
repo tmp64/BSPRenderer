@@ -13,7 +13,7 @@
 	
 	"rad": {
 		// Size of the patch in units
-		"patch_size": 32,
+		"patch_size": 64,
 		
 		// Bounce count
 		"bounce_count": 32,

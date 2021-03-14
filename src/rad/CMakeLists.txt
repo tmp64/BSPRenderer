@@ -1,24 +1,42 @@
-add_executable(rad
-	CMakeLists.txt
-	src/main.cpp
-	src/main.h
-	src/patch_list.cpp
-	src/patch_list.h
-	src/patches.cpp
-	src/patches.h
-	src/plat_win.cpp
-	src/plat.h
-	src/this_module_info.h
-	src/utils.cpp
-	src/utils.h
-	src/vis.cpp
-	src/vis.h
+set(PUBLIC_HEADERS
+	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/patch_list.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/rad_sim.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/types.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/vflist.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/vismat.h
+
 )
 
-target_include_directories(rad PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+set(PRIVATE_HEADERS
+	${CMAKE_CURRENT_SOURCE_DIR}/src/plat.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/this_module_info.h
+)
+
+set(PRIVATE_SOURCES
+	${CMAKE_CURRENT_SOURCE_DIR}/src/patch_list.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/plat_win.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/rad_sim.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/vflist.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/vismat.cpp
+)
+
+add_library(rad STATIC
+	${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
+	${PUBLIC_HEADERS}
+	${PRIVATE_HEADERS}
+	${PRIVATE_SOURCES}
+)
+
+target_include_directories(rad PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(rad PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_link_libraries(rad
 	appfw
 	app_base
 	bsp
+	nlohmann_json
 )
+
+source_group("Public Headers" FILES ${PUBLIC_HEADERS})
+source_group("Private Headers" FILES ${PRIVATE_HEADERS})
+source_group("Private Sources" FILES ${PRIVATE_SOURCES})

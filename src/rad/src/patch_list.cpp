@@ -1,8 +1,6 @@
-#include "patch_list.h"
+#include <rad/patch_list.h>
 
-PatchList g_Patches;
-
-void PatchList::allocate(size_t size) {
+void rad::PatchList::allocate(PatchIndex size) {
     AFW_ASSERT(m_iSize == 0);
     m_iSize = size;
     m_flSize.resize(size);
@@ -14,7 +12,7 @@ void PatchList::allocate(size_t size) {
     m_ViewFactors.resize(size);
 }
 
-void PatchList::clear() {
+void rad::PatchList::clear() {
     m_iSize = 0;
     m_flSize.clear();
     m_vOrigin.clear();
@@ -25,4 +23,4 @@ void PatchList::clear() {
     m_ViewFactors.clear();
 }
 
-PatchRef PatchList::Iterator::operator*() { return PatchRef(m_iIndex); }
+rad::PatchRef rad::PatchList::Iterator::operator*() { return PatchRef(*m_pList, m_iIndex); }

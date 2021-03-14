@@ -75,14 +75,14 @@ public:
                                                     const EntityListItem *pPrev = nullptr) const;
 
         inline auto begin() { return m_Items.begin(); }
-        inline auto end() { return m_Items.begin(); }
+        inline auto end() { return m_Items.end(); }
         inline auto begin() const { return m_Items.begin(); }
-        inline auto end() const { return m_Items.begin(); }
+        inline auto end() const { return m_Items.end(); }
 
-        inline auto rbegin() { return m_Items.begin(); }
-        inline auto rend() { return m_Items.begin(); }
-        inline auto rbegin() const { return m_Items.begin(); }
-        inline auto rend() const { return m_Items.begin(); }
+        inline auto rbegin() { return m_Items.rbegin(); }
+        inline auto rend() { return m_Items.rend(); }
+        inline auto rbegin() const { return m_Items.rbegin(); }
+        inline auto rend() const { return m_Items.rend(); }
 
         inline size_t size() const { return m_Items.size(); }
 
@@ -123,7 +123,7 @@ public:
      * Traces a line and returns contents of hit leaf
      * (CONTENTS_SOLID or CONTENTS_SKY) or CONTENTS_EMPTY if didn't hit.
      */
-    int traceLine(glm::vec3 from, glm::vec3 to);
+    int traceLine(glm::vec3 from, glm::vec3 to) const;
 
     inline const std::vector<BSPPlane> &getPlanes() const { return m_Planes; }
     inline const std::vector<BSPMipTex> &getTextures() const { return m_Textures; }

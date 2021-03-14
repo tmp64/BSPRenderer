@@ -1,13 +1,28 @@
-#ifndef MAIN_H
-#define MAIN_H
-#include <appfw/thread_pool.h>
-#include <bsp/level.h>
-#include <glm/glm.hpp>
-#include <vector>
-#include <unordered_map>
-#include <map>
+#ifndef RAD_TYPES_H
+#define RAD_TYPES_H
+#include <bsp/bsp_types.h>
 
-using ViewFactor = std::tuple<size_t, float>;
+namespace rad {
+
+using PatchIndex = uint32_t;
+using ViewFactor = std::tuple<PatchIndex, float>;
+
+/**
+ * Maximum number of patches.
+ * Maximum patch index is (MAX_PATCH_COUNT - 1).
+ */
+constexpr PatchIndex MAX_PATCH_COUNT = std::numeric_limits<PatchIndex>::max();
+
+/**
+ * Epsilon used for floating-point comparisons.
+ */
+constexpr float EPSILON = 1.f / 64.f;
+
+constexpr float ON_EPSILON = 0.01f;
+
+enum FaceFlags : unsigned {
+    FACE_SKY = (1u << 0), //!< Face is a sky surface
+};
 
 struct Plane : public bsp::BSPPlane {
     /**
@@ -15,11 +30,6 @@ struct Plane : public bsp::BSPPlane {
      * X is calculated as cross(j, n)
      */
     glm::vec3 vJ;
-};
-
-enum FaceFlags : unsigned {
-    FACE_SKY = (1u << 0),   //!< Face is a sky surface
-    FACE_HACK = (1u << 1),  //!< Face is a constant light. TODO: Read lights from a file
 };
 
 struct Face : public bsp::BSPFace {
@@ -90,12 +100,12 @@ struct Face : public bsp::BSPFace {
     /**
      * Index of first patch
      */
-    size_t iFirstPatch = 0;
+    PatchIndex iFirstPatch = 0;
 
     /**
      * Number of patches of this face
      */
-    size_t iNumPatches = 0;
+    PatchIndex iNumPatches = 0;
 
     /**
      * Index of the lightmap in g_Lightmaps.
@@ -108,6 +118,17 @@ struct Face : public bsp::BSPFace {
     glm::ivec2 lmSize;
 };
 
+/**
+ * Sunlight information.
+ */
+struct EnvLight {
+    glm::vec3 vColor = glm::vec3(0, 0, 0);     // color * brightness
+    glm::vec3 vDirection = glm::vec3(0, 0, 0); // Direction of sun rays
+};
+
+/**
+ * Lightmap of a face.
+ */
 struct LightmapTexture {
     LightmapTexture() = default;
 
@@ -129,33 +150,33 @@ struct LightmapTexture {
     /**
      * Returns a pixel of the image.
      */
-    inline glm::vec3 &getPixel(glm::ivec2 pos) {
-        return data[(size_t)pos.y * (size_t)size.x + (size_t)pos.x];
+    inline glm::vec3 &getPixel(glm::ivec2 pos) { return data[(size_t)pos.y * (size_t)size.x + (size_t)pos.x]; }
+};
+
+/**
+ * Returns true if two floats are almost equal.
+ */
+inline bool floatEquals(float l, float r) { return std::abs(l - r) <= EPSILON; }
+
+/**
+ * Converts float to int rounding up while checking with EPSILON.
+ * Value is >= 1.
+ */
+inline int texFloatToInt(float flVal) {
+    if (flVal < 1 || floatEquals(flVal, 1)) {
+        return 1;
     }
-};
 
-struct RADConfig {
-    float flPatchSize = 0;
-    size_t iBounceCount = 0;
-    float flReflectivity = 0;
-    glm::vec3 flThatLight = glm::vec3(0, 0, 0);
-    std::string mapName;
-};
+    float intpart;
+    float fracpart = std::modf(flVal, &intpart);
 
-struct EnvLight {
-    glm::vec3 vColor = glm::vec3(0, 0, 0);      // color * brightness
-    glm::vec3 vDirection = glm::vec3(0, 0, 0);  // Direction of sun rays
-};
+    if (floatEquals(fracpart, 0)) {
+        return (int)intpart;
+    }
 
-extern bsp::Level g_Level;
-extern RADConfig g_Config;
-extern EnvLight g_EnvLight;
+    return (int)intpart + 1;
+}
 
-extern std::vector<Plane> g_Planes;
-extern std::vector<Face> g_Faces;
-extern std::vector<LightmapTexture> g_Lightmaps;
-
-extern appfw::ThreadPool g_ThreadPool;
-extern appfw::ThreadDispatcher g_Dispatcher;
+} // namespace rad
 
 #endif

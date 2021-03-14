@@ -6,10 +6,7 @@
 #include <appfw/dbg.h>
 #include <appfw/init.h>
 #include <appfw/services.h>
-
-#include <bsp/level.h>
-#include <bsp/wad_file.h>
-#include <renderer/base_renderer.h>
+#include <appfw/command_line.h>
 
 static bool s_IsRunning = false;
 
@@ -22,37 +19,23 @@ ConVar<bool> test_cvar_bool("test_cvar_bool", true, "sdfsdfsdf");
 
 ConCommand quit_cmd("quit", "Exits the app", [](auto &) { s_IsRunning = false; });
 
-class TestRenderer : public BaseRenderer {
-public:
-    virtual void createSurfaces() override {}
-    virtual void destroySurfaces() override {}
-    virtual void drawWorldSurfaces(const std::vector<size_t> &surfaceIdxs) noexcept override {
-        int count = 0;
-        for (size_t idx : surfaceIdxs) {
-            count++;
-            logWarn("Surface {}", count);
-            LevelSurface &surf = getLevelVars().baseSurfaces[idx];
-
-            for (glm::vec3 v : surf.vertices) {
-                logInfo("    {} {} {}", v.x, v.y, v.z);
-            }
-            logInfo("");
-        }
-        logInfo("Need to draw {} surfaces", surfaceIdxs.size());
-    }
-};
-
 int realMain(int, char **) {
     appfw::init::init();
 
     logWarn("Test");
 
-    /*bsp::Level lvl("maps/test1.bsp");
-    TestRenderer renderer;
-    renderer.setLevel(&lvl);
-    renderer.draw(BaseRenderer::DrawOptions{{0.f, 0.f, 0.f}});*/
-
-    bsp::WADFile wad("halflife.wad");
+    try {
+        // --arg1 "val1 with spaces" --fl1 -fA +cmd cmdarg
+        int argc = 7;
+        char *argv[] = {"exec_name", "--arg1", "val1 with spaces", "--fl1", "-fA", "+cmd", "cmdarg"};
+        appfw::CommandLine cmd;
+        cmd.parseCommandLine(argc, argv);
+        logInfo("parsed");
+    }
+    catch (const std::exception &e) {
+        logError("{}", e.what());
+    }
+    
 
     /*s_IsRunning = true;
 
