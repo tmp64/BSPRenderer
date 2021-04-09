@@ -75,10 +75,10 @@ void rad::VFList::loadFromFile(const fs::path &path) {
     for (PatchIndex i = 0; i < m_pRadSim->m_Patches.size(); i++) {
         PatchRef patch(m_pRadSim->m_Patches, i);
         size_t offset;
-        size_t size;
+        size_t len;
         file.read(offset);
-        file.read(size);
-        patch.getViewFactors() = appfw::span(m_Data).subspan(offset, size);
+        file.read(len);
+        patch.getViewFactors() = appfw::span(m_Data).subspan(offset, len);
     }
 
     m_bIsLoaded = true;
