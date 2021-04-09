@@ -56,6 +56,8 @@ constexpr int MAX_MAP_VISIBILITY = 0x200000;
 
 constexpr int MAX_MAP_PORTALS = 65536;
 
+constexpr int NUM_LIGHTSTYLES = 4;
+
 constexpr std::array<const char *, MAX_BSP_LUMPS> LUMP_NAME{
     "LUMP_ENTITIES",
     "LUMP_PLANES",
@@ -270,7 +272,7 @@ struct BSPFace {
     /**
      * Specify lighting styles
      */
-    uint8_t nStyles[4];
+    uint8_t nStyles[NUM_LIGHTSTYLES];
 
     /**
      * Offsets into the raw lightmap data

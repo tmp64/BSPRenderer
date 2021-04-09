@@ -4,11 +4,37 @@
 #include <renderer/surface_renderer.h>
 #include <renderer/base_shader.h>
 #include <renderer/raii.h>
+#include <renderer/time_smoother.h>
 
 class SceneRenderer : appfw::NoCopy {
 public:
     SceneRenderer();
     ~SceneRenderer();
+
+    struct RenderingStats {
+        //! Number of world polygons rendered
+        unsigned uRenderedWorldPolys = 0;
+
+        //! Number of sky polygons rendered
+        unsigned uRenderedSkyPolys = 0;
+
+        //! Time (us) taken by world BSP traversing
+        TimeSmoother uWorldBSPTime;
+
+        //! Time (us) taken by world geometry rendering
+        TimeSmoother uWorldRenderingTime;
+
+        //! Time (us) taken by sky polygons rendering
+        TimeSmoother uSkyRenderingTime;
+
+        //! Total time (us) taken by scene rendering
+        TimeSmoother uTotalRenderingTime;
+
+        inline void clear() {
+            uRenderedWorldPolys = 0;
+            uRenderedSkyPolys = 0;
+        }
+    };
 
     /**
      * Returns level set to the renderer.
@@ -50,9 +76,14 @@ public:
     void renderScene(GLint targetFb);
 
     /**
+     * Returns performance stats for last renderScene call.
+     */
+    inline const RenderingStats &getStats() const { return m_Stats; }
+
+    /**
      * Shows ImGui dialog with debug info.
      */
-    void showDebugDialog();
+    void showDebugDialog(const char *title, bool *isVisible = nullptr);
 
 private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
@@ -138,6 +169,7 @@ private:
     bsp::Level *m_pLevel = nullptr;
     SurfaceRenderer m_Surf;
     LevelData m_Data;
+    RenderingStats m_Stats;
 
     // Screen-wide quad
     GLVao m_nQuadVao;

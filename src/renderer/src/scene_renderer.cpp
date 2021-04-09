@@ -1,4 +1,5 @@
 #include <appfw/binary_file.h>
+#include <appfw/timer.h>
 #include <renderer/stb_image.h>
 #include <renderer/scene_renderer.h>
 #include <imgui.h>
@@ -20,11 +21,12 @@ ConVar<float> r_gamma("r_gamma", 2.2f, "Gamma");
 ConVar<float> r_texgamma("r_texgamma", 2.2f, "Texture gamma");
 ConVar<int> r_texture("r_texture", 2,
                       "Which texture should be used:\n  0 - white color, 1 - random color, 2 - texture");
-ConVar<int> r_lighting("r_lighting", 3,
-                       "Lighting method:\n  0 - fullbright, 1 - shaded, 2 - HL lightmaps, 3 - custom lightmaps");
+ConVar<int> r_lighting("r_lighting", 2,
+                       "Lighting method:\n  0 - fullbright, 1 - shaded, 2 - BSP lightmaps, 3 - custom lightmaps");
 ConVar<int> r_tonemap("r_tonemap", 2, "HDR tonemapping method:\n  0 - none (clamp to 1), 1 - Reinhard, 2 - exposure");
 ConVar<float> r_exposure("r_exposure", 0.5f, "Picture exposure");
 ConVar<float> r_skybright("r_skybright", 3.f, "Sky brightness");
+ConVar<float> r_skybright_ldr("r_skybright", 1.f, "Sky brightness for LDR (BSP lightmpas)");
 
 //----------------------------------------------------------------
 // WorldShader
@@ -83,8 +85,13 @@ void SceneRenderer::SkyBoxShader::setupUniforms(SceneRenderer &scene) {
     m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
     m_Texture.set(0);
     m_TexGamma.set(r_texgamma.getValue());
-    m_Brightness.set(r_skybright.getValue());
     m_ViewOrigin.set(scene.m_Data.viewContext.getViewOrigin());
+
+    if (r_lighting.getValue() == 2) {
+        m_Brightness.set(r_skybright_ldr.getValue());
+    } else {
+        m_Brightness.set(r_skybright.getValue());
+    }
 }
 
 //----------------------------------------------------------------
@@ -104,7 +111,12 @@ void SceneRenderer::PostProcessShader::create() {
 }
 
 void SceneRenderer::PostProcessShader::setupUniforms() {
-    m_Tonemap.set(r_tonemap.getValue());
+    if (r_lighting.getValue() == 2) {
+        // No tonemapping for BSP lightmaps
+        m_Tonemap.set(0);
+    } else {
+        m_Tonemap.set(r_tonemap.getValue());
+    }
     m_Exposure.set(r_exposure.getValue());
     m_Gamma.set(r_gamma.getValue());
 }
@@ -158,6 +170,10 @@ void SceneRenderer::setViewportSize(const glm::ivec2 &size) {
 }
 
 void SceneRenderer::renderScene(GLint targetFb) {
+    m_Stats.clear();
+    appfw::Timer renderTimer;
+    renderTimer.start();
+
     if (m_bNeedRefreshFB) {
         recreateFramebuffer();
     }
@@ -166,7 +182,7 @@ void SceneRenderer::renderScene(GLint targetFb) {
     setupViewContext();
 
     if (!m_Data.bCustomLMLoaded && r_lighting.getValue() == 3) {
-        r_lighting.setValue(1);
+        r_lighting.setValue(2);
         logWarn("Lighting type set to shaded since custom lightmaps are not loaded");
     }
 
@@ -180,10 +196,38 @@ void SceneRenderer::renderScene(GLint targetFb) {
 
     glBindFramebuffer(GL_FRAMEBUFFER, targetFb);
     doPostProcessing();
+
+    renderTimer.stop();
+    m_Stats.uTotalRenderingTime += (unsigned)renderTimer.elapsedMicroseconds();
 }
 
-void SceneRenderer::showDebugDialog() {
-    
+void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
+    if (!isVisible || *isVisible) {
+        if (!ImGui::Begin(title, isVisible)) {
+            ImGui::End();
+            return;
+        }
+
+        ImGui::Text("World: %d (%d + %d)", m_Stats.uRenderedWorldPolys + m_Stats.uRenderedSkyPolys,
+                    m_Stats.uRenderedWorldPolys, m_Stats.uRenderedSkyPolys);
+        ImGui::Separator();
+
+        unsigned timeLost = m_Stats.uTotalRenderingTime.getSmoothed() - m_Stats.uWorldBSPTime.getSmoothed() -
+                            m_Stats.uWorldRenderingTime.getSmoothed() - m_Stats.uSkyRenderingTime.getSmoothed();
+
+        ImGui::Text("FPS: %.3f", 1000000.0 / m_Stats.uTotalRenderingTime.getSmoothed());
+        ImGui::Text("Total: %2d.%03d ms", m_Stats.uTotalRenderingTime.getSmoothed() / 1000,
+                    m_Stats.uTotalRenderingTime.getSmoothed() % 1000);
+        ImGui::Text("BSP: %2d.%03d ms", m_Stats.uWorldBSPTime.getSmoothed() / 1000,
+                    m_Stats.uWorldBSPTime.getSmoothed() % 1000);
+        ImGui::Text("World: %2d.%03d ms", m_Stats.uWorldRenderingTime.getSmoothed() / 1000,
+                    m_Stats.uWorldRenderingTime.getSmoothed() % 1000);
+        ImGui::Text("Sky: %2d.%03d ms", m_Stats.uSkyRenderingTime.getSmoothed() / 1000,
+                    m_Stats.uSkyRenderingTime.getSmoothed() % 1000);
+        ImGui::Text("Unaccounted: %2d.%03d ms", timeLost / 1000, timeLost % 1000);
+
+        ImGui::End();
+    }
 }
 
 void SceneRenderer::createScreenQuad() {
@@ -296,10 +340,11 @@ void SceneRenderer::loadBSPLightmaps() {
         // Calculate lightmap texture extents and size
         glm::vec2 texmins = {floor(mins.x / BSP_LIGHTMAP_DIVISOR), floor(mins.y / BSP_LIGHTMAP_DIVISOR)};
         glm::vec2 texmaxs = {ceil(maxs.x / BSP_LIGHTMAP_DIVISOR), ceil(maxs.y / BSP_LIGHTMAP_DIVISOR)};
-        surf.m_vTextureMins = texmins * (float)BSP_LIGHTMAP_DIVISOR;
+        surf.m_vTextureMins = texmins * (float)BSP_LIGHTMAP_DIVISOR; // This one used in the engine (I think)
+        //surf.m_vTextureMins = mins; // This one makes more sense. I don't see any difference in-game between them though
 
-        int wide = (int)((texmaxs - texmins).x);
-        int tall = (int)((texmaxs - texmins).y);
+        int wide = (int)((texmaxs - texmins).x + 1);
+        int tall = (int)((texmaxs - texmins).y + 1);
         surf.m_BSPLMSize = {wide, tall};
 
         // Validate size
@@ -314,25 +359,31 @@ void SceneRenderer::loadBSPLightmaps() {
             continue;
         }
 
-        // Combine all lightmaps
+        // Combine all lightstyles
+        // TODO: need only combine what is needed
+        /*
         uint32_t lmBytesSize = wide * tall * 3;
         const bsp::BSPFace &face = m_pLevel->getFaces()[i];
         std::vector<uint8_t> lm(lmBytesSize);
-        for (int j = 0; j < 1 && face.nStyles[j] != 255; j++) {
+        for (int j = 0; j < bsp::NUM_LIGHTSTYLES && face.nStyles[j] != 255; j++) {
             for (int k = 0; k < lm.size(); k++) {
                 lm[k] += m_pLevel->getLightMaps()[offset + lmBytesSize * j + k];
             }
         }
+        */
 
         // Create texture
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         surf.m_BSPLMTex.create();
         glBindTexture(GL_TEXTURE_2D, surf.m_BSPLMTex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, wide, tall, 0, GL_RGB, GL_UNSIGNED_BYTE, lm.data());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, wide, tall, 0, GL_RGB, GL_UNSIGNED_BYTE,
+                     m_pLevel->getLightMaps().data() + offset);
         glGenerateMipmap(GL_TEXTURE_2D);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     }
 }
 
@@ -452,15 +503,15 @@ void SceneRenderer::createSurfaceObjects() {
             // BSP lightmap texture
             if (surf.m_BSPLMTex != 0) {
                 v.bspLMTexture.s = glm::dot(v.position, texInfo.vS);
-                //v.bspLMTexture.s += texInfo.fSShift;
+                v.bspLMTexture.s += texInfo.fSShift;
                 v.bspLMTexture.s -= surf.m_vTextureMins.x;
-                //v.bspLMTexture.s += 8;
+                v.bspLMTexture.s += 8; // Shift by half-texel
                 v.bspLMTexture.s /= surf.m_BSPLMSize.x * BSP_LIGHTMAP_DIVISOR;
 
                 v.bspLMTexture.t = glm::dot(v.position, texInfo.vT);
-                //v.bspLMTexture.t += texInfo.fTShift;
+                v.bspLMTexture.t += texInfo.fTShift;
                 v.bspLMTexture.t -= surf.m_vTextureMins.y;
-                //v.bspLMTexture.t += 8;
+                v.bspLMTexture.t += 8; // Shift by half-texel
                 v.bspLMTexture.t /= surf.m_BSPLMSize.y * BSP_LIGHTMAP_DIVISOR;
             }
 
@@ -622,8 +673,15 @@ void SceneRenderer::setupViewContext() {
 
 void SceneRenderer::drawWorldSurfaces() {
     // Prepare list of visible world surfaces
+    appfw::Timer bspTimer;
+    bspTimer.start();
     m_Surf.setContext(&m_Data.viewContext);
     m_Surf.calcWorldSurfaces();
+    bspTimer.stop();
+    m_Stats.uWorldBSPTime += (unsigned)bspTimer.elapsedMicroseconds();
+
+    appfw::Timer timer;
+    timer.start();
 
     // Draw visible surfaces
     glEnable(GL_DEPTH_TEST);
@@ -665,9 +723,16 @@ void SceneRenderer::drawWorldSurfaces() {
 
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
+
+    timer.stop();
+    m_Stats.uWorldRenderingTime += (unsigned)timer.elapsedMicroseconds();
+    m_Stats.uRenderedWorldPolys = (unsigned)m_Data.viewContext.getWorldSurfaces().size();
 }
 
 void SceneRenderer::drawSkySurfaces() {
+    appfw::Timer timer;
+    timer.start();
+
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
 
@@ -696,6 +761,10 @@ void SceneRenderer::drawSkySurfaces() {
     glDepthFunc(GL_LESS);
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
+
+    timer.stop();
+    m_Stats.uSkyRenderingTime += (unsigned)timer.elapsedMicroseconds();
+    m_Stats.uRenderedSkyPolys = (unsigned)m_Data.viewContext.getSkySurfaces().size();
 }
 
 void SceneRenderer::doPostProcessing() {

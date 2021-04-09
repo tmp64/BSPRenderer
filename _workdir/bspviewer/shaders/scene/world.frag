@@ -68,6 +68,8 @@ void main(void) {
 	} else if (uLightingType == 2) {
 		// BSP lightmaps
 		ligtmapColor = texture(uLMTexture, gBSPLMTexCoord).rgb;
+		// Gamma correction
+		ligtmapColor.rgb = pow(ligtmapColor.rgb, vec3(1.5));
 	} else if (uLightingType == 3) {
 		// Custom lightmaps
 		ligtmapColor = texture(uLMTexture, gCustomLMTexCoord).rgb;
