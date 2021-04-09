@@ -163,6 +163,7 @@ void SurfaceRenderer::createSurfaces() {
         surface.iFirstEdge = face.iFirstEdge;
         surface.iNumEdges = face.nEdges;
         surface.pPlane = &m_pLevel->getPlanes().at(face.iPlane);
+        surface.nLightmapOffset = face.nLightmapOffset;
 
         if (face.nPlaneSide) {
             surface.iFlags |= SURF_PLANEBACK;

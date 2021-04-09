@@ -159,9 +159,7 @@ public:
         std::vector<glm::vec3> vVertices;
         glm::vec3 vMins, vMaxs;
 
-        /*std::vector<glm::vec2> vLMTexCoords;
-        glm::ivec2 vLMSize;
-        GLuint nLightmapTex = 0;*/
+        uint32_t nLightmapOffset = bsp::NO_LIGHTMAP_OFFSET;
     };
 
     struct BaseNode {

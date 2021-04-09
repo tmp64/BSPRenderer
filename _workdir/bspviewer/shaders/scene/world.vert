@@ -7,13 +7,17 @@ layout (location = 1) in vec3 inNormal;
 // Texture coordinates
 layout (location = 2) in vec2 inTexCoord;
 
-// Lightmap texture coordinates
-layout (location = 3) in vec2 inLMTexCoord;
+// BSP lightmap texture coordinates
+layout (location = 3) in vec2 inBSPLMTexCoord;
+
+// Custom lightmap texture coordinates
+layout (location = 4) in vec2 inCustomLMTexCoord;
 
 out vec3 gFragPos;
 out vec3 gNormal;
 out vec2 gTexCoord;
-out vec2 gLMTexCoord;
+out vec2 gBSPLMTexCoord;
+out vec2 gCustomLMTexCoord;
 
 uniform mat4 uProjMatrix;
 uniform mat4 uViewMatrix;
@@ -23,5 +27,6 @@ void main(void) {
 	gFragPos = inPosition;
 	gNormal = inNormal;
 	gTexCoord = inTexCoord;
-	gLMTexCoord = inLMTexCoord;
+	gBSPLMTexCoord = inBSPLMTexCoord;
+	gCustomLMTexCoord = inCustomLMTexCoord;
 }

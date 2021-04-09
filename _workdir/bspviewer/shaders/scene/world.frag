@@ -7,8 +7,11 @@ in vec3 gNormal;
 // Texture coordinates
 in vec2 gTexCoord;
 
-// Lightmap texture coordinates
-in vec2 gLMTexCoord;
+// BSP lightmap texture coordinates
+in vec2 gBSPLMTexCoord;
+
+// Custom lightmap texture coordinates
+in vec2 gCustomLMTexCoord;
 
 // Output color
 out vec4 outColor;
@@ -63,11 +66,11 @@ void main(void) {
 		// Result
 		ligtmapColor = ambient + diffuse;
 	} else if (uLightingType == 2) {
-		// HL lightmaps - not implemented
-		ligtmapColor = vec3(1, 1, 1);
+		// BSP lightmaps
+		ligtmapColor = texture(uLMTexture, gBSPLMTexCoord).rgb;
 	} else if (uLightingType == 3) {
 		// Custom lightmaps
-		ligtmapColor = texture(uLMTexture, gLMTexCoord).rgb;
+		ligtmapColor = texture(uLMTexture, gCustomLMTexCoord).rgb;
 	}
 
 	//--------------------------------------------------

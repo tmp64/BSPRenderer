@@ -94,6 +94,8 @@ void BSPViewer::tick() {
     ImGui::ShowDemoWindow();
     //
 
+    m_Renderer.showDebugDialog();
+
     processUserInput();
     showInfoDialog();
 }

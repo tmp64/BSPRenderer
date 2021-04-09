@@ -55,6 +55,8 @@ public:
     void showDebugDialog();
 
 private:
+    static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
+
     class WorldShader : public BaseShader {
     public:
         WorldShader();
@@ -102,10 +104,11 @@ private:
         glm::vec3 position;
         glm::vec3 normal;
         glm::vec2 texture;
-        glm::vec2 lmTexture;
+        glm::vec2 bspLMTexture;
+        glm::vec2 customLMTexture;
     };
 
-    static_assert(sizeof(SurfaceVertex) == sizeof(float) * 10, "Size of Vertex is invalid");
+    static_assert(sizeof(SurfaceVertex) == sizeof(float) * 12, "Size of Vertex is invalid");
 
     struct Surface {
         GLVao m_Vao;
@@ -114,10 +117,15 @@ private:
         GLsizei m_iVertexCount = 0;
         size_t m_nMatIdx = NULL_MATERIAL;
 
-        // Lightmap info
-        std::vector<glm::vec2> m_vLMTexCoords;
-        glm::ivec2 m_vLMSize;
-        GLTexture m_LMTex;
+        // BSP lightmap info
+        glm::vec2 m_vTextureMins = glm::vec2(0, 0);
+        glm::ivec2 m_BSPLMSize = glm::ivec2(0, 0);
+        GLTexture m_BSPLMTex;
+
+        // Custom lightmap info
+        std::vector<glm::vec2> m_vCustomLMTexCoords;
+        glm::ivec2 m_vCustomLMSize = glm::ivec2(0, 0);
+        GLTexture m_CustomLMTex;
     };
 
     struct LevelData {
@@ -146,6 +154,7 @@ private:
     void destroyFramebuffer();
 
     void createSurfaces();
+    void loadBSPLightmaps();
     void loadCustomLightmaps(const std::string &path, const char *tag);
     void createSurfaceObjects();
     void loadSkyBox();
