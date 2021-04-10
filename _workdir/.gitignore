@@ -1,3 +1,5 @@
 /*.dll
 /*.wad
 /imgui.ini
+/test*.png
+/out*.bmp

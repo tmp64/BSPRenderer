@@ -32,7 +32,12 @@ public:
 
     void setDrawDebugTextEnabled(bool state);
     inline bool isDrawDebugTextEnabled() { return m_bDrawDebugText; }
+
     inline glm::vec3 getCameraPos() { return m_vPos; }
+    inline glm::vec3 getCameraRot() { return m_vRot; }
+
+    inline void setCameraPos(glm::vec3 pos) { m_vPos = pos; }
+    inline void setCameraRot(glm::vec3 rot) { m_vRot = rot; }
 
 private:
     bsp::Level m_LoadedLevel;

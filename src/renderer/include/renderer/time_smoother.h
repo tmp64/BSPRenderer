@@ -4,7 +4,7 @@
 
 class TimeSmoother {
 public:
-    static constexpr unsigned BUF_SIZE = 64;
+    static constexpr unsigned BUF_SIZE = 128;
 
     TimeSmoother();
 

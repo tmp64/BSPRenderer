@@ -31,6 +31,27 @@ static ConCommand cmd_toggle_debug_text("toggle_debug_text", "", [](const appfw:
     BSPViewer::get().setDrawDebugTextEnabled(!BSPViewer::get().isDrawDebugTextEnabled());
 });
 
+static ConCommand cmd_getpos("getpos", "", [](const appfw::ParsedCommand &) {
+    auto pos = BSPViewer::get().getCameraPos();
+    auto rot = BSPViewer::get().getCameraRot();
+    conPrint("setpos {} {} {} {} {} {}", pos.x, pos.y, pos.z, rot.x, rot.y, rot.z);
+});
+
+static ConCommand cmd_setpos("setpos", "", [](const appfw::ParsedCommand &cmd) {
+    if (cmd.size() < 4) {
+        conPrint("setpos <x> <y> <z> [pitch] [yaw] [roll]");
+        return;
+    }
+
+    glm::vec3 pos = {std::stof(cmd[1]), std::stof(cmd[2]), std::stof(cmd[3])};
+    BSPViewer::get().setCameraPos(pos);
+
+    if (cmd.size() >= 7) {
+        glm::vec3 rot = {std::stof(cmd[4]), std::stof(cmd[5]), std::stof(cmd[6])};
+        BSPViewer::get().setCameraRot(rot);
+    }
+});
+
 static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
 static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
 static ConVar<float> fov("fov", 120.f, "Horizontal field of view");
