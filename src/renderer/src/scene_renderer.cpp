@@ -695,27 +695,44 @@ void SceneRenderer::drawWorldSurfaces() {
     m_sWorldShader.enable();
     m_sWorldShader.setupUniforms(*this);
 
-    for (unsigned i : m_Data.viewContext.getWorldSurfaces()) {
-        Surface &surf = m_Data.surfaces[i];
-        const Material &mat = MaterialManager::get().getMaterial(surf.m_nMatIdx);
-        mat.bindTextures();
+    auto &textureChain = m_Data.viewContext.getWorldTextureChain();
+    auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
+    unsigned frame = m_Data.viewContext.getWorldTextureChainFrame();
+    unsigned drawnSurfs = 0;
 
-        // Bind lightmap texture
-        if (r_lighting.getValue() == 2) {
-            if (surf.m_BSPLMTex != 0) {
-                glActiveTexture(GL_TEXTURE1);
-                glBindTexture(GL_TEXTURE_2D, surf.m_BSPLMTex);
-            }
-        } else if (r_lighting.getValue() == 3) {
-            if (surf.m_CustomLMTex != 0) {
-                glActiveTexture(GL_TEXTURE1);
-                glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);
-            }
+    for (size_t i = 0; i < textureChain.size(); i++) {
+        if (textureChainFrames[i] != frame) {
+            continue;
         }
 
-        m_sWorldShader.setColor(surf.m_Color);
-        glBindVertexArray(surf.m_Vao);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei)surf.m_iVertexCount);
+        // Bind material
+        const Material &mat = MaterialManager::get().getMaterial(m_Data.surfaces[textureChain[i][0]].m_nMatIdx);
+        mat.bindTextures();
+
+        for (unsigned j : textureChain[i]) {
+            Surface &surf = m_Data.surfaces[j];
+
+            // Bind lightmap texture
+            if (r_lighting.getValue() == 2) {
+                if (surf.m_BSPLMTex != 0) {
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, surf.m_BSPLMTex);
+                }
+            } else if (r_lighting.getValue() == 3) {
+                if (surf.m_CustomLMTex != 0) {
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);
+                }
+            }
+
+            if (r_texture.getValue() == 1) {
+                m_sWorldShader.setColor(surf.m_Color);
+            }
+            glBindVertexArray(surf.m_Vao);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei)surf.m_iVertexCount);
+        }
+
+        drawnSurfs += (unsigned)textureChain[i].size();
     }
 
     glBindVertexArray(0);
@@ -726,7 +743,7 @@ void SceneRenderer::drawWorldSurfaces() {
 
     timer.stop();
     m_Stats.uWorldRenderingTime += (unsigned)timer.elapsedMicroseconds();
-    m_Stats.uRenderedWorldPolys = (unsigned)m_Data.viewContext.getWorldSurfaces().size();
+    m_Stats.uRenderedWorldPolys = drawnSurfs;
 }
 
 void SceneRenderer::drawSkySurfaces() {

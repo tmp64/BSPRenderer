@@ -93,9 +93,21 @@ public:
         inline const glm::mat4 &getViewMatrix() { return m_ViewMat; }
 
         /**
-         * Returns list of world surfaces that are visible and need to be rendered.
+         * Returns list of texture chains. Each chain needs to be rendered only if
+         * its frame == getWorldTextureChainFrame().
+         * In that case it definitely has at least one surface.
          */
-        inline std::vector<unsigned> &getWorldSurfaces() { return m_WorldSurfaces; }
+        inline std::vector<std::vector<unsigned>> &getWorldTextureChain() { return m_WorldTextureChain; }
+
+        /**
+         * Returns frames if texture chains.
+         */
+        inline std::vector<unsigned> &getWorldTextureChainFrames() { return m_WorldTextureChainFrames; }
+
+        /**
+         * Returns current world texture chain frame.
+         */
+        inline unsigned getWorldTextureChainFrame() { return m_uWorldTextureChainFrame; }
 
         /**
          * Returns list of sky surfaces that are visible and need to be rendered.
@@ -118,7 +130,9 @@ public:
         float m_flFarZ = 0;
 
         // Rendering
-        std::vector<unsigned> m_WorldSurfaces;
+        unsigned m_uWorldTextureChainFrame = 0;
+        std::vector<std::vector<unsigned>> m_WorldTextureChain;
+        std::vector<unsigned> m_WorldTextureChainFrames;
         std::vector<unsigned> m_SkySurfaces;
 
         // PVS culling
@@ -182,6 +196,7 @@ public:
         std::vector<Node> nodes;
         std::vector<Leaf> leaves;
         std::vector<Surface> surfaces;
+        size_t nMaxMaterial = 0;
     };
 
     SurfaceRenderer();

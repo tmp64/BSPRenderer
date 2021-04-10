@@ -124,8 +124,8 @@ void SurfaceRenderer::setLevel(bsp::Level *level) {
 
 void SurfaceRenderer::calcWorldSurfaces() {
     AFW_ASSERT(m_pContext);
-    m_pContext->getWorldSurfaces().clear();
-    m_pContext->getWorldSurfaces().reserve(m_Data.surfaces.size());
+    m_pContext->m_WorldTextureChain.resize(m_Data.nMaxMaterial + 1);
+    m_pContext->m_WorldTextureChainFrames.resize(m_Data.nMaxMaterial + 1);
     m_pContext->getSkySurfaces().clear();
 
     if (!m_pLevel) {
@@ -134,6 +134,7 @@ void SurfaceRenderer::calcWorldSurfaces() {
 
     AFW_ASSERT(m_pContext->m_iVisFrame != 0 || m_pContext->m_NodeVisFrame.empty());
     AFW_ASSERT(m_pContext->m_iVisFrame != 0 || m_pContext->m_LeafVisFrame.empty());
+    m_pContext->m_uWorldTextureChainFrame++;
 
     if (m_pContext->m_iVisFrame == 0) {
         m_pContext->m_NodeVisFrame.resize(m_Data.nodes.size());
@@ -214,8 +215,11 @@ void SurfaceRenderer::createSurfaces() {
         surface.nMatIndex = MaterialManager::get().findMaterial(tex.szName);
 
         if (!strncmp(tex.szName, "sky", 3)) {
+            // Sky surface
             surface.iFlags |= SURF_DRAWSKY;
         }
+
+        m_Data.nMaxMaterial = std::max(m_Data.nMaxMaterial, surface.nMatIndex);
     }
 }
 
@@ -353,7 +357,14 @@ void SurfaceRenderer::recursiveWorldNodes(int node) noexcept {
         if (surf.iFlags & SURF_DRAWSKY) {
             m_pContext->m_SkySurfaces.push_back(idx);
         } else {
-            m_pContext->m_WorldSurfaces.push_back(idx);
+            size_t mat = surf.nMatIndex;
+            unsigned frame = m_pContext->m_WorldTextureChainFrames[mat];
+            if (frame != m_pContext->m_uWorldTextureChainFrame) {
+                m_pContext->m_WorldTextureChainFrames[mat] = m_pContext->m_uWorldTextureChainFrame;
+                m_pContext->m_WorldTextureChain[mat].clear();
+            }
+
+            m_pContext->m_WorldTextureChain[mat].push_back(idx);
         }
     }
 
