@@ -84,6 +84,8 @@ void TextureBlock<T>::resize(int wide, int tall) {
 template <typename T>
 bool TextureBlock<T>::insert(const T *data, int wide, int tall, int &xout, int &yout, int padding) {
     int x, y;
+
+    AFW_ASSERT(wide != 0 && tall != 0);
     
     if (!findFreeBlock(wide + 2 * padding, tall + 2 * padding, x, y)) {
         return false;

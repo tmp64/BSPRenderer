@@ -317,6 +317,21 @@ void SceneRenderer::loadBSPLightmaps() {
         return;
     }
 
+    m_Data.bspLightmapBlock.resize(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
+
+    struct Lightmap {
+        unsigned surface;
+        int size;
+        uint32_t offset;
+
+        inline bool operator<(const Lightmap &rhs) const {
+            return size > rhs.size;
+        }
+    };
+
+    std::vector<Lightmap> sortedLightmaps;
+    sortedLightmaps.reserve(m_Data.surfaces.size());
+
     for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
         Surface &surf = m_Data.surfaces[i];
         const SurfaceRenderer::Surface &baseSurf = m_Surf.getSurface(i);
@@ -372,19 +387,38 @@ void SceneRenderer::loadBSPLightmaps() {
         }
         */
 
-        // Create texture
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        surf.m_BSPLMTex.create();
-        glBindTexture(GL_TEXTURE_2D, surf.m_BSPLMTex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, wide, tall, 0, GL_RGB, GL_UNSIGNED_BYTE,
-                     m_pLevel->getLightMaps().data() + offset);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        // Add to sorting list
+        sortedLightmaps.push_back({(unsigned)i, wide * tall, offset});
     }
+
+    // Sort all lightmaps by size, large to small
+    std::sort(sortedLightmaps.begin(), sortedLightmaps.end());
+
+    // Add them to the lightmap block
+    for (auto &i : sortedLightmaps) {
+        Surface &surf = m_Data.surfaces[i.surface];
+        const glm::u8vec3 *data = reinterpret_cast<const glm::u8vec3 *>(m_pLevel->getLightMaps().data() + i.offset);
+        int x, y;
+        
+        if (m_Data.bspLightmapBlock.insert(data, surf.m_BSPLMSize.x, surf.m_BSPLMSize.y, x, y, BSP_LIGHTMAP_PADDING)) {
+            surf.m_BSPLMOffset.x = x;
+            surf.m_BSPLMOffset.y = y;
+        } else {
+            logWarn("BSP Lightmap block overflow: no space for surface {} ({}x{})", i.surface, surf.m_BSPLMSize.x,
+                    surf.m_BSPLMSize.y);
+        }
+    }
+
+    // Load the block into the GPU
+    m_Data.bspLightmapBlockTex.create();
+    glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE, 0, GL_RGB,
+                 GL_UNSIGNED_BYTE, m_Data.bspLightmapBlock.getData());
+    glGenerateMipmap(GL_TEXTURE_2D);
 }
 
 void SceneRenderer::loadCustomLightmaps(const std::string &path, const char *tag) {
@@ -501,18 +535,14 @@ void SceneRenderer::createSurfaceObjects() {
             v.texture.t /= material.getTall();
 
             // BSP lightmap texture
-            if (surf.m_BSPLMTex != 0) {
+            if (surf.m_BSPLMSize.x != 0) {
                 v.bspLMTexture.s = glm::dot(v.position, texInfo.vS);
-                v.bspLMTexture.s += texInfo.fSShift;
-                v.bspLMTexture.s -= surf.m_vTextureMins.x;
-                v.bspLMTexture.s += 8; // Shift by half-texel
-                v.bspLMTexture.s /= surf.m_BSPLMSize.x * BSP_LIGHTMAP_DIVISOR;
-
                 v.bspLMTexture.t = glm::dot(v.position, texInfo.vT);
-                v.bspLMTexture.t += texInfo.fTShift;
-                v.bspLMTexture.t -= surf.m_vTextureMins.y;
-                v.bspLMTexture.t += 8; // Shift by half-texel
-                v.bspLMTexture.t /= surf.m_BSPLMSize.y * BSP_LIGHTMAP_DIVISOR;
+                v.bspLMTexture += glm::vec2(texInfo.fSShift, texInfo.fTShift);
+                v.bspLMTexture -= surf.m_vTextureMins;
+                v.bspLMTexture += glm::vec2(BSP_LIGHTMAP_DIVISOR / 2); // Shift by half-texel
+                v.bspLMTexture += surf.m_BSPLMOffset * BSP_LIGHTMAP_DIVISOR;
+                v.bspLMTexture /= BSP_LIGHTMAP_BLOCK_SIZE * BSP_LIGHTMAP_DIVISOR;
             }
 
             // Custom lightmap texture
@@ -700,6 +730,14 @@ void SceneRenderer::drawWorldSurfaces() {
     unsigned frame = m_Data.viewContext.getWorldTextureChainFrame();
     unsigned drawnSurfs = 0;
 
+    // Bind lightmap block texture
+    if (r_lighting.getValue() == 2) {
+        if (m_Data.bspLightmapBlockTex != 0) {
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex);
+        }
+    }
+
     for (size_t i = 0; i < textureChain.size(); i++) {
         if (textureChainFrames[i] != frame) {
             continue;
@@ -713,12 +751,7 @@ void SceneRenderer::drawWorldSurfaces() {
             Surface &surf = m_Data.surfaces[j];
 
             // Bind lightmap texture
-            if (r_lighting.getValue() == 2) {
-                if (surf.m_BSPLMTex != 0) {
-                    glActiveTexture(GL_TEXTURE1);
-                    glBindTexture(GL_TEXTURE_2D, surf.m_BSPLMTex);
-                }
-            } else if (r_lighting.getValue() == 3) {
+            if (r_lighting.getValue() == 3) {
                 if (surf.m_CustomLMTex != 0) {
                     glActiveTexture(GL_TEXTURE1);
                     glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);

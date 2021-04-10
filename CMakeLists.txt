@@ -11,6 +11,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(COMPILER_MSVC)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4")
 	set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} /EHsc /W4")
+
+	# Disable RTC in debug since it interferes with texture block optimization
+	string(REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
 # External libraries

@@ -5,6 +5,7 @@
 #include <renderer/base_shader.h>
 #include <renderer/raii.h>
 #include <renderer/time_smoother.h>
+#include <renderer/texture_block.h>
 
 class SceneRenderer : appfw::NoCopy {
 public:
@@ -87,6 +88,8 @@ public:
 
 private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
+    static constexpr int BSP_LIGHTMAP_BLOCK_SIZE = 1024;
+    static constexpr int BSP_LIGHTMAP_PADDING = 2;
 
     class WorldShader : public BaseShader {
     public:
@@ -151,7 +154,7 @@ private:
         // BSP lightmap info
         glm::vec2 m_vTextureMins = glm::vec2(0, 0);
         glm::ivec2 m_BSPLMSize = glm::ivec2(0, 0);
-        GLTexture m_BSPLMTex;
+        glm::ivec2 m_BSPLMOffset = glm::ivec2(0, 0);
 
         // Custom lightmap info
         std::vector<glm::vec2> m_vCustomLMTexCoords;
@@ -164,6 +167,10 @@ private:
         std::vector<Surface> surfaces;
         bool bCustomLMLoaded = false;
         GLTexture skyboxCubemap;
+        
+        // BSP lightmaps
+        TextureBlock<glm::u8vec3> bspLightmapBlock;
+        GLTexture bspLightmapBlockTex;
     };
 
     bsp::Level *m_pLevel = nullptr;
