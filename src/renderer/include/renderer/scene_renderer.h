@@ -19,6 +19,9 @@ public:
         //! Number of sky polygons rendered
         unsigned uRenderedSkyPolys = 0;
 
+        //! Time (us) taken by frame setup
+        TimeSmoother uSetupTime;
+
         //! Time (us) taken by world BSP traversing
         TimeSmoother uWorldBSPTime;
 
@@ -27,6 +30,9 @@ public:
 
         //! Time (us) taken by sky polygons rendering
         TimeSmoother uSkyRenderingTime;
+
+        //! Time (us) taken by post processing
+        TimeSmoother uPostProcessingTime;
 
         //! Total time (us) taken by scene rendering
         TimeSmoother uTotalRenderingTime;

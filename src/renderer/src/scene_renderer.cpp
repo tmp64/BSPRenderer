@@ -176,6 +176,7 @@ void SceneRenderer::renderScene(GLint targetFb) {
 
     if (m_bNeedRefreshFB) {
         recreateFramebuffer();
+        m_bNeedRefreshFB = false;
     }
 
     prepareHdrFramebuffer();
@@ -213,17 +214,22 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         ImGui::Separator();
 
         unsigned timeLost = m_Stats.uTotalRenderingTime.getSmoothed() - m_Stats.uWorldBSPTime.getSmoothed() -
-                            m_Stats.uWorldRenderingTime.getSmoothed() - m_Stats.uSkyRenderingTime.getSmoothed();
+                            m_Stats.uWorldRenderingTime.getSmoothed() - m_Stats.uSkyRenderingTime.getSmoothed() -
+                            m_Stats.uPostProcessingTime.getSmoothed() - m_Stats.uSetupTime.getSmoothed();
 
         ImGui::Text("FPS: %.3f", 1000000.0 / m_Stats.uTotalRenderingTime.getSmoothed());
         ImGui::Text("Total: %2d.%03d ms", m_Stats.uTotalRenderingTime.getSmoothed() / 1000,
                     m_Stats.uTotalRenderingTime.getSmoothed() % 1000);
+        ImGui::Text("Setup: %2d.%03d ms", m_Stats.uSetupTime.getSmoothed() / 1000,
+                    m_Stats.uSetupTime.getSmoothed() % 1000);
         ImGui::Text("BSP: %2d.%03d ms", m_Stats.uWorldBSPTime.getSmoothed() / 1000,
                     m_Stats.uWorldBSPTime.getSmoothed() % 1000);
         ImGui::Text("World: %2d.%03d ms", m_Stats.uWorldRenderingTime.getSmoothed() / 1000,
                     m_Stats.uWorldRenderingTime.getSmoothed() % 1000);
         ImGui::Text("Sky: %2d.%03d ms", m_Stats.uSkyRenderingTime.getSmoothed() / 1000,
                     m_Stats.uSkyRenderingTime.getSmoothed() % 1000);
+        ImGui::Text("Post: %2d.%03d ms", m_Stats.uPostProcessingTime.getSmoothed() / 1000,
+                    m_Stats.uPostProcessingTime.getSmoothed() % 1000);
         ImGui::Text("Unaccounted: %2d.%03d ms", timeLost / 1000, timeLost % 1000);
 
         ImGui::End();
@@ -687,8 +693,14 @@ std::vector<uint8_t> SceneRenderer::rotateImage90CCW(uint8_t *data, int wide, in
 }
 
 void SceneRenderer::prepareHdrFramebuffer() {
+    appfw::Timer renderTimer;
+    renderTimer.start();
+
     glBindFramebuffer(GL_FRAMEBUFFER, m_nHdrFramebuffer);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    renderTimer.stop();
+    m_Stats.uSetupTime += renderTimer.elapsedMicroseconds();
 }
 
 void SceneRenderer::setupViewContext() {
@@ -818,6 +830,9 @@ void SceneRenderer::drawSkySurfaces() {
 }
 
 void SceneRenderer::doPostProcessing() {
+    appfw::Timer timer;
+    timer.start();
+
     m_sPostProcessShader.enable();
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
@@ -828,4 +843,7 @@ void SceneRenderer::doPostProcessing() {
     glBindVertexArray(0);
 
     m_sPostProcessShader.disable();
+    
+    timer.stop();
+    m_Stats.uPostProcessingTime += timer.elapsedMicroseconds();
 }
