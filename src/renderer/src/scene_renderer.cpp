@@ -700,7 +700,7 @@ void SceneRenderer::prepareHdrFramebuffer() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     renderTimer.stop();
-    m_Stats.uSetupTime += renderTimer.elapsedMicroseconds();
+    m_Stats.uSetupTime += (unsigned)renderTimer.elapsedMicroseconds();
 }
 
 void SceneRenderer::setupViewContext() {
@@ -845,5 +845,5 @@ void SceneRenderer::doPostProcessing() {
     m_sPostProcessShader.disable();
     
     timer.stop();
-    m_Stats.uPostProcessingTime += timer.elapsedMicroseconds();
+    m_Stats.uPostProcessingTime += (unsigned)timer.elapsedMicroseconds();
 }
