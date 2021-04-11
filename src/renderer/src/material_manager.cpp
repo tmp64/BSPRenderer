@@ -107,6 +107,8 @@ void MaterialManager::shutdown() {
 }
 
 void MaterialManager::addWadFile(const fs::path &name) {
+    std::lock_guard lock(m_Mutex);
+
     try {
         appfw::Timer timer;
         timer.start();
@@ -130,6 +132,7 @@ void MaterialManager::addWadFile(const fs::path &name) {
 }
 
 size_t MaterialManager::findMaterial(const std::string &name) { 
+    std::lock_guard lock(m_Mutex);
     auto it = m_Map.find(name);
 
     if (it == m_Map.end()) {

@@ -6,6 +6,7 @@
 #include <glad/glad.h>
 #include <vector>
 #include <unordered_map>
+#include <mutex>
 #include <renderer/raii.h>
 
 constexpr size_t NULL_MATERIAL = 0;
@@ -95,6 +96,7 @@ public:
 private:
     std::vector<Material> m_Materials;
     std::unordered_map<std::string, size_t> m_Map;
+    std::mutex m_Mutex;
 };
 
 #endif

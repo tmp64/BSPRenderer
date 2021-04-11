@@ -105,7 +105,7 @@ BSPViewer::~BSPViewer() {
     AFW_ASSERT(m_sSingleton);
 
     // Shutdown renderer
-    m_Renderer.setLevel(nullptr, "", "");
+    m_Renderer.unloadLevel();
 
     m_sSingleton = nullptr;
 }
@@ -115,16 +115,31 @@ void BSPViewer::tick() {
     ImGui::ShowDemoWindow();
     //
 
-    m_Renderer.showDebugDialog("Renderer");
+    if (m_Renderer.getLevel()) {
+        if (m_Renderer.isLoading()) {
+            try {
+                if (m_Renderer.loadingTick()) {
+                    logInfo("Loading finished");
+                }
+            } catch (const std::exception &e) {
+                logError("Failed to load the map: {}", e.what());
+                return;
+            }
+        } else {
+            m_Renderer.showDebugDialog("Renderer");
+            processUserInput();
+        }
+    }
 
-    processUserInput();
     showInfoDialog();
 }
 
 void BSPViewer::draw() {
-    m_Renderer.setPerspective(fov.getValue(), m_flAspectRatio, 4, 8192);
-    m_Renderer.setPerspViewOrigin(m_vPos, m_vRot);
-    m_Renderer.renderScene(0);
+    if (m_Renderer.getLevel() && !m_Renderer.isLoading()) {
+        m_Renderer.setPerspective(fov.getValue(), m_flAspectRatio, 4, 8192);
+        m_Renderer.setPerspViewOrigin(m_vPos, m_vRot);
+        m_Renderer.renderScene(0);
+    }
 }
 
 void BSPViewer::onWindowSizeChange(int wide, int tall) {
@@ -235,7 +250,12 @@ void BSPViewer::processUserInput() {
 void BSPViewer::setDrawDebugTextEnabled(bool state) { m_bDrawDebugText = state; }
 
 void BSPViewer::loadMap(const std::string &name) {
-    m_Renderer.setLevel(nullptr, "", nullptr);
+    if (m_Renderer.isLoading()) {
+        logError("Can't load a level while loading another level.");
+        return;
+    }
+
+    m_Renderer.unloadLevel();
 
     std::string path = "maps/" + name + ".bsp";    
     logInfo("Loading map {}", path);
@@ -243,17 +263,15 @@ void BSPViewer::loadMap(const std::string &name) {
     try {
         fs::path bspPath = getFileSystem().findFile(path, "assets");
         m_LoadedLevel.loadFromFile(bspPath);
-        m_Renderer.setLevel(&m_LoadedLevel, path, "assets");
+        m_Renderer.beginLoading(&m_LoadedLevel, path, "assets");
 
         g_BSPTree.setLevel(&m_LoadedLevel);
         g_BSPTree.createTree();
 
         m_vPos = {0.f, 0.f, 0.f};
         m_vRot = {0.f, 0.f, 0.f};
-
-        logInfo("Map loaded");
     } catch (const std::exception &e) {
-        logError("Failed to load map: {}", e.what());
+        logError("Failed to load the map: {}", e.what());
         return;
     }
 }

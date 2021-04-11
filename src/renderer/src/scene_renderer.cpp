@@ -132,30 +132,110 @@ SceneRenderer::SceneRenderer() {
 
 SceneRenderer::~SceneRenderer() {}
 
-void SceneRenderer::setLevel(bsp::Level *level, const std::string &path, const char *tag) {
+void SceneRenderer::beginLoading(bsp::Level *level, const std::string &path, const char *tag) {
+    AFW_ASSERT(level);
+
     if (m_pLevel == level) {
         return;
     }
 
-    m_pLevel = level;
-    m_Data = LevelData();
+    unloadLevel();
 
-    try {
-        m_Surf.setLevel(level);
-        
-        if (level) {
-            createSurfaces();
-            loadBSPLightmaps();
-            loadCustomLightmaps(path, tag);
-            createSurfaceObjects();
-            loadSkyBox();
-        }
-    } catch (...) {
+    m_Data.customLightmapPath = getFileSystem().findFileOrEmpty(path + ".lm", tag);
+
+    m_pLevel = level;
+    loadSkyBox();
+
+    m_pLoadingState = std::make_unique<LoadingState>();
+    m_LoadingStatus = LoadingStatus::CreateSurfaces;
+    m_pLoadingState->createSurfacesResult = std::async(std::launch::async, [this]() { asyncCreateSurfaces(); });
+}
+
+void SceneRenderer::unloadLevel() {
+    AFW_ASSERT(!isLoading());
+
+    if (isLoading()) {
+        throw std::logic_error("can't unload level while loading");
+    }
+
+    if (m_pLevel) {
+        m_pLoadingState = nullptr;
+        m_Data = LevelData();
         m_Surf.setLevel(nullptr);
         m_pLevel = nullptr;
+    }
+}
+
+bool SceneRenderer::loadingTick() { 
+    AFW_ASSERT(m_pLoadingState);
+
+    try {
+        switch (m_LoadingStatus) {
+        case LoadingStatus::CreateSurfaces: {
+            if (appfw::IsFutureReady(m_pLoadingState->createSurfacesResult)) {
+                m_pLoadingState->createSurfacesResult.get();
+                m_pLoadingState->createSurfacesResult = std::future<void>();
+
+                // Start async tasks
+                m_LoadingStatus = LoadingStatus::AsyncTasks;
+
+                m_pLoadingState->loadBSPLightmapsResult =
+                    std::async(std::launch::async, [this]() { asyncLoadBSPLightmaps(); });
+
+                m_pLoadingState->loadCustomLightmapsResult =
+                    std::async(std::launch::async, [this]() { asyncLoadCustomLightmaps(); });
+            }
+            return false;
+        }
+        case LoadingStatus::AsyncTasks: {
+            if (!m_pLoadingState->loadBSPLightmapsFinished) {
+                if (appfw::IsFutureReady(m_pLoadingState->loadBSPLightmapsResult)) {
+                    m_pLoadingState->loadBSPLightmapsResult.get();
+                    m_pLoadingState->loadBSPLightmapsResult = std::future<void>();
+                    finishLoadBSPLightmaps();
+                    m_pLoadingState->loadBSPLightmapsFinished = true;
+                }
+            }
+
+            if (!m_pLoadingState->loadCustomLightmapsFinished) {
+                if (appfw::IsFutureReady(m_pLoadingState->loadCustomLightmapsResult)) {
+                    m_pLoadingState->loadCustomLightmapsResult.get();
+                    m_pLoadingState->loadCustomLightmapsResult = std::future<void>();
+                    finishLoadCustomLightmaps();
+                    m_pLoadingState->loadCustomLightmapsFinished = true;
+                }
+            }
+
+            bool isReady = m_pLoadingState->loadBSPLightmapsFinished && m_pLoadingState->loadCustomLightmapsFinished;
+
+            if (isReady) {
+                m_LoadingStatus = LoadingStatus::CreateSurfaceObjects;
+                m_pLoadingState->createSurfaceObjectsResult =
+                    std::async(std::launch::async, [this]() { asyncCreateSurfaceObjects(); });
+            }
+
+            return false;
+        }
+        case LoadingStatus::CreateSurfaceObjects: {
+            if (appfw::IsFutureReady(m_pLoadingState->createSurfaceObjectsResult)) {
+                m_pLoadingState->createSurfaceObjectsResult.get();
+                m_pLoadingState->createSurfaceObjectsResult = std::future<void>();
+                finishCreateSurfaceObjects();
+                finishLoading();
+                return true;
+            }
+            return false;
+        }
+        }
+    }
+    catch (const std::exception &) {
+        m_pLoadingState = nullptr;
+        unloadLevel();
         throw;
     }
 
+    AFW_ASSERT(false);
+    return false;
 }
 
 void SceneRenderer::setPerspective(float fov, float aspect, float near, float far) {
@@ -172,6 +252,9 @@ void SceneRenderer::setViewportSize(const glm::ivec2 &size) {
 }
 
 void SceneRenderer::renderScene(GLint targetFb) {
+    AFW_ASSERT(m_pLevel);
+    AFW_ASSERT(!isLoading());
+
     m_Stats.clear();
     appfw::Timer renderTimer;
     renderTimer.start();
@@ -313,7 +396,10 @@ void SceneRenderer::destroyFramebuffer() {
     }
 }
 
-void SceneRenderer::createSurfaces() {
+void SceneRenderer::asyncCreateSurfaces() {
+    logInfo("Creating surfaces...");
+    m_Surf.setLevel(m_pLevel);
+
     m_Data.surfaces.resize(m_Surf.getSurfaceCount());
 
     for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
@@ -328,13 +414,14 @@ void SceneRenderer::createSurfaces() {
     }
 }
 
-void SceneRenderer::loadBSPLightmaps() {
+void SceneRenderer::asyncLoadBSPLightmaps() {
     if (m_pLevel->getLightMaps().size() == 0) {
-        logInfo("BSP has no embedded lightmaps.");
+        logInfo("BSP lightmaps: no lightmaps in the map file");
         return;
     }
 
-    m_Data.bspLightmapBlock.resize(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
+    logInfo("BSP lightmaps: loading...");
+    m_pLoadingState->bspLightmapBlock.resize(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
 
     struct Lightmap {
         unsigned surface;
@@ -387,7 +474,7 @@ void SceneRenderer::loadBSPLightmaps() {
         }
 
         if (offset + wide * tall * 3 > m_pLevel->getLightMaps().size()) {
-            logWarn("Face {} has invalid lightmap offset", i);
+            logWarn("BSP lightmaps: face {} has invalid lightmap offset", i);
             continue;
         }
 
@@ -417,15 +504,18 @@ void SceneRenderer::loadBSPLightmaps() {
         const glm::u8vec3 *data = reinterpret_cast<const glm::u8vec3 *>(m_pLevel->getLightMaps().data() + i.offset);
         int x, y;
         
-        if (m_Data.bspLightmapBlock.insert(data, surf.m_BSPLMSize.x, surf.m_BSPLMSize.y, x, y, BSP_LIGHTMAP_PADDING)) {
+        if (m_pLoadingState->bspLightmapBlock.insert(data, surf.m_BSPLMSize.x, surf.m_BSPLMSize.y, x, y,
+                                                     BSP_LIGHTMAP_PADDING)) {
             surf.m_BSPLMOffset.x = x;
             surf.m_BSPLMOffset.y = y;
         } else {
-            logWarn("BSP Lightmap block overflow: no space for surface {} ({}x{})", i.surface, surf.m_BSPLMSize.x,
+            logWarn("BSP lightmaps: no space for surface {} ({}x{})", i.surface, surf.m_BSPLMSize.x,
                     surf.m_BSPLMSize.y);
         }
     }
+}
 
+void SceneRenderer::finishLoadBSPLightmaps() {
     // Load the block into the GPU
     m_Data.bspLightmapBlockTex.create();
     glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex);
@@ -434,23 +524,24 @@ void SceneRenderer::loadBSPLightmaps() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE, 0, GL_RGB,
-                 GL_UNSIGNED_BYTE, m_Data.bspLightmapBlock.getData());
+                 GL_UNSIGNED_BYTE, m_pLoadingState->bspLightmapBlock.getData());
     glGenerateMipmap(GL_TEXTURE_2D);
+
+    m_pLoadingState->bspLightmapBlock.clear();
+    logInfo("BSP lightmaps: loaded.");
 }
 
-void SceneRenderer::loadCustomLightmaps(const std::string &path, const char *tag) {
-    if (path.empty() || !tag) {
-        logInfo("No path to BSP - custom lightmaps not loaded.");
-        return;
-    }
-
+void SceneRenderer::asyncLoadCustomLightmaps() {
     m_Data.bCustomLMLoaded = false;
-    fs::path lmPath = getFileSystem().findFileOrEmpty(path + ".lm", tag);
+    m_pLoadingState->customLightmaps.clear();
+    fs::path &lmPath = m_Data.customLightmapPath;
 
     if (lmPath.empty()) {
-        logInfo("Custom lightmap file not found - not loading.");
+        logInfo("Custom lightmaps: file not found - not loading.");
         return;
     }
+
+    logInfo("Custom lightmaps: loading...");
 
     try {
         constexpr uint32_t LM_MAGIC = ('1' << 24) | ('0' << 16) | ('M' << 8) | ('L' << 0);
@@ -494,35 +585,53 @@ void SceneRenderer::loadCustomLightmaps(const std::string &path, const char *tag
             file.readArray(appfw::span(surf.m_vCustomLMTexCoords));
         }
 
+        m_pLoadingState->customLightmaps.resize(lmHeader.iFaceCount);
+
         // Read textures
         for (size_t i = 0; i < lmHeader.iFaceCount; i++) {
             Surface &surf = m_Data.surfaces[i];
-            std::vector<glm::vec3> data;
+            std::vector<glm::vec3> &data = m_pLoadingState->customLightmaps[i];
             data.resize((size_t)surf.m_vCustomLMSize.x * (size_t)surf.m_vCustomLMSize.y);
             file.readArray(appfw::span(data));
-
-            surf.m_CustomLMTex.create();
-            glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, surf.m_vCustomLMSize.x, surf.m_vCustomLMSize.y, 0, GL_RGB, GL_FLOAT,
-                         data.data());
-            glGenerateMipmap(GL_TEXTURE_2D);
         }
-
-        m_Data.bCustomLMLoaded = true;
     } catch (const std::exception &e) {
-        logWarn("Failed to load custom light map: {}", e.what());
+        logWarn("Custom lightmaps: failed to load: {}", e.what());
+        m_pLoadingState->customLightmaps.clear();
     }
 }
 
-void SceneRenderer::createSurfaceObjects() {
+void SceneRenderer::finishLoadCustomLightmaps() {
+    if (m_pLoadingState->customLightmaps.empty()) {
+        return;
+    }
+
+    for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
+        Surface &surf = m_Data.surfaces[i];
+        std::vector<glm::vec3> &data = m_pLoadingState->customLightmaps[i];
+
+        surf.m_CustomLMTex.create();
+        glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, surf.m_vCustomLMSize.x, surf.m_vCustomLMSize.y, 0, GL_RGB, GL_FLOAT,
+                     data.data());
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+
+    m_Data.bCustomLMLoaded = true;
+    logInfo("Custom lightmaps: loaded");
+}
+
+void SceneRenderer::asyncCreateSurfaceObjects() {
+    logInfo("Surface objects: creating");
+
     std::vector<SurfaceVertex> vertices;
-    std::vector<SurfaceVertex> surfVertices; // Vertices of all surfaces
-    surfVertices.reserve(bsp::MAX_MAP_VERTS);
+    m_pLoadingState->allVertices.reserve(bsp::MAX_MAP_VERTS);
     unsigned maxEboSize = 0; // Sum of vertex counts of all surfaces + surface count (to account for primitive restart element)
+
+    m_pLoadingState->surfVertices.resize(m_Data.surfaces.size());
 
     for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
         Surface &surf = m_Data.surfaces[i];
@@ -575,11 +684,12 @@ void SceneRenderer::createSurfaceObjects() {
             vertices.push_back(v);
 
             // Add vertex to world vertex list
-            unsigned eboIdx = (unsigned)surfVertices.size();
-            surfVertices.push_back(v);
+            unsigned eboIdx = (unsigned)m_pLoadingState->allVertices.size();
+            m_pLoadingState->allVertices.push_back(v);
 
             if (eboIdx >= std::numeric_limits<uint16_t>::max()) {
-                logError("Vertex limit reached.");
+                logError("Surface objects: vertex limit reached.");
+                throw std::runtime_error("vertex limit reached");
                 return;
             }
 
@@ -589,17 +699,33 @@ void SceneRenderer::createSurfaceObjects() {
         auto fnGetRandColor = []() { return (rand() % 256) / 255.f; };
         surf.m_Color = {fnGetRandColor(), fnGetRandColor(), fnGetRandColor()};
 
+        m_pLoadingState->surfVertices[i] = std::move(vertices);
+    }
+
+    m_pLoadingState->maxEboSize = maxEboSize;
+}
+
+void SceneRenderer::finishCreateSurfaceObjects() {
+    for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
+        Surface &surf = m_Data.surfaces[i];
+        std::vector<SurfaceVertex> &vertices = m_pLoadingState->surfVertices[i];
         surf.m_Vao.create();
         surf.m_Vbo.create();
+
+        AFW_ASSERT(vertices.size() == (size_t)surf.m_iVertexCount);
 
         glBindVertexArray(surf.m_Vao);
         glBindBuffer(GL_ARRAY_BUFFER, surf.m_Vbo);
 
-        glBufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * surf.m_iVertexCount, vertices.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * surf.m_iVertexCount, vertices.data(),
+                     GL_STATIC_DRAW);
         enableSurfaceAttribs();
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
     }
+
+    unsigned maxEboSize = m_pLoadingState->maxEboSize;
+    auto &allVertices = m_pLoadingState->allVertices;
 
     // VAO for world geometry
     m_Data.worldVao.create();
@@ -607,19 +733,21 @@ void SceneRenderer::createSurfaceObjects() {
     glBindVertexArray(m_Data.worldVao);
     glBindBuffer(GL_ARRAY_BUFFER, m_Data.worldVbo);
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * surfVertices.size(), surfVertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * allVertices.size(), allVertices.data(), GL_STATIC_DRAW);
     enableSurfaceAttribs();
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
     // Create EBO
     logInfo("Maximum EBO size: {} B", maxEboSize * sizeof(uint16_t));
-    logInfo("Vertex count: {}", surfVertices.size());
+    logInfo("Vertex count: {}", allVertices.size());
     m_Data.worldEboData.resize(maxEboSize);
     m_Data.worldEbo.create();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.worldEbo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, maxEboSize * sizeof(uint16_t), nullptr, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    logInfo("Surface objects: finished");
 }
 
 void SceneRenderer::enableSurfaceAttribs() {
@@ -702,6 +830,11 @@ void SceneRenderer::loadSkyBox() {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+}
+
+void SceneRenderer::finishLoading() {
+    m_LoadingStatus = LoadingStatus::NotLoading;
+    m_pLoadingState = nullptr;
 }
 
 std::vector<uint8_t> SceneRenderer::rotateImage90CW(uint8_t *data, int wide, int tall) {
@@ -849,6 +982,8 @@ void SceneRenderer::drawWorldSurfacesVao() {
 }
 
 void SceneRenderer::drawWorldSurfacesIndexed() {
+    AFW_ASSERT(!m_Data.worldEboData.empty());
+
     m_sWorldShader.enable();
     m_sWorldShader.setupUniforms(*this);
 

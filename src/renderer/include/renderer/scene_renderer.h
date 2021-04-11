@@ -53,12 +53,28 @@ public:
     inline bsp::Level *getLevel() { return m_pLevel; }
 
     /**
-     * Sets the level.
+     * Begins async level loading.
      * @param   level   Loaded bsp::Level
      * @param   path    Path to the .bsp file to load lightmap from (can be empty)
      * @param   tag     Tag of .bsp
      */
-    void setLevel(bsp::Level *level, const std::string &path, const char *tag);
+    void beginLoading(bsp::Level *level, const std::string &path, const char *tag);
+
+    /**
+     * Unloads the level.
+     */
+    void unloadLevel();
+
+    /**
+     * Returns whether the level is loading.
+     */
+    bool isLoading() { return m_pLoadingState != nullptr; }
+
+    /**
+     * Should be called during loading from main thread.
+     * @return  Whether loading has finished or not
+     */
+    bool loadingTick();
 
     /**
      * Sets perspective projection.
@@ -181,13 +197,13 @@ private:
     };
 
     struct LevelData {
+        fs::path customLightmapPath;
         SurfaceRenderer::Context viewContext;
         std::vector<Surface> surfaces;
         bool bCustomLMLoaded = false;
         GLTexture skyboxCubemap;
         
         // BSP lightmaps
-        TextureBlock<glm::u8vec3> bspLightmapBlock;
         GLTexture bspLightmapBlockTex;
 
         // World geometry indexed rendering
@@ -197,10 +213,42 @@ private:
         std::vector<uint16_t> worldEboData;
     };
 
+    enum class LoadingStatus {
+        NotLoading,
+        CreateSurfaces, //!< Calls SurfaceRenderer::setLevel and fills m_Data.surfaces
+        AsyncTasks, //!< Starts and waits for various tasks
+        CreateSurfaceObjects, //!< Creates VAOs and VBOs
+    };
+
+    struct LoadingState {
+        // CreateSurfaces
+        std::future<void> createSurfacesResult;
+
+        // Async tasks
+        std::future<void> loadBSPLightmapsResult;
+        std::future<void> loadCustomLightmapsResult;
+        bool loadBSPLightmapsFinished = false;
+        bool loadCustomLightmapsFinished = false;
+
+        // BSP lightmaps
+        TextureBlock<glm::u8vec3> bspLightmapBlock;
+
+        // Custom lightmaps
+        std::vector<std::vector<glm::vec3>> customLightmaps;
+
+        // Surface objects
+        std::future<void> createSurfaceObjectsResult;
+        std::vector<std::vector<SurfaceVertex>> surfVertices; //!< Vertices of individual surfaces
+        std::vector<SurfaceVertex> allVertices; //!< Vertices of all surfaces
+        int maxEboSize = 0; //!< Maximum number of elements in the EBO (if all surfaces are visible at the same time)
+    };
+
     bsp::Level *m_pLevel = nullptr;
     SurfaceRenderer m_Surf;
     LevelData m_Data;
     RenderingStats m_Stats;
+    LoadingStatus m_LoadingStatus;
+    std::unique_ptr<LoadingState> m_pLoadingState;
 
     // Screen-wide quad
     GLVao m_nQuadVao;
@@ -216,12 +264,16 @@ private:
     void recreateFramebuffer();
     void destroyFramebuffer();
 
-    void createSurfaces();
-    void loadBSPLightmaps();
-    void loadCustomLightmaps(const std::string &path, const char *tag);
-    void createSurfaceObjects();
+    void asyncCreateSurfaces();
+    void asyncLoadBSPLightmaps();
+    void finishLoadBSPLightmaps();
+    void asyncLoadCustomLightmaps();
+    void finishLoadCustomLightmaps();
+    void asyncCreateSurfaceObjects();
+    void finishCreateSurfaceObjects();
     void enableSurfaceAttribs();
     void loadSkyBox();
+    void finishLoading();
     std::vector<uint8_t> rotateImage90CW(uint8_t *data, int wide, int tall);
     std::vector<uint8_t> rotateImage90CCW(uint8_t *data, int wide, int tall);
 
