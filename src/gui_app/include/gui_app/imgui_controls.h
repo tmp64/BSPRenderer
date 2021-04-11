@@ -35,9 +35,8 @@ inline const char *QuatToString(const glm::quat &quat, int width = 5, int prec =
 
 inline void CvarCheckbox(const char *text, ConVar<bool> &cvar) {
     bool value = cvar.getValue();
-    ImGui::Checkbox(text, &value);
 
-	if (value != cvar.getValue()) {
+	if (ImGui::Checkbox(text, &value)) {
         cvar.setValue(value);
 	}
 }

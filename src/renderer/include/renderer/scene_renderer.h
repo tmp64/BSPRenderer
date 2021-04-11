@@ -19,6 +19,9 @@ public:
         //! Number of sky polygons rendered
         unsigned uRenderedSkyPolys = 0;
 
+        //! Number of draw calls issued (glDrawArrays, ...)
+        unsigned uDrawCallCount = 0;
+
         //! Time (us) taken by frame setup
         TimeSmoother uSetupTime;
 
@@ -40,6 +43,7 @@ public:
         inline void clear() {
             uRenderedWorldPolys = 0;
             uRenderedSkyPolys = 0;
+            uDrawCallCount = 0;
         }
     };
 
@@ -96,6 +100,7 @@ private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
     static constexpr int BSP_LIGHTMAP_BLOCK_SIZE = 1024;
     static constexpr int BSP_LIGHTMAP_PADDING = 2;
+    static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
 
     class WorldShader : public BaseShader {
     public:
@@ -146,6 +151,11 @@ private:
         glm::vec2 texture;
         glm::vec2 bspLMTexture;
         glm::vec2 customLMTexture;
+
+        inline bool operator==(const SurfaceVertex &rhs) {
+            return position == rhs.position && normal == rhs.normal && texture == rhs.texture &&
+                   bspLMTexture == rhs.bspLMTexture && customLMTexture == rhs.customLMTexture;
+        }
     };
 
     static_assert(sizeof(SurfaceVertex) == sizeof(float) * 12, "Size of Vertex is invalid");
@@ -156,6 +166,8 @@ private:
         glm::vec3 m_Color;
         GLsizei m_iVertexCount = 0;
         size_t m_nMatIdx = NULL_MATERIAL;
+
+        std::vector<uint16_t> m_VertexIndices;
 
         // BSP lightmap info
         glm::vec2 m_vTextureMins = glm::vec2(0, 0);
@@ -177,6 +189,12 @@ private:
         // BSP lightmaps
         TextureBlock<glm::u8vec3> bspLightmapBlock;
         GLTexture bspLightmapBlockTex;
+
+        // World geometry indexed rendering
+        GLVao worldVao;
+        GLBuffer worldVbo;
+        GLBuffer worldEbo;
+        std::vector<uint16_t> worldEboData;
     };
 
     bsp::Level *m_pLevel = nullptr;
@@ -202,6 +220,7 @@ private:
     void loadBSPLightmaps();
     void loadCustomLightmaps(const std::string &path, const char *tag);
     void createSurfaceObjects();
+    void enableSurfaceAttribs();
     void loadSkyBox();
     std::vector<uint8_t> rotateImage90CW(uint8_t *data, int wide, int tall);
     std::vector<uint8_t> rotateImage90CCW(uint8_t *data, int wide, int tall);
@@ -220,6 +239,16 @@ private:
      * Draws solid BSP faces.
      */
     void drawWorldSurfaces();
+
+    /**
+     * Draws solid BSP faces.
+     */
+    void drawWorldSurfacesVao();
+
+    /**
+     * Draws solid BSP faces using indexed rendering.
+     */
+    void drawWorldSurfacesIndexed();
 
      /**
      * Draws BSP faces with SKY texture.

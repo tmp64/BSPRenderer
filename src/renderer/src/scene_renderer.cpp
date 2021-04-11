@@ -3,6 +3,7 @@
 #include <renderer/stb_image.h>
 #include <renderer/scene_renderer.h>
 #include <imgui.h>
+#include <gui_app/imgui_controls.h>
 
 ConVar<int> r_cull("r_cull", 1,
                    "Backface culling:\n"
@@ -27,6 +28,7 @@ ConVar<int> r_tonemap("r_tonemap", 2, "HDR tonemapping method:\n  0 - none (clam
 ConVar<float> r_exposure("r_exposure", 0.5f, "Picture exposure");
 ConVar<float> r_skybright("r_skybright", 3.f, "Sky brightness");
 ConVar<float> r_skybright_ldr("r_skybright", 1.f, "Sky brightness for LDR (BSP lightmpas)");
+ConVar<bool> r_ebo("r_ebo", true, "Use indexed rendering");
 
 //----------------------------------------------------------------
 // WorldShader
@@ -209,11 +211,12 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
             return;
         }
 
-        ImGui::Text("World: %d (%d + %d)", m_Stats.uRenderedWorldPolys + m_Stats.uRenderedSkyPolys,
+        ImGui::Text("World: %u (%u + %u)", m_Stats.uRenderedWorldPolys + m_Stats.uRenderedSkyPolys,
                     m_Stats.uRenderedWorldPolys, m_Stats.uRenderedSkyPolys);
+        ImGui::Text("Draw calls: %u", m_Stats.uDrawCallCount);
         ImGui::Separator();
 
-        unsigned timeLost = m_Stats.uTotalRenderingTime.getSmoothed() - m_Stats.uWorldBSPTime.getSmoothed() -
+        int timeLost = (int)m_Stats.uTotalRenderingTime.getSmoothed() - m_Stats.uWorldBSPTime.getSmoothed() -
                             m_Stats.uWorldRenderingTime.getSmoothed() - m_Stats.uSkyRenderingTime.getSmoothed() -
                             m_Stats.uPostProcessingTime.getSmoothed() - m_Stats.uSetupTime.getSmoothed();
 
@@ -230,7 +233,15 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
                     m_Stats.uSkyRenderingTime.getSmoothed() % 1000);
         ImGui::Text("Post: %2d.%03d ms", m_Stats.uPostProcessingTime.getSmoothed() / 1000,
                     m_Stats.uPostProcessingTime.getSmoothed() % 1000);
-        ImGui::Text("Unaccounted: %2d.%03d ms", timeLost / 1000, timeLost % 1000);
+        ImGui::Text("Unaccounted: %6.3f ms", timeLost / 1000.0);
+
+        ImGui::Separator();
+
+        CvarCheckbox("World", r_drawworld);
+        ImGui::SameLine();
+        CvarCheckbox("Sky", r_drawsky);
+        ImGui::SameLine();
+        CvarCheckbox("EBO", r_ebo);
 
         ImGui::End();
     }
@@ -509,12 +520,17 @@ void SceneRenderer::loadCustomLightmaps(const std::string &path, const char *tag
 
 void SceneRenderer::createSurfaceObjects() {
     std::vector<SurfaceVertex> vertices;
+    std::vector<SurfaceVertex> surfVertices; // Vertices of all surfaces
+    surfVertices.reserve(bsp::MAX_MAP_VERTS);
+    unsigned maxEboSize = 0; // Sum of vertex counts of all surfaces + surface count (to account for primitive restart element)
 
     for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
         Surface &surf = m_Data.surfaces[i];
         const SurfaceRenderer::Surface &baseSurf = m_Surf.getSurface(i);
 
+        vertices.clear();
         vertices.reserve(surf.m_iVertexCount);
+        maxEboSize += surf.m_iVertexCount + 1;
 
         glm::vec3 normal = baseSurf.pPlane->vNormal;
         if (baseSurf.iFlags & SURF_PLANEBACK) {
@@ -557,6 +573,17 @@ void SceneRenderer::createSurfaceObjects() {
             }
 
             vertices.push_back(v);
+
+            // Add vertex to world vertex list
+            unsigned eboIdx = (unsigned)surfVertices.size();
+            surfVertices.push_back(v);
+
+            if (eboIdx >= std::numeric_limits<uint16_t>::max()) {
+                logError("Vertex limit reached.");
+                return;
+            }
+
+            surf.m_VertexIndices.push_back((uint16_t)eboIdx);
         }
 
         auto fnGetRandColor = []() { return (rand() % 256) / 255.f; };
@@ -569,27 +596,48 @@ void SceneRenderer::createSurfaceObjects() {
         glBindBuffer(GL_ARRAY_BUFFER, surf.m_Vbo);
 
         glBufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * surf.m_iVertexCount, vertices.data(), GL_STATIC_DRAW);
-        glEnableVertexAttribArray(0);
-        glEnableVertexAttribArray(1);
-        glEnableVertexAttribArray(2);
-        glEnableVertexAttribArray(3);
-        glEnableVertexAttribArray(4);
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(SurfaceVertex),
-                              reinterpret_cast<void *>(offsetof(SurfaceVertex, position)));
-        glVertexAttribPointer(1, 3, GL_FLOAT, false, sizeof(SurfaceVertex),
-                              reinterpret_cast<void *>(offsetof(SurfaceVertex, normal)));
-        glVertexAttribPointer(2, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
-                              reinterpret_cast<void *>(offsetof(SurfaceVertex, texture)));
-        glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
-                              reinterpret_cast<void *>(offsetof(SurfaceVertex, bspLMTexture)));
-        glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
-                              reinterpret_cast<void *>(offsetof(SurfaceVertex, customLMTexture)));
-
+        enableSurfaceAttribs();
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
-
-        vertices.clear();
     }
+
+    // VAO for world geometry
+    m_Data.worldVao.create();
+    m_Data.worldVbo.create();
+    glBindVertexArray(m_Data.worldVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_Data.worldVbo);
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * surfVertices.size(), surfVertices.data(), GL_STATIC_DRAW);
+    enableSurfaceAttribs();
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    // Create EBO
+    logInfo("Maximum EBO size: {} B", maxEboSize * sizeof(uint16_t));
+    logInfo("Vertex count: {}", surfVertices.size());
+    m_Data.worldEboData.resize(maxEboSize);
+    m_Data.worldEbo.create();
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.worldEbo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, maxEboSize * sizeof(uint16_t), nullptr, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+void SceneRenderer::enableSurfaceAttribs() {
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+    glEnableVertexAttribArray(3);
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(SurfaceVertex),
+                          reinterpret_cast<void *>(offsetof(SurfaceVertex, position)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, false, sizeof(SurfaceVertex),
+                          reinterpret_cast<void *>(offsetof(SurfaceVertex, normal)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
+                          reinterpret_cast<void *>(offsetof(SurfaceVertex, texture)));
+    glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
+                          reinterpret_cast<void *>(offsetof(SurfaceVertex, bspLMTexture)));
+    glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
+                          reinterpret_cast<void *>(offsetof(SurfaceVertex, customLMTexture)));
 }
 
 void SceneRenderer::loadSkyBox() {
@@ -725,7 +773,6 @@ void SceneRenderer::drawWorldSurfaces() {
     appfw::Timer timer;
     timer.start();
 
-    // Draw visible surfaces
     glEnable(GL_DEPTH_TEST);
 
     if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
@@ -734,6 +781,20 @@ void SceneRenderer::drawWorldSurfaces() {
         glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
     }
 
+    if (r_ebo.getValue()) {
+        drawWorldSurfacesIndexed();
+    } else {
+        drawWorldSurfacesVao();
+    }
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+
+    timer.stop();
+    m_Stats.uWorldRenderingTime += (unsigned)timer.elapsedMicroseconds();
+}
+
+void SceneRenderer::drawWorldSurfacesVao() {
     m_sWorldShader.enable();
     m_sWorldShader.setupUniforms(*this);
 
@@ -783,11 +844,70 @@ void SceneRenderer::drawWorldSurfaces() {
     glBindVertexArray(0);
     m_sWorldShader.disable();
 
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
+    m_Stats.uRenderedWorldPolys = drawnSurfs;
+    m_Stats.uDrawCallCount += drawnSurfs;
+}
 
-    timer.stop();
-    m_Stats.uWorldRenderingTime += (unsigned)timer.elapsedMicroseconds();
+void SceneRenderer::drawWorldSurfacesIndexed() {
+    m_sWorldShader.enable();
+    m_sWorldShader.setupUniforms(*this);
+
+    auto &textureChain = m_Data.viewContext.getWorldTextureChain();
+    auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
+    unsigned frame = m_Data.viewContext.getWorldTextureChainFrame();
+    unsigned drawnSurfs = 0;
+
+    // Bind lightmap block texture
+    if (r_lighting.getValue() == 2) {
+        if (m_Data.bspLightmapBlockTex != 0) {
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex);
+        }
+    }
+
+    // Bind buffers
+    glBindVertexArray(m_Data.worldVao);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.worldEbo);
+    glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
+    glEnable(GL_PRIMITIVE_RESTART);
+
+    for (size_t i = 0; i < textureChain.size(); i++) {
+        if (textureChainFrames[i] != frame) {
+            continue;
+        }
+
+        // Bind material
+        const Material &mat = MaterialManager::get().getMaterial(m_Data.surfaces[textureChain[i][0]].m_nMatIdx);
+        mat.bindTextures();
+
+        // Fill the EBO
+        unsigned eboIdx = 0;
+
+        for (unsigned j : textureChain[i]) {
+            Surface &surf = m_Data.surfaces[j];
+            std::copy(surf.m_VertexIndices.begin(), surf.m_VertexIndices.end(), m_Data.worldEboData.begin() + eboIdx);
+            eboIdx += (unsigned)surf.m_VertexIndices.size();
+            m_Data.worldEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
+            eboIdx++;
+        }
+
+        // Decrement EBO size to remove last PRIMITIVE_RESTART_IDX
+        eboIdx--;
+
+        // Update EBO
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.worldEboData.data());
+
+        // Draw elements
+        glDrawElements(GL_TRIANGLE_FAN, eboIdx, GL_UNSIGNED_SHORT, nullptr);
+
+        drawnSurfs += (unsigned)textureChain[i].size();
+        m_Stats.uDrawCallCount++;
+    }
+
+    glDisable(GL_PRIMITIVE_RESTART);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    m_sWorldShader.disable();
     m_Stats.uRenderedWorldPolys = drawnSurfs;
 }
 
@@ -827,6 +947,7 @@ void SceneRenderer::drawSkySurfaces() {
     timer.stop();
     m_Stats.uSkyRenderingTime += (unsigned)timer.elapsedMicroseconds();
     m_Stats.uRenderedSkyPolys = (unsigned)m_Data.viewContext.getSkySurfaces().size();
+    m_Stats.uDrawCallCount += m_Stats.uRenderedSkyPolys;
 }
 
 void SceneRenderer::doPostProcessing() {

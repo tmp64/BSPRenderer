@@ -48,6 +48,7 @@ target_link_libraries(renderer
 	bsp
 	glad
 	glm::glm
+	gui_app
 	imgui
 	Freetype::Freetype
 )
