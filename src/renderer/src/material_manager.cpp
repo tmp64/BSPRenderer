@@ -106,8 +106,18 @@ void MaterialManager::shutdown() {
     m_Materials.clear();
 }
 
-void MaterialManager::addWadFile(const fs::path &name) {
+bool MaterialManager::isWadLoaded(const std::string &name) {
+    return std::find(m_LoadedWadNames.begin(), m_LoadedWadNames.end(), name) != m_LoadedWadNames.end();
+}
+
+void MaterialManager::loadWadFile(const fs::path &name) {
     std::lock_guard lock(m_Mutex);
+
+    std::string wadFileName = name.filename().u8string();
+
+    if (isWadLoaded(wadFileName)) {
+        return;
+    }
 
     try {
         appfw::Timer timer;
@@ -124,6 +134,7 @@ void MaterialManager::addWadFile(const fs::path &name) {
         }
         
         timer.stop();
+        m_LoadedWadNames.push_back(wadFileName);
         logInfo("Loaded {} in {:.3f} s", name.filename().u8string(), timer.elapsedSeconds());
     }
     catch (const std::exception &e) {

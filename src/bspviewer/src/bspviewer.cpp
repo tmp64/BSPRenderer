@@ -89,9 +89,6 @@ BSPViewer::BSPViewer() {
     setAutoClearEnabled(true);
     setAutoClearColor({0, 0.5f, 0, 1});
 
-    // Init renderer
-    MaterialManager::get().addWadFile(getFileSystem().findFile("halflife.wad", "assets"));
-
     // Init input
     InputSystem::get().bindKey(SDL_SCANCODE_F3, "toggle_debug_text");
     InputSystem::get().bindKey(SDL_SCANCODE_GRAVE, "toggleconsole");

@@ -144,6 +144,7 @@ void SceneRenderer::beginLoading(bsp::Level *level, const std::string &path, con
     m_Data.customLightmapPath = getFileSystem().findFileOrEmpty(path + ".lm", tag);
 
     m_pLevel = level;
+    loadTextures();
     loadSkyBox();
 
     m_pLoadingState = std::make_unique<LoadingState>();
@@ -766,6 +767,58 @@ void SceneRenderer::enableSurfaceAttribs() {
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, bspLMTexture)));
     glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, customLMTexture)));
+}
+
+void SceneRenderer::loadTextures() {
+    auto &ws = m_pLevel->getEntities().getWorldspawn();
+    std::string wads = ws.getValue<std::string>("wad", "");
+    
+    if (wads.empty()) {
+        logWarn("Level doesn't reference any WAD files.");
+        return;
+    }
+
+    size_t oldsep = static_cast<size_t>(0) - 1;
+    size_t sep = 0;
+
+    auto fnLoadWad = [&](const std::string &wadpath) {
+        if (wadpath.empty()) {
+            return;
+        }
+
+        // Find last '/' or '\'
+        size_t pos = 0;
+
+        size_t slashpos = wadpath.find_last_of('/');
+        if (slashpos != wadpath.npos)
+            pos = slashpos;
+
+        size_t backslashpos = wadpath.find_last_of('\\');
+        if (backslashpos != wadpath.npos && (slashpos == wadpath.npos || backslashpos > slashpos))
+            pos = backslashpos;
+
+        // Load the WAD
+        std::string wadname = wadpath.substr(pos + 1);
+        fs::path path = getFileSystem().findFileOrEmpty(wadname, "assets");
+
+        if (!path.empty()) {
+            if (!MaterialManager::get().isWadLoaded(wadname)) {
+                logInfo("Loading WAD {}", wadname);
+                MaterialManager::get().loadWadFile(path);
+            }
+        } else {
+            logError("WAD {} not found", wadname);
+        }
+    };
+
+    while ((sep = wads.find(';', sep)) != wads.npos) {
+        std::string wadpath = wads.substr(oldsep + 1, sep - oldsep - 1);
+        fnLoadWad(wadpath);
+        oldsep = sep;
+        sep++;
+    }
+
+    fnLoadWad(wads.substr(oldsep + 1));
 }
 
 void SceneRenderer::loadSkyBox() {

@@ -77,9 +77,14 @@ public:
     void shutdown();
 
     /**
+     * Returns whether specified WAD is loaded or not.
+     */
+    bool isWadLoaded(const std::string &name);
+
+    /**
      * Loads a WAD file into the manager.
      */
-    void addWadFile(const fs::path &name);
+    void loadWadFile(const fs::path &name);
 
     /**
      * Returns an index of specified material or NULL_MATERIAL if not found.
@@ -94,6 +99,7 @@ public:
     inline const Material &getMaterial(size_t index) { return m_Materials[index]; }
 
 private:
+    std::vector<std::string> m_LoadedWadNames;
     std::vector<Material> m_Materials;
     std::unordered_map<std::string, size_t> m_Map;
     std::mutex m_Mutex;

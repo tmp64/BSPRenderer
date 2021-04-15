@@ -272,6 +272,7 @@ private:
     void asyncCreateSurfaceObjects();
     void finishCreateSurfaceObjects();
     void enableSurfaceAttribs();
+    void loadTextures();
     void loadSkyBox();
     void finishLoading();
     std::vector<uint8_t> rotateImage90CW(uint8_t *data, int wide, int tall);
