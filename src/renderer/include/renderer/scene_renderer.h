@@ -303,10 +303,20 @@ private:
      */
     void drawWorldSurfacesIndexed();
 
-     /**
+    /**
      * Draws BSP faces with SKY texture.
      */
     void drawSkySurfaces();
+
+    /**
+     * Draws BSP faces with SKY texture using VAOs.
+     */
+    void drawSkySurfacesVao();
+
+    /**
+     * Draws BSP faces with SKY texture using EBO.
+     */
+    void drawSkySurfacesIndexed();
 
     /**
      * Post-processes HDB framebuffer (tonemapping, gamma correction) and draws it into active framebuffer.

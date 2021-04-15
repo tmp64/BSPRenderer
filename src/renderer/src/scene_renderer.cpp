@@ -1103,21 +1103,40 @@ void SceneRenderer::drawSkySurfaces() {
     appfw::Timer timer;
     timer.start();
 
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
+    if (!m_Data.viewContext.getSkySurfaces().empty()) {
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
 
-    if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
-        glEnable(GL_CULL_FACE);
-        glFrontFace(GL_CCW);
-        glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
+        if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
+            glEnable(GL_CULL_FACE);
+            glFrontFace(GL_CCW);
+            glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
+        }
+
+        m_sSkyShader.enable();
+        m_sSkyShader.setupUniforms(*this);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, m_Data.skyboxCubemap);
+
+        if (r_ebo.getValue()) {
+            drawSkySurfacesIndexed();
+        } else {
+            drawSkySurfacesVao();
+        }
+
+        m_sSkyShader.disable();
+
+        glDepthFunc(GL_LESS);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_DEPTH_TEST);
     }
 
-    m_sSkyShader.enable();
-    m_sSkyShader.setupUniforms(*this);
+    timer.stop();
+    m_Stats.uSkyRenderingTime += (unsigned)timer.elapsedMicroseconds();
+}
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_Data.skyboxCubemap);
-
+void SceneRenderer::drawSkySurfacesVao() {
     for (unsigned i : m_Data.viewContext.getSkySurfaces()) {
         Surface &surf = m_Data.surfaces[i];
 
@@ -1126,16 +1145,45 @@ void SceneRenderer::drawSkySurfaces() {
     }
 
     glBindVertexArray(0);
-    m_sSkyShader.disable();
-
-    glDepthFunc(GL_LESS);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-
-    timer.stop();
-    m_Stats.uSkyRenderingTime += (unsigned)timer.elapsedMicroseconds();
     m_Stats.uRenderedSkyPolys = (unsigned)m_Data.viewContext.getSkySurfaces().size();
     m_Stats.uDrawCallCount += m_Stats.uRenderedSkyPolys;
+}
+
+void SceneRenderer::drawSkySurfacesIndexed() {
+    AFW_ASSERT(!m_Data.worldEboData.empty());
+
+    // Bind buffers
+    glBindVertexArray(m_Data.worldVao);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.worldEbo);
+    glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
+    glEnable(GL_PRIMITIVE_RESTART);
+
+    // Fill the EBO
+    unsigned eboIdx = 0;
+
+    for (unsigned j : m_Data.viewContext.getSkySurfaces()) {
+        Surface &surf = m_Data.surfaces[j];
+        std::copy(surf.m_VertexIndices.begin(), surf.m_VertexIndices.end(), m_Data.worldEboData.begin() + eboIdx);
+        eboIdx += (unsigned)surf.m_VertexIndices.size();
+        m_Data.worldEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
+        eboIdx++;
+    }
+
+    // Decrement EBO size to remove last PRIMITIVE_RESTART_IDX
+    eboIdx--;
+
+    // Update EBO
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.worldEboData.data());
+
+    // Draw elements
+    glDrawElements(GL_TRIANGLE_FAN, eboIdx, GL_UNSIGNED_SHORT, nullptr);
+
+    m_Stats.uRenderedSkyPolys = (unsigned)m_Data.viewContext.getSkySurfaces().size();
+    m_Stats.uDrawCallCount++;
+
+    glDisable(GL_PRIMITIVE_RESTART);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 }
 
 void SceneRenderer::doPostProcessing() {
