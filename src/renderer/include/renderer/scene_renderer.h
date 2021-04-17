@@ -125,7 +125,6 @@ private:
         void setupUniforms(SceneRenderer &scene);
         void setColor(const glm::vec3 &c);
 
-    private:
         ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
         ShaderUniform<glm::vec3> m_Color;
         ShaderUniform<int> m_LightingType;

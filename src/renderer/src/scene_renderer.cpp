@@ -29,6 +29,7 @@ ConVar<float> r_exposure("r_exposure", 0.5f, "Picture exposure");
 ConVar<float> r_skybright("r_skybright", 3.f, "Sky brightness");
 ConVar<float> r_skybright_ldr("r_skybright", 1.f, "Sky brightness for LDR (BSP lightmpas)");
 ConVar<bool> r_ebo("r_ebo", true, "Use indexed rendering");
+ConVar<bool> r_wireframe("r_wireframe", false, "Draw wireframes");
 
 //----------------------------------------------------------------
 // WorldShader
@@ -1090,6 +1091,48 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 
         drawnSurfs += (unsigned)textureChain[i].size();
         m_Stats.uDrawCallCount++;
+    }
+
+    if (r_wireframe.getValue()) {
+        unsigned eboIdx = 0;
+
+        // Fill EBO with all visible surfaces
+        for (size_t i = 0; i < textureChain.size(); i++) {
+            if (textureChainFrames[i] != frame) {
+                continue;
+            }
+
+            for (unsigned j : textureChain[i]) {
+                Surface &surf = m_Data.surfaces[j];
+                std::copy(surf.m_VertexIndices.begin(), surf.m_VertexIndices.end(),
+                          m_Data.worldEboData.begin() + eboIdx);
+                eboIdx += (unsigned)surf.m_VertexIndices.size();
+                m_Data.worldEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
+                eboIdx++;
+            }
+        }
+
+        if (eboIdx > 0) {
+            // Decrement EBO size to remove last PRIMITIVE_RESTART_IDX
+            eboIdx--;
+
+            // Set rendering mode to color
+            m_sWorldShader.m_TextureType.set(1);
+            m_sWorldShader.m_LightingType.set(0);
+            m_sWorldShader.setColor({1.0, 1.0, 1.0});
+
+            // Update EBO
+            glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.worldEboData.data());
+
+            // Draw elements
+            glEnable(GL_POLYGON_OFFSET_LINE);
+            glPolygonOffset(-1.0f, -1.f);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            glDrawElements(GL_TRIANGLE_FAN, eboIdx, GL_UNSIGNED_SHORT, nullptr);
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            glDisable(GL_POLYGON_OFFSET_LINE);
+            m_Stats.uDrawCallCount++;
+        }
     }
 
     glDisable(GL_PRIMITIVE_RESTART);
