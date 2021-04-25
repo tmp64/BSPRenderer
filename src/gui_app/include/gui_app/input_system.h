@@ -74,6 +74,11 @@ public:
      */
     void peekMouseMovement(int &x, int &y);
 
+    /**
+     * Discard any pending mouse movement.
+     */
+    void discardMouseMovement();
+
 private:
     static inline InputSystem *m_sInstance = nullptr;
 

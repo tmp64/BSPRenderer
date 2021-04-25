@@ -125,6 +125,8 @@ bool InputSystem::isInputGrabbed() { return m_bGrabInput; }
 void InputSystem::setGrabInput(bool state) {
     if (state) {
         SDL_SetRelativeMouseMode(SDL_TRUE);
+        ImGui_ImplSDL2_ResetInput(); //!< Unstuck all keys
+
     } else {
         SDL_SetRelativeMouseMode(SDL_FALSE);
     }
@@ -165,14 +167,18 @@ void InputSystem::bindKey(SDL_Scancode key, const appfw::ParsedCommand &cmd) {
 void InputSystem::getMouseMovement(int &x, int &y) {
     AFW_ASSERT(isInputGrabbed());
     peekMouseMovement(x, y);
-    m_iMouseRelX = 0;
-    m_iMouseRelY = 0;
+    discardMouseMovement();
 }
 
 void InputSystem::peekMouseMovement(int &x, int &y) {
     AFW_ASSERT(isInputGrabbed());
     x = m_iMouseRelX;
     y = m_iMouseRelY;
+}
+
+void InputSystem::discardMouseMovement() {
+    m_iMouseRelX = 0;
+    m_iMouseRelY = 0;
 }
 
 void InputSystem::createScancodeMap() {

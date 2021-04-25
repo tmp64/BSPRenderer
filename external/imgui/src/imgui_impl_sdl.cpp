@@ -128,6 +128,19 @@ bool ImGui_ImplSDL2_ProcessEvent(const SDL_Event* event)
     return false;
 }
 
+IMGUI_IMPL_API void ImGui_ImplSDL2_ResetInput() {
+    g_MousePressed[0] = false;
+    g_MousePressed[1] = false;
+    g_MousePressed[2] = false;
+
+    ImGuiIO &io = ImGui::GetIO();
+    memset(io.KeysDown, 0, sizeof(io.KeysDown));
+    io.KeyShift = false;
+    io.KeyCtrl = false;
+    io.KeyAlt = false;
+    io.KeySuper = false;
+}
+
 static bool ImGui_ImplSDL2_Init(SDL_Window* window)
 {
     g_Window = window;
