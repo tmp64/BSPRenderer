@@ -355,6 +355,8 @@ void SceneRenderer::renderScene(GLint targetFb) {
 
 void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
     if (!isVisible || *isVisible) {
+        ImGui::SetNextWindowBgAlpha(0.2f);
+
         if (!ImGui::Begin(title, isVisible)) {
             ImGui::End();
             return;

@@ -220,3 +220,5 @@ RendererSystemAppComponent::~RendererSystemAppComponent() {
     MaterialManager::get().shutdown();
     ShaderManager::get().shutdown();
 }
+
+void RendererSystemAppComponent::tick() { MaterialManager::get().tick(); }

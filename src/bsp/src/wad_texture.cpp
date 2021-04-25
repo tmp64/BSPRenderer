@@ -54,13 +54,15 @@ void bsp::WADTexture::getRGBAPixels(std::vector<uint8_t> &buffer) const {
     for (size_t i = 0; i < buffer.size(); i += 4, idx++) {
         const uint8_t *color = m_ColorTable.data() + (*idx * 3);
 
-        buffer[i + 0] = color[0];
-        buffer[i + 1] = color[1];
-        buffer[i + 2] = color[2];
-
         if (*idx == 255) {
+            buffer[i + 0] = 0;
+            buffer[i + 1] = 0;
+            buffer[i + 2] = 0;
             buffer[i + 3] = 0;
         } else {
+            buffer[i + 0] = color[0];
+            buffer[i + 1] = color[1];
+            buffer[i + 2] = color[2];
             buffer[i + 3] = 255;
         }
     }

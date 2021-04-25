@@ -104,6 +104,8 @@ class RendererSystemAppComponent : appfw::NoCopy {
 public:
     RendererSystemAppComponent();
     ~RendererSystemAppComponent();
+
+    void tick();
 };
 
 #endif

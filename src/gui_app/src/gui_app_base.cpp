@@ -214,6 +214,7 @@ void GuiAppBase::internalTick() {
         m_AppFWComponent.tick();
         m_InputSystem.tick();
         m_ImGui.newTick();
+        m_RendererSystem.tick();
 
         if (!InputSystem::get().isInputGrabbed() && m_bIsConsoleVisible) {
             m_DevConsole.Draw("Developer Console", &m_bIsConsoleVisible);

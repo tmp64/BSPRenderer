@@ -77,6 +77,11 @@ public:
     void shutdown();
 
     /**
+     * Per-tick update.
+     */
+    void tick();
+
+    /**
      * Returns whether specified WAD is loaded or not.
      */
     bool isWadLoaded(const std::string &name);
@@ -99,6 +104,8 @@ public:
     inline const Material &getMaterial(size_t index) { return m_Materials[index]; }
 
 private:
+    bool m_bLinearFiltering = false;
+    int m_iMipMapping = 0;
     std::vector<std::string> m_LoadedWadNames;
     std::vector<Material> m_Materials;
     std::unordered_map<std::string, size_t> m_Map;

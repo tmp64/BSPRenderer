@@ -5,8 +5,13 @@
 
 #include <appfw/timer.h>
 #include <bsp/wad_file.h>
+#include <gui_app/imgui_controls.h>
 #include <renderer/stb_image.h>
 #include <renderer/material_manager.h>
+
+ConVar<bool> mat_ui("mat_ui", false, "Enable material manager dev UI");
+ConVar<bool> mat_linear("mat_linear", true, "Enable material linear filtering");
+ConVar<int> mat_mipmap("mat_mipmap", 0, "Enable material mip-mapping, 2 - also enable mipmap lerping");
 
 //----------------------------------------------------------------
 // CheckerboardImage
@@ -72,7 +77,7 @@ Material::Material(const bsp::WADTexture &texture, std::vector<uint8_t> &buffer)
     glBindTexture(GL_TEXTURE_2D, m_Texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     if (texture.isTransparent()) {
@@ -104,6 +109,85 @@ void MaterialManager::init() {
 void MaterialManager::shutdown() {
     m_Map.clear();
     m_Materials.clear();
+}
+
+void MaterialManager::tick() {
+    bool bLinear = mat_linear.getValue();
+    int iMipMap = std::clamp(mat_mipmap.getValue(), 0, 2);
+
+    if (m_bLinearFiltering != bLinear || m_iMipMapping != iMipMap) {
+        int min = 0;
+        int mag = 0;
+
+        if (bLinear) {
+            // Linear filtering enabled
+            mag = GL_LINEAR;
+
+            if (iMipMap == 0) {
+                // No mip-mapping
+                min = GL_LINEAR;
+            } else if (iMipMap == 1) {
+                // Nearest mipmap level + linear
+                min = GL_LINEAR_MIPMAP_NEAREST;
+            } else if (iMipMap == 2) {
+                // Linear mipmap level + linear
+                min = GL_LINEAR_MIPMAP_LINEAR;
+            }
+        } else {
+            // Linear filtering disabled
+            mag = GL_NEAREST;
+
+            if (iMipMap == 0) {
+                // No mip-mapping
+                min = GL_NEAREST;
+            } else if (iMipMap == 1) {
+                // Nearest mipmap level + linear
+                min = GL_NEAREST_MIPMAP_NEAREST;
+            } else if (iMipMap == 2) {
+                // Linear mipmap level + linear
+                min = GL_NEAREST_MIPMAP_LINEAR;
+            }
+        }
+
+        // Update for all materials
+        for (size_t i = 0; i < m_Materials.size(); i++) {
+            m_Materials[i].bindTextures();
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag);
+        }
+
+        m_bLinearFiltering = bLinear;
+        m_iMipMapping = iMipMap;
+    }
+
+    // Show UI
+    bool showUI = mat_ui.getValue();
+    if (showUI) {
+        ImGui::SetNextWindowBgAlpha(0.2f);
+        if (ImGui::Begin("Material manager", &showUI)) {
+            ImGui::Text("Count: %d", (int)m_Materials.size());
+            CvarCheckbox("Linear filtering", mat_linear);
+
+            const char *mipmapList[] = {"Off", "Nearest", "Linear"};
+
+            if (ImGui::BeginCombo("Mipmap", mipmapList[iMipMap])) {
+                for (int i = 0; i < 3; i++) {
+                    bool isSelected = i == iMipMap;
+                    if (ImGui::Selectable(mipmapList[i], isSelected))
+                        mat_mipmap.setValue(i);
+
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+        }
+
+        ImGui::End();
+        if (showUI != mat_ui.getValue()) {
+            mat_ui.setValue(showUI);
+        }
+    }
 }
 
 bool MaterialManager::isWadLoaded(const std::string &name) {
