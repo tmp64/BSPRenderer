@@ -324,7 +324,13 @@ void SceneRenderer::renderScene(GLint targetFb) {
     m_uVisibleEntCount = 0;
 
     if (r_drawents.getValue()) {
+        appfw::Timer timer;
+        timer.start();
+
         m_pfnEntListCb();
+
+        timer.stop();
+        m_Stats.uEntityListTime += (unsigned)timer.elapsedMicroseconds();
     }
 
     if (r_drawworld.getValue()) {
@@ -373,16 +379,22 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         ImGui::Text("    Trans: %lu", m_TransEntityList.size());
         ImGui::Separator();
 
-        int timeLost = (int)m_Stats.uTotalRenderingTime.getSmoothed() - m_Stats.uWorldBSPTime.getSmoothed() -
-                       m_Stats.uWorldRenderingTime.getSmoothed() - m_Stats.uSkyRenderingTime.getSmoothed() -
-                       m_Stats.uEntityRenderingTime.getSmoothed() - m_Stats.uPostProcessingTime.getSmoothed() -
-                       m_Stats.uSetupTime.getSmoothed();
+        int timeLost = m_Stats.uTotalRenderingTime.getSmoothed();
+        timeLost -= m_Stats.uSetupTime.getSmoothed();
+        timeLost -= m_Stats.uEntityListTime.getSmoothed();
+        timeLost -= m_Stats.uWorldBSPTime.getSmoothed();
+        timeLost -= m_Stats.uWorldRenderingTime.getSmoothed();
+        timeLost -= m_Stats.uSkyRenderingTime.getSmoothed();
+        timeLost -= m_Stats.uEntityRenderingTime.getSmoothed();
+        timeLost -= m_Stats.uPostProcessingTime.getSmoothed();
 
         ImGui::Text("FPS: %.3f", 1000000.0 / m_Stats.uTotalRenderingTime.getSmoothed());
         ImGui::Text("Total: %2d.%03d ms", m_Stats.uTotalRenderingTime.getSmoothed() / 1000,
                     m_Stats.uTotalRenderingTime.getSmoothed() % 1000);
         ImGui::Text("Setup: %2d.%03d ms", m_Stats.uSetupTime.getSmoothed() / 1000,
                     m_Stats.uSetupTime.getSmoothed() % 1000);
+        ImGui::Text("Ent list: %2d.%03d ms", m_Stats.uEntityListTime.getSmoothed() / 1000,
+                    m_Stats.uEntityListTime.getSmoothed() % 1000);
         ImGui::Text("BSP: %2d.%03d ms", m_Stats.uWorldBSPTime.getSmoothed() / 1000,
                     m_Stats.uWorldBSPTime.getSmoothed() % 1000);
         ImGui::Text("World: %2d.%03d ms", m_Stats.uWorldRenderingTime.getSmoothed() / 1000,

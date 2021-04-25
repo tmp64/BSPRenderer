@@ -35,6 +35,9 @@ public:
         //! Time (us) taken by frame setup
         TimeSmoother uSetupTime;
 
+        //! Time (us) taken by entity list
+        TimeSmoother uEntityListTime;
+
         //! Time (us) taken by world BSP traversing
         TimeSmoother uWorldBSPTime;
 
