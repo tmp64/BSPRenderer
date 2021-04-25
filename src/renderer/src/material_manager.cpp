@@ -213,8 +213,14 @@ void MaterialManager::loadWadFile(const fs::path &name) {
         m_Materials.reserve(m_Materials.size() + wad.getTextures().size());
 
         for (const bsp::WADTexture &tex : wad.getTextures()) {
-            m_Materials.emplace_back(tex, buffer);
-            m_Map[tex.getName()] = m_Materials.size() - 1;
+            auto it = m_Map.find(tex.getName());
+            if (it == m_Map.end()) {
+                m_Materials.emplace_back(tex, buffer);
+                m_Map[tex.getName()] = m_Materials.size() - 1;
+            } else {
+                logWarn("{}: texture {} already loaded from other WAD", wadFileName, tex.getName());
+            }
+            
         }
         
         timer.stop();
