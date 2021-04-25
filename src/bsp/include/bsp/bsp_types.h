@@ -373,7 +373,7 @@ struct BSPModel {
     /**
      * Defines bounding box
      */
-    float nMins[3], nMaxs[3];
+    glm::vec3 nMins, nMaxs;
 
     /**
      * Coordinates to move the // coordinate system

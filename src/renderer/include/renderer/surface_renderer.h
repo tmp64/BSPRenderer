@@ -80,7 +80,12 @@ public:
         /**
          * Returns view position in the world.
          */
-        inline const glm::vec3 getViewOrigin() { return m_vViewOrigin; }
+        inline const glm::vec3 &getViewOrigin() { return m_vViewOrigin; }
+
+        /**
+         * Returns view forward direction
+         */
+        inline const glm::vec3 &getViewForward() { return m_vForward; }
 
         /**
          * Returns projection matrix.
@@ -172,6 +177,7 @@ public:
 
         std::vector<glm::vec3> vVertices;
         glm::vec3 vMins, vMaxs;
+        glm::vec3 vOrigin; //!< Middle point of the surface (averga of verticies)
 
         uint32_t nLightmapOffset = bsp::NO_LIGHTMAP_OFFSET;
     };
@@ -204,12 +210,12 @@ public:
     /**
      * Returns level set to the renderer.
      */
-    inline bsp::Level *getLevel() { return m_pLevel; }
+    inline const bsp::Level *getLevel() { return m_pLevel; }
 
     /**
      * Sets the level.
      */
-    void setLevel(bsp::Level *level);
+    void setLevel(const bsp::Level *level);
 
     /**
      * Returns context set to the renderer.
@@ -237,8 +243,29 @@ public:
      */
     void calcWorldSurfaces();
 
+    /**
+     * Returns true if surface shouldn't be drawn.
+     */
+    bool cullSurface(const Surface &surface) noexcept;
+
+    /**
+     * Returns true if an AABB is completely outside the frustum
+     */
+    bool cullBox(glm::vec3 mins, glm::vec3 maxs) noexcept;
+
+    /**
+     * Finds leaf which contains the point.
+     * @return  Negative int pointing to the leaf.
+     */
+    int pointInLeaf(glm::vec3 p) noexcept;
+
+    /**
+     * Decompresses (RLE) PVS data for a leaf.
+     */
+    uint8_t *leafPVS(int leaf) noexcept;
+
 private:
-    bsp::Level *m_pLevel = nullptr;
+    const bsp::Level *m_pLevel = nullptr;
     Context *m_pContext = nullptr;
     LevelData m_Data;
 
@@ -271,27 +298,6 @@ private:
      * Walks over the BSP tree and fills surface list with visible surfaces. Front surfaces first.
      */
     void recursiveWorldNodes(int node) noexcept;
-
-    /**
-     * Returns true if surface shouldn't be drawn.
-     */
-    bool cullSurface(Surface &surface) noexcept;
-
-    /**
-     * Returns true if an AABB is completely outside the frustum
-     */
-    bool cullBox(glm::vec3 mins, glm::vec3 maxs) noexcept;
-
-    /**
-     * Finds leaf which contains the point.
-     * @return  Negative int pointing to the leaf.
-     */
-    int pointInLeaf(glm::vec3 p) noexcept;
-
-    /**
-     * Decompresses (RLE) PVS data for a leaf.
-     */
-    uint8_t *leafPVS(int leaf) noexcept;
 };
 
 #endif

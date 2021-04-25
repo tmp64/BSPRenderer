@@ -1,8 +1,11 @@
 set(RNDR_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/base_shader.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/client_entity.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/const.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/font_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/frame_console.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/material_manager.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/model.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/raii.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/shader_manager.h

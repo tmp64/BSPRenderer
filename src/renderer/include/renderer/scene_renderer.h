@@ -1,14 +1,21 @@
 #ifndef RENDERER_SCENE_RENDERER_H
 #define RENDERER_SCENE_RENDERER_H
 #include <vector>
+#include <functional>
 #include <renderer/surface_renderer.h>
 #include <renderer/base_shader.h>
 #include <renderer/raii.h>
 #include <renderer/time_smoother.h>
 #include <renderer/texture_block.h>
+#include <renderer/client_entity.h>
 
 class SceneRenderer : appfw::NoCopy {
 public:
+    /**
+     * Called during rendering to update the entity list.
+     */
+    using EntListCallback = std::function<void()>;
+
     SceneRenderer();
     ~SceneRenderer();
 
@@ -18,6 +25,9 @@ public:
 
         //! Number of sky polygons rendered
         unsigned uRenderedSkyPolys = 0;
+
+        //! Number of brush entity polygons rendered
+        unsigned uRenderedBrushEntPolys = 0;
 
         //! Number of draw calls issued (glDrawArrays, ...)
         unsigned uDrawCallCount = 0;
@@ -34,6 +44,15 @@ public:
         //! Time (us) taken by sky polygons rendering
         TimeSmoother uSkyRenderingTime;
 
+        //! Time (us) taken by entity rendering
+        TimeSmoother uEntityRenderingTime;
+
+        //! Time (us) taken by solid entity rendering
+        TimeSmoother uSolidEntityRenderingTime;
+
+        //! Time (us) taken by transparent entity rendering
+        TimeSmoother uTransEntityRenderingTime;
+
         //! Time (us) taken by post processing
         TimeSmoother uPostProcessingTime;
 
@@ -43,6 +62,7 @@ public:
         inline void clear() {
             uRenderedWorldPolys = 0;
             uRenderedSkyPolys = 0;
+            uRenderedBrushEntPolys = 0;
             uDrawCallCount = 0;
         }
     };
@@ -50,7 +70,7 @@ public:
     /**
      * Returns level set to the renderer.
      */
-    inline bsp::Level *getLevel() { return m_pLevel; }
+    inline const bsp::Level *getLevel() { return m_pLevel; }
 
     /**
      * Begins async level loading.
@@ -58,7 +78,7 @@ public:
      * @param   path    Path to the .bsp file to load lightmap from (can be empty)
      * @param   tag     Tag of .bsp
      */
-    void beginLoading(bsp::Level *level, const std::string &path, const char *tag);
+    void beginLoading(const bsp::Level *level, const std::string &path, const char *tag);
 
     /**
      * Unloads the level.
@@ -98,6 +118,11 @@ public:
     void setViewportSize(const glm::ivec2 &size);
 
     /**
+     * Sets the entitiy list callback.
+     */
+    inline void setEntListCallback(const EntListCallback &fn) { m_pfnEntListCb = fn; }
+
+    /**
      * Renders the image to the screen.
      */
     void renderScene(GLint targetFb);
@@ -112,11 +137,19 @@ public:
      */
     void showDebugDialog(const char *title, bool *isVisible = nullptr);
 
+    /**
+     * During EntListCallback:
+     * Adds an entity into rendering list.
+     * @returns true if entity was added, false if limit reached
+     */
+    bool addEntity(ClientEntity *pClent);
+
 private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
     static constexpr int BSP_LIGHTMAP_BLOCK_SIZE = 1024;
     static constexpr int BSP_LIGHTMAP_PADDING = 2;
     static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
+    static constexpr int MAX_TRANS_SURFS_PER_MODEL = 512; //!< Maximum number of surfaces per transparent model
 
     class WorldShader : public BaseShader {
     public:
@@ -146,6 +179,25 @@ private:
         ShaderUniform<float> m_TexGamma;
         ShaderUniform<float> m_Brightness;
         ShaderUniform<glm::vec3> m_ViewOrigin;
+    };
+
+    class BrushEntityShader : public BaseShader {
+    public:
+        BrushEntityShader();
+        virtual void create() override;
+        void setupSceneUniforms(SceneRenderer &scene);
+        void setColor(const glm::vec3 &c);
+
+        ShaderUniform<glm::mat4> m_ModelMat, m_ViewMat, m_ProjMat;
+        ShaderUniform<glm::vec3> m_Color;
+        ShaderUniform<int> m_LightingType;
+        ShaderUniform<int> m_TextureType;
+        ShaderUniform<int> m_Texture;
+        ShaderUniform<int> m_LMTexture;
+        ShaderUniform<float> m_TexGamma;
+        ShaderUniform<int> m_RenderMode;
+        ShaderUniform<float> m_FxAmount;
+        ShaderUniform<glm::vec3> m_FxColor;
     };
 
     class PostProcessShader : public BaseShader {
@@ -242,12 +294,17 @@ private:
         int maxEboSize = 0; //!< Maximum number of elements in the EBO (if all surfaces are visible at the same time)
     };
 
-    bsp::Level *m_pLevel = nullptr;
+    const bsp::Level *m_pLevel = nullptr;
     SurfaceRenderer m_Surf;
     LevelData m_Data;
     RenderingStats m_Stats;
     LoadingStatus m_LoadingStatus;
     std::unique_ptr<LoadingState> m_pLoadingState;
+    EntListCallback m_pfnEntListCb;
+    std::vector<ClientEntity *> m_SolidEntityList;
+    std::vector<ClientEntity *> m_TransEntityList;
+    std::vector<size_t> m_SortBuffer;
+    unsigned m_uVisibleEntCount = 0;
 
     // Screen-wide quad
     GLVao m_nQuadVao;
@@ -318,12 +375,43 @@ private:
     void drawSkySurfacesIndexed();
 
     /**
+     * Draws solid entities
+     */
+    void drawSolidEntities();
+
+    /**
+     * Draws transparent entities
+     */
+    void drawTransEntities();
+
+    /**
+     * Draws a solid brush entity
+     */
+    void drawSolidBrushEntity(ClientEntity *pClent);
+
+    /**
+     * Draws a (maybe transparent) brush entity
+     */
+    void drawBrushEntity(ClientEntity *pClent);
+
+    /**
+     * Draws a brush entity surface.
+     */
+    void drawBrushEntitySurface(Surface &surf);
+
+    /**
      * Post-processes HDB framebuffer (tonemapping, gamma correction) and draws it into active framebuffer.
      */
     void doPostProcessing();
 
+    /**
+     * Sets up render mode.
+     */
+    void setRenderMode(RenderMode mode);
+
     static inline WorldShader m_sWorldShader;
     static inline SkyBoxShader m_sSkyShader;
+    static inline BrushEntityShader m_sBrushEntityShader;
     static inline PostProcessShader m_sPostProcessShader;
 };
 

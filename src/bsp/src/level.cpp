@@ -6,6 +6,19 @@
 
 using namespace std::literals::string_literals;
 
+namespace {
+
+class NoVis {
+public:
+    uint8_t data[bsp::MAX_MAP_LEAFS / 8];
+
+    NoVis() { memset(data, 0xFF, sizeof(data)); }
+};
+
+NoVis s_NoVis;
+
+}
+
 bsp::Level::EntityList::EntityList(const std::vector<char> &entityLump) {
     size_t i = 0;
 
@@ -274,7 +287,78 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
 }
 
 int bsp::Level::traceLine(glm::vec3 from, glm::vec3 to) const {
-    return recursiveTraceLine(0, from, to);
+    return recursiveTraceLine(0, from, to); }
+
+int bsp::Level::pointInLeaf(glm::vec3 p) const noexcept {
+    int node = 0;
+
+    for (;;) {
+        if (node < 0) {
+            return node;
+        }
+
+        const bsp::BSPNode *pNode = &m_Nodes[node];
+        const bsp::BSPPlane &plane = m_Planes[pNode->iPlane];
+        float d = glm::dot(p, plane.vNormal) - plane.fDist;
+
+        if (d > 0) {
+            node = pNode->iChildren[0];
+        } else {
+            node = pNode->iChildren[1];
+        }
+    }
+}
+
+const uint8_t *bsp::Level::leafPVS(int leaf, appfw::span<uint8_t> buf) const noexcept {
+    AFW_ASSERT(leaf < 0);
+    AFW_ASSERT(buf.size() >= bsp::MAX_MAP_LEAFS / 8);
+    int leafIdx = ~leaf;
+
+    if (leafIdx == 0) {
+        return s_NoVis.data;
+    }
+
+    const bsp::BSPLeaf *pLeaf = (leaf != 0) ? &m_Leaves[leafIdx] : nullptr;
+
+    // Decompress VIS
+    int row = ((int)m_Leaves.size() + 7) >> 3;
+    const uint8_t *in = nullptr;
+    uint8_t *out = buf.data();
+
+    glm::vec3 v;
+    v[0] = 1;
+
+    if (!pLeaf || pLeaf->nVisOffset == -1) {
+        in = nullptr;
+    } else {
+        in = m_VisData.data() + pLeaf->nVisOffset;
+    }
+
+    if (!in) {
+        // No vis info, so make all visible
+        while (row) {
+            *out++ = 0xff;
+            row--;
+        }
+        return buf.data();
+    }
+
+    do {
+        if (*in) {
+            *out++ = *in++;
+            continue;
+        }
+
+        int c = in[1];
+        in += 2;
+
+        while (c) {
+            *out++ = 0;
+            c--;
+        }
+    } while (out - buf.data() < row);
+
+    return buf.data();
 }
 
 int bsp::Level::recursiveTraceLine(int nodeidx, const glm::vec3 &start, const glm::vec3 &stop) const {

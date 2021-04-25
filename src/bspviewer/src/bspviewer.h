@@ -2,6 +2,8 @@
 #define APP_H
 #include <gui_app/gui_app_base.h>
 #include <renderer/scene_renderer.h>
+#include "world_state.h"
+#include "renderer.h"
 
 class BSPViewer : public GuiAppBase {
 public:
@@ -18,7 +20,9 @@ public:
      * Load a .bsp map
      * @param   name    Name of the map, without maps/ and .bsp.
      */
-    void loadMap(const std::string &name);
+    void loadLevel(const std::string &name);
+
+    void unloadLevel();
 
     /**
      * Shows dialog with framerates and position.
@@ -39,14 +43,26 @@ public:
     inline void setCameraPos(glm::vec3 pos) { m_vPos = pos; }
     inline void setCameraRot(glm::vec3 rot) { m_vRot = rot; }
 
+    inline float getAspectRatio() { return m_flAspectRatio; }
+
 private:
+    enum class LoadingState {
+        NotLoaded,
+        Loading,
+        Loaded
+    };
+
+    LoadingState m_LoadingState = LoadingState::NotLoaded;
     bsp::Level m_LoadedLevel;
-    SceneRenderer m_Renderer;
+    Renderer m_Renderer;
+    WorldState *m_pWorldState = nullptr;
     glm::vec3 m_vPos = {0.f, 0.f, 0.f};
     glm::vec3 m_vRot = {0.f, 0.f, 0.f};
     float m_flAspectRatio = 1.f;
 
     bool m_bDrawDebugText = true;
+
+    void loadingTick();
 
     static inline BSPViewer *m_sSingleton = nullptr;
 };

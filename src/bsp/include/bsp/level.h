@@ -23,6 +23,8 @@ public:
 
     class EntityListItem {
     public:
+        inline bool hasValue(const std::string &key) const { return m_Keys.find(key) != m_Keys.end(); }
+
         template <typename T>
         inline T getValue(const std::string &key, const std::optional<T> &defVal = std::nullopt) const {
             auto it = m_Keys.find(key);
@@ -124,6 +126,20 @@ public:
      * (CONTENTS_SOLID or CONTENTS_SKY) or CONTENTS_EMPTY if didn't hit.
      */
     int traceLine(glm::vec3 from, glm::vec3 to) const;
+
+    /**
+     * Finds leaf which contains the point.
+     * @return  Negative int pointing to the leaf.
+     */
+    int pointInLeaf(glm::vec3 p) const noexcept;
+
+    /**
+     * Decompresses (RLE) PVS data for a leaf.
+     * @param   leaf    Negative leaf index
+     * @param   buf     Buffer of size at least (bsp::MAX_MAP_LEAFS / 8) to decompress PVS into
+     * @return Poitner into buf or to a static buffer if not vis is loaded
+     */
+    const uint8_t *leafPVS(int leaf, appfw::span<uint8_t> buf) const noexcept;
 
     inline const std::vector<BSPPlane> &getPlanes() const { return m_Planes; }
     inline const std::vector<BSPMipTex> &getTextures() const { return m_Textures; }

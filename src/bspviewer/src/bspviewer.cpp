@@ -24,7 +24,7 @@ static ConCommand cmd_map("map", "Loads a map", [](const appfw::ParsedCommand &c
         return;
     }
 
-    BSPViewer::get().loadMap(cmd[1]);
+    BSPViewer::get().loadLevel(cmd[1]);
 });
 
 static ConCommand cmd_toggle_debug_text("toggle_debug_text", "", [](const appfw::ParsedCommand &) {
@@ -54,7 +54,6 @@ static ConCommand cmd_setpos("setpos", "", [](const appfw::ParsedCommand &cmd) {
 
 static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
 static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
-static ConVar<float> fov("fov", 120.f, "Horizontal field of view");
 static ConVar<bool> gl_break_on_error("gl_break_on_error", false, "Break in debugger on OpenGL error");
 
 //----------------------------------------------------------------
@@ -95,15 +94,19 @@ BSPViewer::BSPViewer() {
     InputSystem::get().bindKey(InputSystem::get().getScancodeForKey("mouse1"), "trace1");
     InputSystem::get().bindKey(InputSystem::get().getScancodeForKey("mouse2"), "trace2");
 
-    loadMap("crossfire");
+    loadLevel("crossfire");
 }
 
 BSPViewer::~BSPViewer() {
     AFW_ASSERT(m_sSingleton);
 
-    // Shutdown renderer
-    m_Renderer.unloadLevel();
+    while (m_LoadingState == LoadingState::Loading) {
+        // Run until loading finishes
+        loadingTick();
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    }
 
+    unloadLevel();
     m_sSingleton = nullptr;
 }
 
@@ -112,37 +115,36 @@ void BSPViewer::tick() {
     ImGui::ShowDemoWindow();
     //
 
-    if (m_Renderer.getLevel()) {
-        if (m_Renderer.isLoading()) {
-            try {
-                if (m_Renderer.loadingTick()) {
-                    logInfo("Loading finished");
-                }
-            } catch (const std::exception &e) {
-                logError("Failed to load the map: {}", e.what());
-                return;
-            }
-        } else {
-            m_Renderer.showDebugDialog("Renderer");
-            processUserInput();
-        }
+    switch (m_LoadingState) {
+    case LoadingState::NotLoaded: {
+        InputSystem::get().discardMouseMovement();
+        break;
+    }
+    case LoadingState::Loading: {
+        loadingTick();
+        InputSystem::get().discardMouseMovement();
+        break;
+    }
+    case LoadingState::Loaded: {
+        Renderer::get().tick();
+        processUserInput();
+        break;
+    }
     }
 
     showInfoDialog();
 }
 
 void BSPViewer::draw() {
-    if (m_Renderer.getLevel() && !m_Renderer.isLoading()) {
-        m_Renderer.setPerspective(fov.getValue(), m_flAspectRatio, 4, 8192);
-        m_Renderer.setPerspViewOrigin(m_vPos, m_vRot);
-        m_Renderer.renderScene(0);
+    if (m_LoadingState == LoadingState::Loaded) {
+        Renderer::get().draw();
     }
 }
 
 void BSPViewer::onWindowSizeChange(int wide, int tall) {
     m_flAspectRatio = (float)wide / tall;
     glViewport(0, 0, wide, tall);
-    m_Renderer.setViewportSize({wide, tall});
+    Renderer::get().setViewportSize({wide, tall});
 }
 
 void BSPViewer::showInfoDialog() {
@@ -246,29 +248,65 @@ void BSPViewer::processUserInput() {
 
 void BSPViewer::setDrawDebugTextEnabled(bool state) { m_bDrawDebugText = state; }
 
-void BSPViewer::loadMap(const std::string &name) {
-    if (m_Renderer.isLoading()) {
+void BSPViewer::loadLevel(const std::string &name) {
+    if (m_LoadingState == LoadingState::Loading) {
         logError("Can't load a level while loading another level.");
         return;
     }
 
-    m_Renderer.unloadLevel();
+    unloadLevel();
 
     std::string path = "maps/" + name + ".bsp";    
     logInfo("Loading map {}", path);
 
     try {
+        AFW_ASSERT(!m_pWorldState);
         fs::path bspPath = getFileSystem().findFile(path, "assets");
         m_LoadedLevel.loadFromFile(bspPath);
-        m_Renderer.beginLoading(&m_LoadedLevel, path, "assets");
+        m_pWorldState = new WorldState();
+        WorldState::get().loadLevel(m_LoadedLevel);
+        Renderer::get().loadLevel(path, "assets");
 
         g_BSPTree.setLevel(&m_LoadedLevel);
         g_BSPTree.createTree();
 
         m_vPos = {0.f, 0.f, 0.f};
         m_vRot = {0.f, 0.f, 0.f};
+
+        m_LoadingState = LoadingState::Loading;
     } catch (const std::exception &e) {
         logError("Failed to load the map: {}", e.what());
+        unloadLevel();
         return;
+    }
+}
+
+void BSPViewer::unloadLevel() {
+    if (m_LoadingState == LoadingState::NotLoaded) {
+        return;
+    }
+
+    AFW_ASSERT(m_LoadingState != LoadingState::Loading);
+
+    if (m_LoadingState == LoadingState::Loading) {
+        throw std::logic_error("can't unload while loading");
+    }
+
+    delete m_pWorldState;
+    m_pWorldState = nullptr;
+    Renderer::get().unloadLevel();
+    m_LoadingState = LoadingState::NotLoaded;
+}
+
+void BSPViewer::loadingTick() {
+    try {
+        if (Renderer::get().loadingTick()) {
+            logInfo("Loading finished");
+            m_LoadingState = LoadingState::Loaded;
+        }
+    } catch (const std::exception &e) {
+        logError("Failed to load the map: {}", e.what());
+        m_LoadingState = LoadingState::Loaded;
+        unloadLevel();
     }
 }

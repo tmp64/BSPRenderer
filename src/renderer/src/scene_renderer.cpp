@@ -18,6 +18,7 @@ ConVar<int> r_cull("r_cull", 1,
 
 ConVar<bool> r_drawworld("r_drawworld", true, "Draw world polygons");
 ConVar<bool> r_drawsky("r_drawsky", true, "Draw skybox");
+ConVar<bool> r_drawents("r_drawents", true, "Draw entities");
 ConVar<float> r_gamma("r_gamma", 2.2f, "Gamma");
 ConVar<float> r_texgamma("r_texgamma", 2.2f, "Texture gamma");
 ConVar<int> r_texture("r_texture", 2,
@@ -30,6 +31,10 @@ ConVar<float> r_skybright("r_skybright", 3.f, "Sky brightness");
 ConVar<float> r_skybright_ldr("r_skybright", 1.f, "Sky brightness for LDR (BSP lightmpas)");
 ConVar<bool> r_ebo("r_ebo", true, "Use indexed rendering");
 ConVar<bool> r_wireframe("r_wireframe", false, "Draw wireframes");
+ConVar<bool> r_nosort("r_nosort", false, "Disable transparent entity sorting");
+ConVar<bool> r_notrans("r_notrans", false, "Disable entity transparency");
+
+static inline bool isVectorNull(const glm::vec3 &v) { return v.x == 0.f && v.y == 0.f && v.z == 0.f; }
 
 //----------------------------------------------------------------
 // WorldShader
@@ -98,6 +103,43 @@ void SceneRenderer::SkyBoxShader::setupUniforms(SceneRenderer &scene) {
 }
 
 //----------------------------------------------------------------
+// BrushEntityShader
+//----------------------------------------------------------------
+SceneRenderer::BrushEntityShader::BrushEntityShader()
+    : BaseShader("SceneRenderer_BrushEntityShader")
+    , m_ModelMat(this, "uModelMatrix")
+    , m_ViewMat(this, "uViewMatrix")
+    , m_ProjMat(this, "uProjMatrix")
+    , m_Color(this, "uColor")
+    , m_LightingType(this, "uLightingType")
+    , m_TextureType(this, "uTextureType")
+    , m_Texture(this, "uTexture")
+    , m_LMTexture(this, "uLMTexture")
+    , m_TexGamma(this, "uTexGamma")
+    , m_RenderMode(this, "uRenderMode")
+    , m_FxAmount(this, "uFxAmount")
+    , m_FxColor(this, "uFxColor") {}
+
+void SceneRenderer::BrushEntityShader::create() {
+    createProgram();
+    createVertexShader("shaders/scene/brush_entity.vert", "assets");
+    createFragmentShader("shaders/scene/brush_entity.frag", "assets");
+    linkProgram();
+}
+
+void SceneRenderer::BrushEntityShader::setupSceneUniforms(SceneRenderer &scene) {
+    m_ProjMat.set(scene.m_Data.viewContext.getProjectionMatrix());
+    m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
+    m_LightingType.set(r_lighting.getValue());
+    m_TextureType.set(r_texture.getValue());
+    m_Texture.set(0);
+    m_LMTexture.set(1);
+    m_TexGamma.set(r_texgamma.getValue());
+}
+
+void SceneRenderer::BrushEntityShader::setColor(const glm::vec3 &c) { m_Color.set(c); }
+
+//----------------------------------------------------------------
 // PostProcessShader
 //----------------------------------------------------------------
 SceneRenderer::PostProcessShader::PostProcessShader()
@@ -129,11 +171,14 @@ void SceneRenderer::PostProcessShader::setupUniforms() {
 //----------------------------------------------------------------
 SceneRenderer::SceneRenderer() {
     createScreenQuad();
+
+    m_SolidEntityList.reserve(MAX_VISIBLE_ENTS);
+    m_SortBuffer.reserve(MAX_TRANS_SURFS_PER_MODEL);
 }
 
 SceneRenderer::~SceneRenderer() {}
 
-void SceneRenderer::beginLoading(bsp::Level *level, const std::string &path, const char *tag) {
+void SceneRenderer::beginLoading(const bsp::Level *level, const std::string &path, const char *tag) {
     AFW_ASSERT(level);
 
     if (m_pLevel == level) {
@@ -274,12 +319,31 @@ void SceneRenderer::renderScene(GLint targetFb) {
         logWarn("Lighting type set to shaded since custom lightmaps are not loaded");
     }
 
+    m_SolidEntityList.clear();
+    m_TransEntityList.clear();
+    m_uVisibleEntCount = 0;
+
+    if (r_drawents.getValue()) {
+        m_pfnEntListCb();
+    }
+
     if (r_drawworld.getValue()) {
         drawWorldSurfaces();
 
         if (r_drawsky.getValue()) {
             drawSkySurfaces();
         }
+    }
+
+    if (r_drawents.getValue()) {
+        appfw::Timer timer;
+        timer.start();
+
+        drawSolidEntities();
+        drawTransEntities();
+
+        timer.stop();
+        m_Stats.uEntityRenderingTime += (unsigned)timer.elapsedMicroseconds();
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, targetFb);
@@ -298,12 +362,19 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
 
         ImGui::Text("World: %u (%u + %u)", m_Stats.uRenderedWorldPolys + m_Stats.uRenderedSkyPolys,
                     m_Stats.uRenderedWorldPolys, m_Stats.uRenderedSkyPolys);
+        ImGui::Text("Brush ent surfs: %u", m_Stats.uRenderedBrushEntPolys);
         ImGui::Text("Draw calls: %u", m_Stats.uDrawCallCount);
         ImGui::Separator();
 
+        ImGui::Text("Entities: %u", m_uVisibleEntCount);
+        ImGui::Text("    Solid: %lu", m_SolidEntityList.size());
+        ImGui::Text("    Trans: %lu", m_TransEntityList.size());
+        ImGui::Separator();
+
         int timeLost = (int)m_Stats.uTotalRenderingTime.getSmoothed() - m_Stats.uWorldBSPTime.getSmoothed() -
-                            m_Stats.uWorldRenderingTime.getSmoothed() - m_Stats.uSkyRenderingTime.getSmoothed() -
-                            m_Stats.uPostProcessingTime.getSmoothed() - m_Stats.uSetupTime.getSmoothed();
+                       m_Stats.uWorldRenderingTime.getSmoothed() - m_Stats.uSkyRenderingTime.getSmoothed() -
+                       m_Stats.uEntityRenderingTime.getSmoothed() - m_Stats.uPostProcessingTime.getSmoothed() -
+                       m_Stats.uSetupTime.getSmoothed();
 
         ImGui::Text("FPS: %.3f", 1000000.0 / m_Stats.uTotalRenderingTime.getSmoothed());
         ImGui::Text("Total: %2d.%03d ms", m_Stats.uTotalRenderingTime.getSmoothed() / 1000,
@@ -316,6 +387,12 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
                     m_Stats.uWorldRenderingTime.getSmoothed() % 1000);
         ImGui::Text("Sky: %2d.%03d ms", m_Stats.uSkyRenderingTime.getSmoothed() / 1000,
                     m_Stats.uSkyRenderingTime.getSmoothed() % 1000);
+        ImGui::Text("Entity: %2d.%03d ms", m_Stats.uEntityRenderingTime.getSmoothed() / 1000,
+                    m_Stats.uEntityRenderingTime.getSmoothed() % 1000);
+        ImGui::Text("    Solid: %2d.%03d ms", m_Stats.uSolidEntityRenderingTime.getSmoothed() / 1000,
+                    m_Stats.uSolidEntityRenderingTime.getSmoothed() % 1000);
+        ImGui::Text("    Trans: %2d.%03d ms", m_Stats.uTransEntityRenderingTime.getSmoothed() / 1000,
+                    m_Stats.uTransEntityRenderingTime.getSmoothed() % 1000);
         ImGui::Text("Post: %2d.%03d ms", m_Stats.uPostProcessingTime.getSmoothed() / 1000,
                     m_Stats.uPostProcessingTime.getSmoothed() % 1000);
         ImGui::Text("Unaccounted: %6.3f ms", timeLost / 1000.0);
@@ -328,8 +405,26 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         ImGui::SameLine();
         CvarCheckbox("EBO", r_ebo);
 
+        CvarCheckbox("Entities", r_drawents);
+
         ImGui::End();
     }
+}
+
+bool SceneRenderer::addEntity(ClientEntity *pClent) {
+    if (m_uVisibleEntCount == MAX_VISIBLE_ENTS) {
+        return false;
+    }
+
+    if (pClent->isOpaque()) {
+        // Solid
+        m_SolidEntityList.push_back(pClent);
+    } else {
+        // Transparent
+        m_TransEntityList.push_back(pClent);
+    }
+    m_uVisibleEntCount++;
+    return true;
 }
 
 void SceneRenderer::createScreenQuad() {
@@ -1229,6 +1324,305 @@ void SceneRenderer::drawSkySurfacesIndexed() {
     glBindVertexArray(0);
 }
 
+void SceneRenderer::drawSolidEntities() {
+    appfw::Timer timer;
+    timer.start();
+
+    glEnable(GL_DEPTH_TEST);
+
+    if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
+        glEnable(GL_CULL_FACE);
+        glFrontFace(GL_CCW);
+        glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
+    }
+
+    m_sBrushEntityShader.enable();
+    m_sBrushEntityShader.setupSceneUniforms(*this);
+    m_sBrushEntityShader.m_FxAmount.set(1);
+
+    // Sort opaque entities
+    auto sortFn = [this](ClientEntity *const &lhs, ClientEntity *const &rhs) {
+        // Sort by model type
+        int lhsmodel = (int)lhs->getModel()->getType();
+        int rhsmodel = (int)rhs->getModel()->getType();
+
+        if (lhsmodel > rhsmodel) {
+            return false;
+        } else if (lhsmodel < rhsmodel) {
+            return true;
+        }
+
+        // Sort by render mode
+        return lhs->getRenderModeRank() < lhs->getRenderModeRank();
+    };
+
+    std::sort(m_SolidEntityList.begin(), m_SolidEntityList.end(), sortFn);
+
+    for (ClientEntity *pClent : m_SolidEntityList) {
+        switch (pClent->getModel()->getType()) {
+        case ModelType::Brush: {
+            drawSolidBrushEntity(pClent);
+            break;
+        }
+        }
+    }
+
+    setRenderMode(kRenderNormal);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+
+    timer.stop();
+    m_Stats.uSolidEntityRenderingTime += (unsigned)timer.elapsedMicroseconds();
+}
+
+void SceneRenderer::drawTransEntities() {
+    appfw::Timer timer;
+    timer.start();
+
+    glEnable(GL_DEPTH_TEST);
+
+    if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
+        glEnable(GL_CULL_FACE);
+        glFrontFace(GL_CCW);
+        glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
+    }
+
+    m_sBrushEntityShader.enable();
+    m_sBrushEntityShader.setupSceneUniforms(*this);
+
+    if (!r_nosort.getValue()) {
+        // Sort entities based on render mode and distance
+        auto sortFn = [this](ClientEntity *const &lhs, ClientEntity *const &rhs) {
+            // Sort by render mode
+            int lhsRank = lhs->getRenderModeRank();
+            int rhsRank = lhs->getRenderModeRank();
+
+            if (lhsRank > rhsRank) {
+                return false;
+            } else if (lhsRank < rhsRank) {
+                return true;
+            }
+
+            // Sort by distance
+            auto fnGetOrigin = [](const ClientEntity *ent) {
+                Model *model = ent->getModel();
+                if (model->getType() == ModelType::Brush) {
+                    glm::vec3 avg = (model->getMins() + model->getMaxs()) * 0.5f;
+                    return ent->getOrigin() + avg;
+                } else {
+                    return ent->getOrigin();
+                }
+            };
+
+            glm::vec3 org1 = fnGetOrigin(lhs) - m_Data.viewContext.getViewOrigin();
+            glm::vec3 org2 = fnGetOrigin(rhs) - m_Data.viewContext.getViewOrigin();
+            float dist1 = glm::length2(org1);
+            float dist2 = glm::length2(org2);
+
+            return dist1 > dist2;
+        };
+
+        std::sort(m_TransEntityList.begin(), m_TransEntityList.end(), sortFn);
+    }
+
+    for (ClientEntity *pClent : m_TransEntityList) {
+        switch (pClent->getModel()->getType()) {
+        case ModelType::Brush: {
+            drawBrushEntity(pClent);
+            break;
+        }
+        }
+    }
+
+    setRenderMode(kRenderNormal);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+
+    timer.stop();
+    m_Stats.uTransEntityRenderingTime += (unsigned)timer.elapsedMicroseconds();
+}
+
+void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
+    m_sBrushEntityShader.enable();
+
+    Model *model = clent->getModel();
+
+    // Frustum culling
+    glm::vec3 mins, maxs;
+
+    if (isVectorNull(clent->getAngles())) {
+        mins = clent->getOrigin() + model->getMins();
+        maxs = clent->getOrigin() + model->getMaxs();
+    } else {
+        // TODO:
+        mins = clent->getOrigin() + model->getMins();
+        maxs = clent->getOrigin() + model->getMaxs();
+    }
+
+    if (m_Surf.cullBox(mins, maxs)) {
+        return;
+    }
+
+    // Model transformation matrix
+    glm::mat4 modelMat = glm::identity<glm::mat4>();
+    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().z), {1.0f, 0.0f, 0.0f});
+    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
+    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
+    modelMat = glm::translate(modelMat, clent->getOrigin());
+    m_sBrushEntityShader.m_ModelMat.set(modelMat);
+
+    // Render mode
+    AFW_ASSERT(clent->getRenderMode() == kRenderNormal || clent->getRenderMode() == kRenderTransAlpha);
+    setRenderMode(clent->getRenderMode());
+    m_sBrushEntityShader.m_RenderMode.set(clent->getRenderMode());
+
+    // Draw surfaces
+    unsigned from = model->getFirstFace();
+    unsigned to = from + model->getFaceNum();
+
+    for (unsigned i = from; i < to; i++) {
+        Surface &surf = m_Data.surfaces[i];
+
+        if (m_Surf.cullSurface(m_Surf.getSurface(i))) {
+            continue;
+        }
+
+        // Bind material
+        const Material &mat = MaterialManager::get().getMaterial(surf.m_nMatIdx);
+        mat.bindTextures();
+
+        // Bind lightmap texture
+        if (r_lighting.getValue() == 3) {
+            if (surf.m_CustomLMTex != 0) {
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);
+            }
+        }
+
+        if (r_texture.getValue() == 1) {
+            m_sWorldShader.setColor(surf.m_Color);
+        }
+
+        glBindVertexArray(surf.m_Vao);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei)surf.m_iVertexCount);
+        m_Stats.uDrawCallCount++;
+        m_Stats.uRenderedBrushEntPolys++;
+    }
+}
+
+void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
+    m_sBrushEntityShader.enable();
+
+    Model *model = clent->getModel();
+
+    // Frustum culling
+    glm::vec3 mins, maxs;
+
+    if (isVectorNull(clent->getAngles())) {
+        mins = clent->getOrigin() + model->getMins();
+        maxs = clent->getOrigin() + model->getMaxs();
+    } else {
+        // TODO:
+        mins = clent->getOrigin() + model->getMins();
+        maxs = clent->getOrigin() + model->getMaxs();
+    }
+
+    if (m_Surf.cullBox(mins, maxs)) {
+        return;
+    }
+
+    // Model transformation matrix
+    glm::mat4 modelMat = glm::identity<glm::mat4>();
+    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().z), {1.0f, 0.0f, 0.0f});
+    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
+    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
+    modelMat = glm::translate(modelMat, clent->getOrigin());
+    m_sBrushEntityShader.m_ModelMat.set(modelMat);
+
+    // Render mode
+    if (!r_notrans.getValue()) {
+        setRenderMode(clent->getRenderMode());
+        m_sBrushEntityShader.m_RenderMode.set(clent->getRenderMode());
+        m_sBrushEntityShader.m_FxAmount.set(clent->getFxAmount() / 255.f);
+        m_sBrushEntityShader.m_FxColor.set(glm::vec3(clent->getFxColor()) / 255.f);
+    } else {
+        setRenderMode(kRenderNormal);
+        m_sBrushEntityShader.m_RenderMode.set(kRenderNormal);
+    }
+
+    bool needSort = false;
+
+    switch (clent->getRenderMode()) {
+    case kRenderTransTexture:
+    case kRenderTransAdd:
+        m_SortBuffer.clear();
+        needSort = true;
+        break;
+    }
+
+    // Draw surfaces of prepare them for sorting
+    unsigned from = model->getFirstFace();
+    unsigned to = from + model->getFaceNum();
+
+    for (unsigned i = from; i < to; i++) {
+        Surface &surf = m_Data.surfaces[i];
+
+        if (m_Surf.cullSurface(m_Surf.getSurface(i))) {
+            continue;
+        }
+
+        if (needSort && !r_nosort.getValue()) {
+            // Add to sorting list
+            m_SortBuffer.push_back(i);
+        } else {
+            // Draw now
+            drawBrushEntitySurface(surf);
+        }
+    }
+
+    // Sort and draw
+    if (needSort && !r_nosort.getValue()) {
+        auto sortFn = [this, clent](const size_t &lhsIdx, const size_t &rhsIdx) {
+            glm::vec3 lhsOrg = m_Surf.getSurface(lhsIdx).vOrigin + clent->getOrigin();
+            glm::vec3 rhsOrg = m_Surf.getSurface(rhsIdx).vOrigin + clent->getOrigin();
+            float lhsDist = glm::dot(lhsOrg, m_Data.viewContext.getViewForward());
+            float rhsDist = glm::dot(rhsOrg, m_Data.viewContext.getViewForward());
+
+            return lhsDist > rhsDist;
+        };
+
+        std::sort(m_SortBuffer.begin(), m_SortBuffer.end(), sortFn);
+
+        for (size_t i : m_SortBuffer) {
+            Surface &surf = m_Data.surfaces[i];
+            drawBrushEntitySurface(surf);
+        }
+    }
+}
+
+void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
+    // Bind material
+    const Material &mat = MaterialManager::get().getMaterial(surf.m_nMatIdx);
+    mat.bindTextures();
+
+    // Bind lightmap texture
+    if (r_lighting.getValue() == 3) {
+        if (surf.m_CustomLMTex != 0) {
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);
+        }
+    }
+
+    if (r_texture.getValue() == 1) {
+        m_sWorldShader.setColor(surf.m_Color);
+    }
+
+    glBindVertexArray(surf.m_Vao);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei)surf.m_iVertexCount);
+    m_Stats.uDrawCallCount++;
+    m_Stats.uRenderedBrushEntPolys++;
+}
+
 void SceneRenderer::doPostProcessing() {
     appfw::Timer timer;
     timer.start();
@@ -1246,4 +1640,26 @@ void SceneRenderer::doPostProcessing() {
     
     timer.stop();
     m_Stats.uPostProcessingTime += (unsigned)timer.elapsedMicroseconds();
+}
+
+void SceneRenderer::setRenderMode(RenderMode mode) {
+    switch (mode) {
+    case kRenderNormal:
+    default:
+        glDisable(GL_BLEND);
+        break;
+    case kRenderTransColor:
+    case kRenderTransTexture:
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        break;
+    case kRenderTransAlpha:
+        glDisable(GL_BLEND);
+        break;
+    case kRenderGlow:
+    case kRenderTransAdd:
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        break;
+    }
 }

@@ -100,7 +100,7 @@ SurfaceRenderer::SurfaceRenderer() {
     memset(s_NoVis, 0xFF, sizeof(s_NoVis));
 }
 
-void SurfaceRenderer::setLevel(bsp::Level *level) {
+void SurfaceRenderer::setLevel(const bsp::Level *level) {
     if (m_pLevel == level) {
         return;
     }
@@ -173,6 +173,7 @@ void SurfaceRenderer::createSurfaces() {
         // Create vertices and calculate bounds
         surface.vMins[0] = surface.vMins[1] = surface.vMins[2] = 999999.0f;
         surface.vMaxs[0] = surface.vMaxs[1] = surface.vMaxs[2] = -999999.0f;
+        surface.vOrigin = glm::vec3(0, 0, 0);
         auto &lvlVertices = m_pLevel->getVertices();
 
         for (int j = 0; j < surface.iNumEdges; j++) {
@@ -204,9 +205,13 @@ void SurfaceRenderer::createSurfaces() {
                 if (val > surface.vMaxs[k])
                     surface.vMaxs[k] = val;
             }
+
+            // Add vertex to origin
+            surface.vOrigin += vertex;
         }
 
         surface.vVertices.shrink_to_fit();
+        surface.vOrigin /= (float)surface.vVertices.size();
 
         // Find material
         const bsp::BSPTextureInfo &texInfo = m_pLevel->getTexInfo().at(face.iTextureInfo);
@@ -372,7 +377,7 @@ void SurfaceRenderer::recursiveWorldNodes(int node) noexcept {
     recursiveWorldNodes(pNode->iChildren[!side]);
 }
 
-bool SurfaceRenderer::cullSurface(Surface &surface) noexcept {
+bool SurfaceRenderer::cullSurface(const Surface &surface) noexcept {
     if (m_pContext->m_Cull == Cull::None) {
         return false;
     }
