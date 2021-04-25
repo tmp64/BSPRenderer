@@ -306,22 +306,12 @@ void SceneRenderer::renderScene(GLint targetFb) {
     appfw::Timer renderTimer;
     renderTimer.start();
 
-    if (m_bNeedRefreshFB) {
-        recreateFramebuffer();
-        m_bNeedRefreshFB = false;
-    }
-
-    prepareHdrFramebuffer();
-    setupViewContext();
-
     if (!m_Data.bCustomLMLoaded && r_lighting.getValue() == 3) {
         r_lighting.setValue(2);
         logWarn("Lighting type set to shaded since custom lightmaps are not loaded");
     }
 
-    m_SolidEntityList.clear();
-    m_TransEntityList.clear();
-    m_uVisibleEntCount = 0;
+    frameSetup();
 
     if (r_drawents.getValue()) {
         appfw::Timer timer;
@@ -351,6 +341,8 @@ void SceneRenderer::renderScene(GLint targetFb) {
         timer.stop();
         m_Stats.uEntityRenderingTime += (unsigned)timer.elapsedMicroseconds();
     }
+
+    frameEnd();
 
     glBindFramebuffer(GL_FRAMEBUFFER, targetFb);
     doPostProcessing();
@@ -1036,15 +1028,46 @@ std::vector<uint8_t> SceneRenderer::rotateImage90CCW(uint8_t *data, int wide, in
     return newData;
 }
 
+void SceneRenderer::frameSetup() {
+    appfw::Timer timer;
+    timer.start();
+
+    prepareHdrFramebuffer();
+    setupViewContext();
+
+    // Reset entity lists
+    m_SolidEntityList.clear();
+    m_TransEntityList.clear();
+    m_uVisibleEntCount = 0;
+
+    // Depth test
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // Backface culling
+    if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
+        glEnable(GL_CULL_FACE);
+        glFrontFace(GL_CCW);
+        glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
+    }
+
+    timer.stop();
+    m_Stats.uSetupTime += (unsigned)timer.elapsedMicroseconds();
+}
+
+void SceneRenderer::frameEnd() {
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+}
+
 void SceneRenderer::prepareHdrFramebuffer() {
-    appfw::Timer renderTimer;
-    renderTimer.start();
+    if (m_bNeedRefreshFB) {
+        recreateFramebuffer();
+        m_bNeedRefreshFB = false;
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, m_nHdrFramebuffer);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    renderTimer.stop();
-    m_Stats.uSetupTime += (unsigned)renderTimer.elapsedMicroseconds();
 }
 
 void SceneRenderer::setupViewContext() {
@@ -1066,25 +1089,15 @@ void SceneRenderer::drawWorldSurfaces() {
     bspTimer.stop();
     m_Stats.uWorldBSPTime += (unsigned)bspTimer.elapsedMicroseconds();
 
+    // Draw visible surfaces
     appfw::Timer timer;
     timer.start();
-
-    glEnable(GL_DEPTH_TEST);
-
-    if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
-        glEnable(GL_CULL_FACE);
-        glFrontFace(GL_CCW);
-        glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
-    }
 
     if (r_ebo.getValue()) {
         drawWorldSurfacesIndexed();
     } else {
         drawWorldSurfacesVao();
     }
-
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
 
     timer.stop();
     m_Stats.uWorldRenderingTime += (unsigned)timer.elapsedMicroseconds();
@@ -1256,14 +1269,7 @@ void SceneRenderer::drawSkySurfaces() {
     timer.start();
 
     if (!m_Data.viewContext.getSkySurfaces().empty()) {
-        glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
-
-        if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
-            glEnable(GL_CULL_FACE);
-            glFrontFace(GL_CCW);
-            glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
-        }
 
         m_sSkyShader.enable();
         m_sSkyShader.setupUniforms(*this);
@@ -1280,8 +1286,6 @@ void SceneRenderer::drawSkySurfaces() {
         m_sSkyShader.disable();
 
         glDepthFunc(GL_LESS);
-        glDisable(GL_CULL_FACE);
-        glDisable(GL_DEPTH_TEST);
     }
 
     timer.stop();
@@ -1342,14 +1346,6 @@ void SceneRenderer::drawSolidEntities() {
     appfw::Timer timer;
     timer.start();
 
-    glEnable(GL_DEPTH_TEST);
-
-    if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
-        glEnable(GL_CULL_FACE);
-        glFrontFace(GL_CCW);
-        glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
-    }
-
     m_sBrushEntityShader.enable();
     m_sBrushEntityShader.setupSceneUniforms(*this);
     m_sBrushEntityShader.m_FxAmount.set(1);
@@ -1382,8 +1378,6 @@ void SceneRenderer::drawSolidEntities() {
     }
 
     setRenderMode(kRenderNormal);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
 
     timer.stop();
     m_Stats.uSolidEntityRenderingTime += (unsigned)timer.elapsedMicroseconds();
@@ -1392,14 +1386,6 @@ void SceneRenderer::drawSolidEntities() {
 void SceneRenderer::drawTransEntities() {
     appfw::Timer timer;
     timer.start();
-
-    glEnable(GL_DEPTH_TEST);
-
-    if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
-        glEnable(GL_CULL_FACE);
-        glFrontFace(GL_CCW);
-        glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
-    }
 
     m_sBrushEntityShader.enable();
     m_sBrushEntityShader.setupSceneUniforms(*this);
@@ -1449,8 +1435,6 @@ void SceneRenderer::drawTransEntities() {
     }
 
     setRenderMode(kRenderNormal);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
 
     timer.stop();
     m_Stats.uTransEntityRenderingTime += (unsigned)timer.elapsedMicroseconds();

@@ -338,6 +338,17 @@ private:
     std::vector<uint8_t> rotateImage90CCW(uint8_t *data, int wide, int tall);
 
     /**
+     * Pre-rendering stuff
+     */
+    void frameSetup();
+
+    /**
+     * Post-rendering stuff.
+     * Disables stuff enabled in frameSetup.
+     */
+    void frameEnd();
+
+    /**
      * Binds and clears HDB framebuffer
      */
     void prepareHdrFramebuffer();
