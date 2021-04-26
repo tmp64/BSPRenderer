@@ -278,7 +278,19 @@ void rad::RadSim::writeLightmaps() {
 
     // Write lightmaps
     for (LightmapTexture &lm : m_Lightmaps) {
+#if 1
         file.writeArray(appfw::span(lm.data));
+#else
+        // Write random pixels
+        for (size_t i = 0; i < lm.data.size(); i++) {
+            int rand0 = rand() % 255;
+            int rand1 = rand() % 255;
+            int rand2 = rand() % 255;
+            file.write(rand0 / 255.f);
+            file.write(rand1 / 255.f);
+            file.write(rand2 / 255.f);
+        }
+#endif
     }
 }
 

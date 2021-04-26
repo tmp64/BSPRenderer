@@ -34,6 +34,10 @@ ConVar<bool> r_wireframe("r_wireframe", false, "Draw wireframes");
 ConVar<bool> r_nosort("r_nosort", false, "Disable transparent entity sorting");
 ConVar<bool> r_notrans("r_notrans", false, "Disable entity transparency");
 
+static const char *r_lighting_values[] = {
+    "Fullbright", "Shaded", "BSP lightmaps", "Custom lightmaps"
+};
+
 static inline bool isVectorNull(const glm::vec3 &v) { return v.x == 0.f && v.y == 0.f && v.z == 0.f; }
 
 //----------------------------------------------------------------
@@ -413,6 +417,20 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
 
         CvarCheckbox("Entities", r_drawents);
 
+        int lighting = std::clamp(r_lighting.getValue(), 0, 3);
+
+        if (ImGui::BeginCombo("Lighting", r_lighting_values[lighting])) {
+            for (int i = 0; i <= 3; i++) {
+                if (ImGui::Selectable(r_lighting_values[i])) {
+                    r_lighting.setValue(i);
+                }
+                if (lighting == i) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
         ImGui::End();
     }
 }
@@ -602,6 +620,9 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
     std::sort(sortedLightmaps.begin(), sortedLightmaps.end());
 
     // Add them to the lightmap block
+    appfw::Timer timer;
+    timer.start();
+
     for (auto &i : sortedLightmaps) {
         Surface &surf = m_Data.surfaces[i.surface];
         const glm::u8vec3 *data = reinterpret_cast<const glm::u8vec3 *>(m_pLevel->getLightMaps().data() + i.offset);
@@ -616,6 +637,9 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
                     surf.m_BSPLMSize.y);
         }
     }
+
+    timer.stop();
+    logInfo("BSP lightmaps: block {:.3f} s", timer.elapsedSeconds());
 }
 
 void SceneRenderer::finishLoadBSPLightmaps() {
@@ -636,7 +660,7 @@ void SceneRenderer::finishLoadBSPLightmaps() {
 
 void SceneRenderer::asyncLoadCustomLightmaps() {
     m_Data.bCustomLMLoaded = false;
-    m_pLoadingState->customLightmaps.clear();
+    m_pLoadingState->customLightmapBlock.clear();
     fs::path &lmPath = m_Data.customLightmapPath;
 
     if (lmPath.empty()) {
@@ -647,6 +671,9 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
     logInfo("Custom lightmaps: loading...");
 
     try {
+        m_pLoadingState->customLightmapBlock.resize(CUSTOM_LIGHTMAP_BLOCK_SIZE, CUSTOM_LIGHTMAP_BLOCK_SIZE);
+
+        // Lightmap file struct
         constexpr uint32_t LM_MAGIC = ('1' << 24) | ('0' << 16) | ('M' << 8) | ('L' << 0);
 
         struct LightmapFileHeader {
@@ -659,6 +686,15 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
             glm::ivec2 lmSize;
         };
 
+        // Lightmap struct for sorting
+        struct Lightmap {
+            unsigned surface;
+            int size;
+
+            inline bool operator<(const Lightmap &rhs) const { return size > rhs.size; }
+        };
+
+        // File reading
         appfw::BinaryReader file(lmPath);
 
         LightmapFileHeader lmHeader;
@@ -673,6 +709,9 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
                 fmt::format("Face count mismatch: expected {}, got {}", m_Data.surfaces.size(), lmHeader.iFaceCount));
         }
 
+        std::vector<Lightmap> sortedLightmaps;
+        sortedLightmaps.reserve(m_Data.surfaces.size());
+
         // Read face info
         for (size_t i = 0; i < lmHeader.iFaceCount; i++) {
             Surface &surf = m_Data.surfaces[i];
@@ -686,43 +725,70 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
             surf.m_vCustomLMSize = info.lmSize;
             surf.m_vCustomLMTexCoords.resize(info.iVertexCount);
             file.readArray(appfw::span(surf.m_vCustomLMTexCoords));
+
+            Lightmap lm;
+            lm.surface = (unsigned)i;
+            lm.size = info.lmSize.x * info.lmSize.y;
+            sortedLightmaps.push_back(lm);
         }
 
-        m_pLoadingState->customLightmaps.resize(lmHeader.iFaceCount);
+        std::vector<std::vector<glm::vec3>> lightmapTextures;
+        lightmapTextures.resize(lmHeader.iFaceCount);
 
         // Read textures
         for (size_t i = 0; i < lmHeader.iFaceCount; i++) {
             Surface &surf = m_Data.surfaces[i];
-            std::vector<glm::vec3> &data = m_pLoadingState->customLightmaps[i];
+            std::vector<glm::vec3> &data = lightmapTextures[i];
             data.resize((size_t)surf.m_vCustomLMSize.x * (size_t)surf.m_vCustomLMSize.y);
             file.readArray(appfw::span(data));
         }
+
+        // Sort all lightmaps by size, large to small
+        std::sort(sortedLightmaps.begin(), sortedLightmaps.end());
+
+        // Add them to the lightmap block
+        appfw::Timer timer;
+        timer.start();
+
+        for (auto &i : sortedLightmaps) {
+            Surface &surf = m_Data.surfaces[i.surface];
+            const glm::vec3 *data = lightmapTextures[i.surface].data();
+            int x, y;
+
+            if (m_pLoadingState->customLightmapBlock.insert(data, surf.m_vCustomLMSize.x, surf.m_vCustomLMSize.y, x, y,
+                                                            CUSTOM_LIGHTMAP_PADDING)) {
+                surf.m_vCustomLMOffset.x = x;
+                surf.m_vCustomLMOffset.y = y;
+            } else {
+                logWarn("Custom lightmaps: no space for surface {} ({}x{})", i.surface, surf.m_vCustomLMSize.x,
+                        surf.m_vCustomLMSize.y);
+            }
+        }
+        
+        timer.stop();
+        logInfo("Custom lightmaps: block {:.3f} s", timer.elapsedSeconds());
     } catch (const std::exception &e) {
         logWarn("Custom lightmaps: failed to load: {}", e.what());
-        m_pLoadingState->customLightmaps.clear();
     }
 }
 
 void SceneRenderer::finishLoadCustomLightmaps() {
-    if (m_pLoadingState->customLightmaps.empty()) {
+    if (m_pLoadingState->customLightmapBlock.getWide() == 0) {
         return;
     }
 
-    for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
-        Surface &surf = m_Data.surfaces[i];
-        std::vector<glm::vec3> &data = m_pLoadingState->customLightmaps[i];
+    // Load the block into the GPU
+    m_Data.customLightmapBlockTex.create();
+    glBindTexture(GL_TEXTURE_2D, m_Data.customLightmapBlockTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, CUSTOM_LIGHTMAP_BLOCK_SIZE, CUSTOM_LIGHTMAP_BLOCK_SIZE, 0, GL_RGB, GL_FLOAT,
+                 m_pLoadingState->customLightmapBlock.getData());
+    glGenerateMipmap(GL_TEXTURE_2D);
 
-        surf.m_CustomLMTex.create();
-        glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, surf.m_vCustomLMSize.x, surf.m_vCustomLMSize.y, 0, GL_RGB, GL_FLOAT,
-                     data.data());
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-
+    m_pLoadingState->customLightmapBlock.clear();
     m_Data.bCustomLMLoaded = true;
     logInfo("Custom lightmaps: loaded");
 }
@@ -780,8 +846,11 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
             }
 
             // Custom lightmap texture
-            if (surf.m_CustomLMTex != 0) {
-                v.customLMTexture = surf.m_vCustomLMTexCoords[j];
+            if (m_Data.bCustomLMLoaded) {
+                glm::vec2 texCoord = surf.m_vCustomLMTexCoords[j] * glm::vec2(surf.m_vCustomLMSize);
+                texCoord += surf.m_vCustomLMOffset;
+                texCoord /= (float)CUSTOM_LIGHTMAP_BLOCK_SIZE;
+                v.customLMTexture = texCoord;
             }
 
             vertices.push_back(v);
@@ -1051,6 +1120,9 @@ void SceneRenderer::frameSetup() {
         glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
     }
 
+    // Bind lightmap - will be used for world and brush ents
+    bindLightmapBlock();
+
     timer.stop();
     m_Stats.uSetupTime += (unsigned)timer.elapsedMicroseconds();
 }
@@ -1077,6 +1149,21 @@ void SceneRenderer::setupViewContext() {
         m_Data.viewContext.setCulling(SurfaceRenderer::Cull::Back);
     } else if (r_cull.getValue() >= 2) {
         m_Data.viewContext.setCulling(SurfaceRenderer::Cull::Front);
+    }
+}
+
+void SceneRenderer::bindLightmapBlock() {
+    // Bind lightmap block texture
+    if (r_lighting.getValue() == 2) {
+        if (m_Data.bspLightmapBlockTex != 0) {
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex);
+        }
+    } else if (r_lighting.getValue() == 3) {
+        if (m_Data.customLightmapBlockTex != 0) {
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, m_Data.customLightmapBlockTex);
+        }
     }
 }
 
@@ -1112,14 +1199,6 @@ void SceneRenderer::drawWorldSurfacesVao() {
     unsigned frame = m_Data.viewContext.getWorldTextureChainFrame();
     unsigned drawnSurfs = 0;
 
-    // Bind lightmap block texture
-    if (r_lighting.getValue() == 2) {
-        if (m_Data.bspLightmapBlockTex != 0) {
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex);
-        }
-    }
-
     for (size_t i = 0; i < textureChain.size(); i++) {
         if (textureChainFrames[i] != frame) {
             continue;
@@ -1132,17 +1211,10 @@ void SceneRenderer::drawWorldSurfacesVao() {
         for (unsigned j : textureChain[i]) {
             Surface &surf = m_Data.surfaces[j];
 
-            // Bind lightmap texture
-            if (r_lighting.getValue() == 3) {
-                if (surf.m_CustomLMTex != 0) {
-                    glActiveTexture(GL_TEXTURE1);
-                    glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);
-                }
-            }
-
             if (r_texture.getValue() == 1) {
                 m_sWorldShader.setColor(surf.m_Color);
             }
+
             glBindVertexArray(surf.m_Vao);
             glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei)surf.m_iVertexCount);
         }
@@ -1167,14 +1239,6 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
     auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
     unsigned frame = m_Data.viewContext.getWorldTextureChainFrame();
     unsigned drawnSurfs = 0;
-
-    // Bind lightmap block texture
-    if (r_lighting.getValue() == 2) {
-        if (m_Data.bspLightmapBlockTex != 0) {
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex);
-        }
-    }
 
     // Bind buffers
     glBindVertexArray(m_Data.worldVao);
@@ -1489,14 +1553,6 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
         const Material &mat = MaterialManager::get().getMaterial(surf.m_nMatIdx);
         mat.bindTextures();
 
-        // Bind lightmap texture
-        if (r_lighting.getValue() == 3) {
-            if (surf.m_CustomLMTex != 0) {
-                glActiveTexture(GL_TEXTURE1);
-                glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);
-            }
-        }
-
         if (r_texture.getValue() == 1) {
             m_sWorldShader.setColor(surf.m_Color);
         }
@@ -1602,14 +1658,6 @@ void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
     // Bind material
     const Material &mat = MaterialManager::get().getMaterial(surf.m_nMatIdx);
     mat.bindTextures();
-
-    // Bind lightmap texture
-    if (r_lighting.getValue() == 3) {
-        if (surf.m_CustomLMTex != 0) {
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, surf.m_CustomLMTex);
-        }
-    }
 
     if (r_texture.getValue() == 1) {
         m_sWorldShader.setColor(surf.m_Color);

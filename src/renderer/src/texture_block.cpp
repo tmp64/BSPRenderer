@@ -101,7 +101,7 @@ bool TextureBlock<T>::insert(const T *data, int wide, int tall, int &xout, int &
     }
 
     // Fill padding
-    if (padding != 0 && false) {
+    if (padding != 0) {
         // Top
         for (int i = y; i < yout; i++) {
             std::copy(data, data + wide, m_Data.begin() + i * m_iWide + xout);

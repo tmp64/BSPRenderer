@@ -151,6 +151,8 @@ private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
     static constexpr int BSP_LIGHTMAP_BLOCK_SIZE = 1024;
     static constexpr int BSP_LIGHTMAP_PADDING = 2;
+    static constexpr int CUSTOM_LIGHTMAP_BLOCK_SIZE = 2048;
+    static constexpr int CUSTOM_LIGHTMAP_PADDING = 4;
     static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
     static constexpr int MAX_TRANS_SURFS_PER_MODEL = 512; //!< Maximum number of surfaces per transparent model
 
@@ -247,7 +249,7 @@ private:
         // Custom lightmap info
         std::vector<glm::vec2> m_vCustomLMTexCoords;
         glm::ivec2 m_vCustomLMSize = glm::ivec2(0, 0);
-        GLTexture m_CustomLMTex;
+        glm::ivec2 m_vCustomLMOffset = glm::ivec2(0, 0);
     };
 
     struct LevelData {
@@ -257,8 +259,9 @@ private:
         bool bCustomLMLoaded = false;
         GLTexture skyboxCubemap;
         
-        // BSP lightmaps
+        // Lightmaps
         GLTexture bspLightmapBlockTex;
+        GLTexture customLightmapBlockTex;
 
         // World geometry indexed rendering
         GLVao worldVao;
@@ -284,11 +287,9 @@ private:
         bool loadBSPLightmapsFinished = false;
         bool loadCustomLightmapsFinished = false;
 
-        // BSP lightmaps
+        // Lightmaps
         TextureBlock<glm::u8vec3> bspLightmapBlock;
-
-        // Custom lightmaps
-        std::vector<std::vector<glm::vec3>> customLightmaps;
+        TextureBlock<glm::vec3> customLightmapBlock;
 
         // Surface objects
         std::future<void> createSurfaceObjectsResult;
@@ -357,6 +358,11 @@ private:
      * Sets view constext settings.
      */
     void setupViewContext();
+
+    /**
+     * Binds lightmap block texture
+     */
+    void bindLightmapBlock();
 
     /**
      * Draws solid BSP faces.

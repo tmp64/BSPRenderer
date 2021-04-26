@@ -51,7 +51,7 @@ private:
  * Maximum width: 65535.
  */
 template <typename T>
-class TextureBlock : detail::TextureBlockBase {
+class TextureBlock : public detail::TextureBlockBase {
 public:
     TextureBlock() = default;
 
