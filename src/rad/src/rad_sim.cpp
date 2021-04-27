@@ -125,14 +125,16 @@ void rad::RadSim::loadLevelConfig() {
 
     m_flReflectivity = m_LevelConfigJson.at("base_reflectivity").get<float>();
     m_iBounceCount = m_LevelConfigJson.at("bounce_count").get<int>();
+    m_flGamma = m_LevelConfigJson.at("gamma").get<float>();
 
     // Load envlight
     if (m_LevelConfigJson.contains("envlight")) {
         const nlohmann::json &envlight = m_LevelConfigJson["envlight"];
 
-        m_EnvLight.vColor.r = (float)envlight.at("color").at(0).get<int>();
-        m_EnvLight.vColor.g = (float)envlight.at("color").at(1).get<int>();
-        m_EnvLight.vColor.b = (float)envlight.at("color").at(2).get<int>();
+        m_EnvLight.vColor.r = envlight.at("color").at(0).get<int>() / 255.f;
+        m_EnvLight.vColor.g = envlight.at("color").at(1).get<int>() / 255.f;
+        m_EnvLight.vColor.b = envlight.at("color").at(2).get<int>() / 255.f;
+        m_EnvLight.vColor = correctColorGamma(m_EnvLight.vColor);
         m_EnvLight.vColor *= envlight.at("brightness").get<float>();
         m_EnvLight.vDirection = getVecFromAngles(envlight.at("pitch"), envlight.at("yaw"));
     }
@@ -576,6 +578,7 @@ void rad::RadSim::loadLevelEntities() {
                     m_EnvLight.vColor.r = color[0] / 255.f;
                     m_EnvLight.vColor.g = color[1] / 255.f;
                     m_EnvLight.vColor.b = color[2] / 255.f;
+                    m_EnvLight.vColor = correctColorGamma(m_EnvLight.vColor);
                     m_EnvLight.vColor *= color[3];
                     m_EnvLight.vColor /= m_pAppConfig->getItem("rad").get<float>("light_env_brightness_divisor");
 
@@ -593,6 +596,14 @@ void rad::RadSim::loadLevelEntities() {
             }
         }
     }
+}
+
+glm::vec3 rad::RadSim::correctColorGamma(const glm::vec3 &color) {
+    glm::vec3 c = color;
+    c.r = std::pow(c.r, m_flGamma);
+    c.g = std::pow(c.g, m_flGamma);
+    c.b = std::pow(c.b, m_flGamma);
+    return c;
 }
 
 glm::vec3 &rad::RadSim::getPatchBounce(size_t patch, size_t bounce) {

@@ -146,6 +146,7 @@ private:
     nlohmann::json m_LevelConfigJson;
     float m_flPatchSize = 0;
     float m_flReflectivity = 0;
+    float m_flGamma = 0;
     std::string m_PatchSizeStr;
     EnvLight m_EnvLight;
 
@@ -172,6 +173,11 @@ private:
      * Loads lights from entities.
      */
     void loadLevelEntities();
+
+    /**
+     * Converts color from gamma space to linear space.
+     */
+    glm::vec3 correctColorGamma(const glm::vec3 &color);
 
     /**
      * Returns reference to color of patch in specified bounce.

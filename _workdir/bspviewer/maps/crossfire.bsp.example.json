@@ -2,6 +2,7 @@
 	"base_patch_size": 64,	// size of patch
 	"base_reflectivity": 0.4,	// reflectivity multiplier
 	"bounce_count": 64,
+	"gamma": 2.2,
 	
 	"envlight": {
 		"color": [255, 0, 0],
