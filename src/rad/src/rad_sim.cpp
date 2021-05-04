@@ -93,7 +93,10 @@ inline glm::vec3 getVecFromAngles(float pitch, float yaw) {
 
 }
 
-rad::RadSim::RadSim() : m_VisMat(this), m_VFList(this) {
+rad::RadSim::RadSim()
+    : m_VisMat(this)
+    , m_VFList(this)
+    , m_SVisMat(this) {
     // Set up thread pool
     size_t threadCount = std::thread::hardware_concurrency();
     if (threadCount == 0) {
@@ -147,33 +150,43 @@ void rad::RadSim::loadLevelConfig() {
     m_PatchHash = hash.digest();
 }
 
-bool rad::RadSim::isVisMatValid() { return m_VisMat.isValid(); }
+bool rad::RadSim::isVisMatValid() { return m_SVisMat.isValid(); }
 
 bool rad::RadSim::loadVisMat() {
     fs::path path = getFileSystem().findFileOrEmpty(getVisMatPath(), "assets");
 
     if (!path.empty()) {
-        m_VisMat.loadFromFile(path);
-        return m_VisMat.isValid();
+        m_SVisMat.loadFromFile(path);
+        return m_SVisMat.isValid();
     }
 
     return false;
 }
 
 void rad::RadSim::calcVisMat() {
-    logInfo("Building visibility matrix...");
     appfw::Timer timer;
+
+    // Build full vismat
+    logInfo("Building visibility matrix...");
     timer.start();
-
     m_VisMat.buildVisMat();
-
     timer.stop();
     logInfo("Build vismat: {:.3} s", timer.elapsedSeconds());
 
+    // Build sparse vismat
+    logInfo("Building sparse vismat...");
+    timer.start();
+    m_SVisMat.buildSparseMat();
+    timer.stop();
+    logInfo("Build sparse vismat: {:.3} s", timer.elapsedSeconds());
+
+    // Clear normal vismat
+    m_VisMat.unloadVisMat();
+
     // Save vismat
-    logInfo("Saving vismat...");
+    logInfo("Saving svismat...");
     fs::path path = getFileSystem().getFile(getVisMatPath(), "assets");
-    m_VisMat.saveToFile(path);
+    m_SVisMat.saveToFile(path);
 }
 
 bool rad::RadSim::isVFListValid() { return m_VFList.isValid(); }
@@ -197,9 +210,9 @@ void rad::RadSim::calcViewFactors() {
     m_VFList.calculateVFList();
 
     // Save vflist
-    logInfo("Saving VFList...");
+    /*logInfo("Saving VFList...");
     fs::path path = getFileSystem().getFile(getVFListPath(), "assets");
-    m_VFList.saveToFile(path);
+    m_VFList.saveToFile(path);*/
 }
 
 void rad::RadSim::bounceLight() {
@@ -207,8 +220,11 @@ void rad::RadSim::bounceLight() {
     clearBounceArray();
     addLighting();
 
+    
     logInfo("Bouncing light...");
-    float p = m_flReflectivity;
+    appfw::Timer timer;
+    timer.start();
+    float refl = m_flReflectivity;
     PatchIndex patchCount = m_Patches.size();
 
     // Copy bounce 0 into the lightmap
@@ -216,21 +232,26 @@ void rad::RadSim::bounceLight() {
         PatchRef patch(m_Patches, i);
         patch.getFinalColor() = getPatchBounce(i, 0);
     }
+    
+    std::vector<glm::vec3> patchSum(m_Patches.size()); //!< Sum of all light for each patch
 
     // Bounce light
     for (int bounce = 1; bounce <= m_iBounceCount; bounce++) {
         updateProgress((bounce - 1.0) / (m_iBounceCount - 1.0));
 
+        std::fill(patchSum.begin(), patchSum.end(), glm::vec3(0, 0, 0));
+
         for (PatchIndex i = 0; i < patchCount; i++) {
+            // Bounce light for each visible path
+            receiveLight(bounce, i, patchSum);
+        }
+
+        for (PatchIndex i = 0; i < patchCount; i++) {
+            // Received light from all visible patches
+            // Write it
             PatchRef patch(m_Patches, i);
-
-            glm::vec3 sum = {0, 0, 0};
-
-            for (auto &j : patch.getViewFactors().subspan(0, m_VFList.getPatchVFCount(i))) {
-                sum += getPatchBounce(std::get<0>(j), bounce - 1) * std::get<1>(j);
-            }
-
-            getPatchBounce(i, bounce) = sum * p;
+            AFW_ASSERT(patchSum[i].r >= 0 && patchSum[i].g >= 0 && patchSum[i].b >= 0);
+            getPatchBounce(i, bounce) = patchSum[i] * refl;
             patch.getFinalColor() += getPatchBounce(i, bounce);
         }
     }
@@ -242,6 +263,9 @@ void rad::RadSim::bounceLight() {
     }
 
     updateProgress(1);
+
+    timer.stop();
+    logInfo("Bounce light: {:.3} s", timer.elapsedSeconds());
 }
 
 void rad::RadSim::writeLightmaps() {
@@ -606,11 +630,6 @@ glm::vec3 rad::RadSim::correctColorGamma(const glm::vec3 &color) {
     return c;
 }
 
-glm::vec3 &rad::RadSim::getPatchBounce(size_t patch, size_t bounce) {
-    AFW_ASSERT(patch < m_Patches.size() && bounce <= m_iBounceCount);
-    return m_PatchBounce[patch * (m_iBounceCount + 1) + bounce];
-}
-
 void rad::RadSim::clearBounceArray() {
     m_PatchBounce.resize((size_t)m_Patches.size() * (m_iBounceCount + 1));
     std::fill(m_PatchBounce.begin(), m_PatchBounce.end(), glm::vec3(0, 0, 0));
@@ -658,6 +677,46 @@ void rad::RadSim::applyTexLights() {
     }
 }
 
+void rad::RadSim::receiveLight(int bounce, PatchIndex i, std::vector<glm::vec3> &patchSum) {
+    auto &countTable = m_SVisMat.getCountTable();
+    auto &offsetTable = m_SVisMat.getOffsetTable();
+    auto &listItems = m_SVisMat.getListItems();
+    auto &vfoffsets = m_VFList.getPatchOffsets();
+    auto &vfdata = m_VFList.getVFData();
+    auto &vfkoeff = m_VFList.getVFKoeff();
+
+    PatchRef patch(m_Patches, i);
+    PatchIndex poff = i + 1;
+    size_t dataOffset = vfoffsets[i];
+
+    for (size_t j = 0; j < countTable[i]; j++) {
+        const SparseVisMat::ListItem &item = listItems[offsetTable[i] + j];
+        poff += item.offset;
+
+        for (PatchIndex k = 0; k < item.size; k++) {
+            PatchIndex patch2 = poff + k;
+            float vf = vfdata[dataOffset];
+
+            AFW_ASSERT(!isnan(vf) && !isinf(vf));
+            AFW_ASSERT(!isnan(vfkoeff[i]) && !isinf(vfkoeff[i]));
+            AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
+
+            // Take light from p to i
+            patchSum[i] += getPatchBounce(patch2, bounce - 1) * (vf * vfkoeff[i]);
+
+            // Take light from i to patch2
+            patchSum[patch2] += getPatchBounce(i, bounce - 1) * (vf * vfkoeff[patch2]);
+
+            AFW_ASSERT(patchSum[i].r >= 0 && patchSum[i].g >= 0 && patchSum[i].b >= 0);
+            AFW_ASSERT(patchSum[patch2].r >= 0 && patchSum[patch2].g >= 0 && patchSum[patch2].b >= 0);
+
+            dataOffset++;
+        }
+
+        poff += item.size;
+    }
+}
+
 void rad::RadSim::updateProgress(double progress) {
     if (m_fnProgressCallback) {
         m_fnProgressCallback(progress);
@@ -665,7 +724,7 @@ void rad::RadSim::updateProgress(double progress) {
 }
 
 std::string rad::RadSim::getVisMatPath() {
-    return fmt::format("{}.vismat{}", m_LevelPath, m_PatchSizeStr);
+    return fmt::format("{}.svismat{}", m_LevelPath, m_PatchSizeStr);
 }
 
 std::string rad::RadSim::getVFListPath() {

@@ -10,6 +10,7 @@
 #include <rad/types.h>
 #include <rad/patch_list.h>
 #include <rad/vismat.h>
+#include <rad/sparse_vismat.h>
 #include <rad/vflist.h>
 
 namespace rad {
@@ -140,6 +141,7 @@ private:
     std::vector<LightmapTexture> m_Lightmaps;
     PatchList m_Patches;
     VisMat m_VisMat;
+    SparseVisMat m_SVisMat;
     VFList m_VFList;
     std::vector<glm::vec3> m_PatchBounce;
 
@@ -183,7 +185,10 @@ private:
      * Returns reference to color of patch in specified bounce.
      * Bounce 0 is initial color.
      */
-    glm::vec3 &getPatchBounce(size_t patch, size_t bounce);
+    inline AFW_FORCE_INLINE glm::vec3 &getPatchBounce(PatchIndex patch, int bounce) {
+        AFW_ASSERT(patch < m_Patches.size() && bounce <= m_iBounceCount);
+        return m_PatchBounce[m_Patches.size() * (size_t)bounce + patch];
+    }
 
     /**
      * Adds initial lighting to patches (texlights, entity lights).
@@ -205,6 +210,8 @@ private:
      */
     void applyTexLights();
 
+    void receiveLight(int bounce, PatchIndex i, std::vector<glm::vec3> &patchsum);
+
     /**
      * Calls the progress callback with specified progress.
      */
@@ -214,6 +221,7 @@ private:
     std::string getVFListPath();
 
     friend class VisMat;
+    friend class SparseVisMat;
     friend class VFList;
 };
 

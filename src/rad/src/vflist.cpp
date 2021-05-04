@@ -38,12 +38,12 @@ void rad::VFList::loadFromFile(const fs::path &path) {
     }
 
     // Read count
-    size_t count;
     size_t patchCount = m_pRadSim->m_Patches.size();
-    file.read(count);
+    size_t offsetSize;
+    file.read(offsetSize);
 
-    if (count != patchCount) {
-        logInfo("VFList discarded: invalid patch count ({} instead of {}).", count, patchCount);
+    if (offsetSize != patchCount) {
+        logInfo("VFList discarded: offset table size mismatch ({} instead of {}).", offsetSize, patchCount);
         return;
     }
 
@@ -51,35 +51,28 @@ void rad::VFList::loadFromFile(const fs::path &path) {
     size_t size;
     file.read(size);
 
-    // Resize count
-    if (m_VFCount.size() != count) {
-        std::vector<PatchIndex>().swap(m_VFCount);
-        m_VFCount.resize(count);
+    // Resize offsets
+    if (m_Offsets.size() != offsetSize) {
+        std::vector<size_t>().swap(m_Offsets);
+        m_Offsets.resize(offsetSize);
     }
 
     // Resize data
     if (m_Data.size() != size) {
-        std::vector<ViewFactor>().swap(m_Data);
+        std::vector<float>().swap(m_Data);
         m_Data.resize(size);
     }
 
-    // Read data
-    file.readArray(appfw::span(m_VFCount));
-
-    for (size_t i = 0; i < m_Data.size(); i++) {
-        file.read(std::get<0>(m_Data[i]));
-        file.read(std::get<1>(m_Data[i]));
+    // Resize koeff
+    if (m_Koeff.size() != patchCount) {
+        std::vector<float>().swap(m_Koeff);
+        m_Koeff.resize(patchCount);
     }
 
-    // Read viewfactor offsets
-    for (PatchIndex i = 0; i < m_pRadSim->m_Patches.size(); i++) {
-        PatchRef patch(m_pRadSim->m_Patches, i);
-        size_t offset;
-        size_t len;
-        file.read(offset);
-        file.read(len);
-        patch.getViewFactors() = appfw::span(m_Data).subspan(offset, len);
-    }
+    // Read arrays
+    file.readArray(appfw::span(m_Offsets));
+    file.readArray(appfw::span(m_Data));
+    file.readArray(appfw::span(m_Koeff));
 
     m_bIsLoaded = true;
     m_PatchHash = patchHash;
@@ -92,25 +85,11 @@ void rad::VFList::saveToFile(const fs::path &path) {
     file.write(VF_MAGIC);
     file.write<uint8_t>(sizeof(void *));
     file.writeArray(appfw::span(m_PatchHash));
-    file.write(m_VFCount.size());
+    file.write(m_Offsets.size());
     file.write(m_Data.size());
-    file.writeArray(appfw::span(m_VFCount));
-
-    // Write viewvactors
-    for (size_t i = 0; i < m_Data.size(); i++) {
-        file.write(std::get<0>(m_Data[i]));
-        file.write(std::get<1>(m_Data[i]));
-    }
-
-    // Write viewfactor offsets
-    for (PatchIndex i = 0; i < m_pRadSim->m_Patches.size(); i++) {
-        PatchRef patch(m_pRadSim->m_Patches, i);
-        auto &span = patch.getViewFactors();
-        size_t offset = span.data() - m_Data.data();
-        size_t size = span.size();
-        file.write(offset);
-        file.write(size);
-    }
+    file.writeArray(appfw::span(m_Offsets));
+    file.writeArray(appfw::span(m_Data));
+    file.writeArray(appfw::span(m_Koeff));
 }
 
 void rad::VFList::calculateVFList() {
@@ -118,62 +97,41 @@ void rad::VFList::calculateVFList() {
         throw std::logic_error("calculateVFList: valid vismat required");
     }
 
-    std::vector<PatchIndex>().swap(m_VFCount);
-    std::vector<ViewFactor>().swap(m_Data);
+    std::vector<size_t>().swap(m_Offsets);
+    std::vector<float>().swap(m_Data);
     m_bIsLoaded = false;
     m_PatchHash = {};
 
-    calcCount();
+    // Allocate memory
+    PatchIndex patchCount = m_pRadSim->m_Patches.size();
+    size_t memoryUsage = (sizeof(size_t) + sizeof(float)) * patchCount + sizeof(float) * m_pRadSim->m_SVisMat.getTotalOnesCount();
+    logInfo("Memory required for viewfactor list: {:.3f} MiB", memoryUsage / 1024.0 / 1024.0);
+    m_Offsets.resize(patchCount);
+    m_Data.resize(m_pRadSim->m_SVisMat.getTotalOnesCount());
+    m_Koeff.resize(patchCount);
+
+    calcOffsets();
     calcViewFactors();
+    sumViewFactors();
 
     m_bIsLoaded = true;
     m_PatchHash = m_pRadSim->getPatchHash();
 }
 
-void rad::VFList::calcCount() {
-	logInfo("Counting visible patches...");
-
-	appfw::Timer timer;
+void rad::VFList::calcOffsets() {
+    logInfo("Calculating vflist offsets...");
+    appfw::Timer timer;
     timer.start();
 
-    size_t totalCount = 0;
-    m_VFCount.resize(m_pRadSim->m_Patches.size());
-
-    m_pRadSim->updateProgress(0);
-
-    for (PatchIndex i = 0; i < m_pRadSim->m_Patches.size(); i++) {
-        m_pRadSim->updateProgress((double)i / m_pRadSim->m_Patches.size());
-
-        for (PatchIndex j = i + 1; j < m_pRadSim->m_Patches.size(); j++) {
-            if (m_pRadSim->m_VisMat.checkVisBit(i, j)) {
-                m_VFCount[i] += 1;
-                m_VFCount[j] += 1;
-                totalCount += 2;
-            }
-        }
+    PatchIndex patchCount = m_pRadSim->m_Patches.size();
+    size_t offset = 0;
+    for (PatchIndex i = 0; i < patchCount; i++) {
+        m_Offsets[i] = offset;
+        offset += m_pRadSim->m_SVisMat.getOnesCountTable()[i];
     }
-
-    m_pRadSim->updateProgress(1);
 
     timer.stop();
-    logInfo("Counted patches in {:.3} s", timer.elapsedSeconds());
-    logInfo("Memory required for viewfactor list: {:.3f} MiB", sizeof(ViewFactor) * totalCount / 1024.0 / 1024.0);
-
-    logInfo("Allocating memory...");
-    m_Data.resize(totalCount);
-
-    logInfo("Writing pointers into patches...");
-    setPointers();
-}
-
-void rad::VFList::setPointers() {
-    appfw::span<ViewFactor> span(m_Data);
-    size_t nextIdx = 0;
-    for (PatchIndex i = 0; i < m_pRadSim->m_Patches.size(); i++) {
-        PatchRef patch(m_pRadSim->m_Patches, i);
-        patch.getViewFactors() = span.subspan(nextIdx, m_VFCount[i]);
-        nextIdx += m_VFCount[i];
-    }
+    logInfo("Calculate offsets: {:.3f} s", timer.elapsedSeconds());
 }
 
 void rad::VFList::calcViewFactors() {
@@ -201,65 +159,119 @@ void rad::VFList::calcViewFactors() {
     m_pRadSim->updateProgress(1);
 
     timer.stop();
-    logInfo("View factors: {:.3} s", timer.elapsedSeconds());
+    logInfo("View factors: {:.3f} s", timer.elapsedSeconds());
 }
 
 void rad::VFList::worker(appfw::ThreadPool::ThreadInfo &ti) {
-    PatchIndex patchCount = m_pRadSim->m_Patches.size();
+    auto &countTable = m_pRadSim->m_SVisMat.getCountTable();
+    auto &offsetTable = m_pRadSim->m_SVisMat.getOffsetTable();
+    auto &listItems = m_pRadSim->m_SVisMat.getListItems();
 
     for (size_t i = m_pRadSim->m_Dispatcher.getWork(); i != m_pRadSim->m_Dispatcher.WORK_DONE;
          i = m_pRadSim->m_Dispatcher.getWork(), ti.iWorkDone++) {
         PatchRef patch(m_pRadSim->m_Patches, (PatchIndex)i);
-        float sum = 0;
-        PatchIndex viewFactorIdx = 0;
 
-        for (PatchIndex j = 0; j < patchCount; j++) {
-            if (i == j) {
-                continue;
+        PatchIndex p = (PatchIndex)i + 1;
+        size_t dataOffset = m_Offsets[i];
+
+        // Calculate view factors for each visible path
+        for (size_t j = 0; j < countTable[i]; j++) {
+            const SparseVisMat::ListItem &item = listItems[offsetTable[i] + j];
+            p += item.offset;
+
+            for (PatchIndex k = 0; k < item.size; k++) {
+                PatchRef other(m_pRadSim->m_Patches, p + k);
+                float vf = calcPatchViewfactor(patch, other);
+                m_Data[dataOffset] = vf;
+                dataOffset++;
             }
 
-            PatchRef other(m_pRadSim->m_Patches, j);
-
-            glm::vec3 dir = other.getOrigin() - patch.getOrigin();
-            float dist = glm::length(dir);
-
-            if (floatEquals(dist, 0)) {
-                continue;
-            }
-
-            if (!m_pRadSim->m_VisMat.checkVisBit((PatchIndex)i, j)) {
-                // Patches can't see each other
-                continue;
-            }
-
-            dir = glm::normalize(dir);
-            float cos1 = glm::dot(patch.getNormal(), dir);
-            float cos2 = -glm::dot(other.getNormal(), dir);
-
-            if (cos1 < 0 || cos2 < 0) {
-                continue;
-            }
-
-            float viewFactor = cos1 * cos2 * 10 / (dist * dist);
-            AFW_ASSERT(!isnan(viewFactor));
-            AFW_ASSERT(viewFactor >= 0);
-
-            if (viewFactor * 10000 < 0.05f) {
-                // Skip this patch
-                continue;
-            }
-
-            patch.getViewFactors()[viewFactorIdx] = {j, viewFactor};
-            sum += viewFactor;
-            viewFactorIdx++;
+            p += item.size;
         }
 
-        m_VFCount[i] = viewFactorIdx;
+        AFW_ASSERT(dataOffset - m_Offsets[i] == m_pRadSim->m_SVisMat.getOnesCountTable()[i]);
 
         // Normalize view factors
-        float k = 1 / sum;
-        for (size_t j = 0; j < viewFactorIdx; j++) {
-            std::get<1>(patch.getViewFactors()[j]) *= k;
+        /*float k = 1 / sum;
+        PatchIndex visPatchCount = (PatchIndex)(dataOffset - m_Offsets[i]);
+        dataOffset = m_Offsets[i];
+        for (size_t j = 0; j < visPatchCount; j++) {
+            m_Data[dataOffset + j] *= k;
+        }*/
+    }
+}
+
+void rad::VFList::sumViewFactors() {
+    logInfo("Summing view factors...");
+    appfw::Timer timer;
+    timer.start();
+
+    auto &countTable = m_pRadSim->m_SVisMat.getCountTable();
+    auto &offsetTable = m_pRadSim->m_SVisMat.getOffsetTable();
+    auto &listItems = m_pRadSim->m_SVisMat.getListItems();
+    PatchIndex patchCount = m_pRadSim->m_Patches.size();
+
+    for (PatchIndex i = 0; i < patchCount; i++) {
+        PatchIndex p = i + 1;
+        size_t dataOffset = m_Offsets[i];
+
+        for (size_t j = 0; j < countTable[i]; j++) {
+            const SparseVisMat::ListItem &item = listItems[offsetTable[i] + j];
+            p += item.offset;
+
+            for (PatchIndex k = 0; k < item.size; k++) {
+                float vf = m_Data[dataOffset];
+                m_Koeff[i] += vf;
+                m_Koeff[p + k] += vf;
+                dataOffset++;
+            }
+
+            p += item.size;
         }
     }
+
+    timer.stop();
+    logInfo("Sum view factors: {:.3f} s", timer.elapsedSeconds());
+
+    logInfo("Inversing view factor sum...");
+    timer.start();
+
+    for (PatchIndex i = 0; i < patchCount; i++) {
+        if (m_Koeff[i] == 0.000000f) {
+            m_Koeff[i] = 1.f;
+        } else {
+            m_Koeff[i] = 1.f / m_Koeff[i];
+        }
+    }
+
+    timer.stop();
+    logInfo("Inverse view factor sum: {:.3f} s", timer.elapsedSeconds());
+}
+
+float rad::VFList::calcPatchViewfactor(PatchRef &patch1, PatchRef &patch2) {
+    glm::vec3 dir = patch2.getOrigin() - patch1.getOrigin();
+    float dist = glm::length(dir);
+
+    if (floatEquals(dist, 0)) {
+        return 0;
+    }
+
+    dir = glm::normalize(dir);
+    float cos1 = glm::dot(patch1.getNormal(), dir);
+    float cos2 = -glm::dot(patch2.getNormal(), dir);
+
+    if (cos1 < 0 || cos2 < 0) {
+        return 0;
+    }
+
+    float viewFactor = cos1 * cos2 * 10 / (dist * dist);
+    AFW_ASSERT(!isnan(viewFactor));
+    AFW_ASSERT(viewFactor >= 0);
+
+    /*if (viewFactor * 10000 < 0.05f) {
+        // Skip this patch
+        return 0;
+    }*/
+
+    return viewFactor;
 }

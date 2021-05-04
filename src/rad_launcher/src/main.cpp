@@ -72,17 +72,21 @@ int main(int argc, char **argv) {
             rad.setBounceCount(getCommandLine().getArgInt("bounce"));
         }
 
+        bool bCanReuseFiles = !getCommandLine().isFlagSet("no-reuse");
+
         logInfo("Base patch size: {}", rad.getPatchSize());
         logInfo("Bounce count: {}", rad.getBounceCount());
 
-        logInfo("Loading VFList...");
-        if (!rad.loadVFList()) {
+        if (bCanReuseFiles) {
             logInfo("Loading vismat...");
             if (!rad.loadVisMat()) {
                 rad.calcVisMat();
             }
-            rad.calcViewFactors();
+        } else {
+            rad.calcVisMat();
         }
+
+        rad.calcViewFactors();
 
         rad.bounceLight();
         rad.writeLightmaps();

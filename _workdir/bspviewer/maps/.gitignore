@@ -1,5 +1,6 @@
 /*.lm
 /*.bsp
-/*.bsp.lm
+/*.bsp.lm*
 /*.bsp.vismat*
+/*.bsp.svismat*
 /*.bsp.vflist*

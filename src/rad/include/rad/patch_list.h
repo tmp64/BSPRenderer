@@ -75,8 +75,7 @@ public:
             return sizeof(Type);
         };
 
-        return fn(m_flSize) + fn(m_vOrigin) + fn(m_vNormal) + fn(m_pPlane) + fn(m_FinalColor) + fn(m_pLMPixel) +
-               fn(m_ViewFactors);
+        return fn(m_flSize) + fn(m_vOrigin) + fn(m_vNormal) + fn(m_pPlane) + fn(m_FinalColor) + fn(m_pLMPixel);
     }
 
 private:
@@ -88,7 +87,6 @@ private:
     std::vector<const Plane *> m_pPlane;
     std::vector<glm::vec3> m_FinalColor;
     std::vector<glm::vec3 *> m_pLMPixel;
-    std::vector<appfw::span<ViewFactor>> m_ViewFactors;
 
     friend class PatchRef;
 };
@@ -126,11 +124,6 @@ public:
      * Pointer to lightmap pixel.
      */
     inline glm::vec3 *&getLMPixel() { return m_List.m_pLMPixel[m_iIndex]; }
-
-    /**
-     * View factors for visible patches.
-     */
-    inline appfw::span<ViewFactor> &getViewFactors() { return m_List.m_ViewFactors[m_iIndex]; }
 
     inline PatchRef &operator++() {
         ++m_iIndex;

@@ -8,6 +8,7 @@
 namespace rad {
 
 class RadSim;
+class PatchRef;
 
 /**
  * View factor list
@@ -44,18 +45,45 @@ public:
      */
     void calculateVFList();
 
-    /**
-     * Return number of viewfactors of a patch.
-     */
-    inline PatchIndex getPatchVFCount(PatchIndex p) { return m_VFCount[p]; }
+    inline const std::vector<size_t> &getPatchOffsets() { return m_Offsets; }
+    inline const std::vector<float> &getVFData() { return m_Data; }
+    inline const std::vector<float> &getVFKoeff() { return m_Koeff; }
 
 private:
     RadSim *m_pRadSim;
     bool m_bIsLoaded = false;
     appfw::SHA256::Digest m_PatchHash = {};
-    std::vector<PatchIndex> m_VFCount;
-    std::vector<ViewFactor> m_Data;
+    std::vector<size_t> m_Offsets;
+    std::vector<float> m_Data;
+    std::vector<float> m_Koeff; //!< Value that you need to multiply vf with to get vf for patch i.
 
+    /**
+     * Calculates offsets into m_Data for each patch.
+     */
+    void calcOffsets();
+
+    /**
+     * Calculates view factors between patches
+     */
+    void calcViewFactors();
+
+    /**
+     * View factor worker.
+     */
+    void worker(appfw::ThreadPool::ThreadInfo &ti);
+
+    /**
+     * Fills m_Sum[i] with sum of all viewfactors of patch i.
+     */
+    void sumViewFactors();
+
+    /**
+     * Calculates view factor between patches.
+     * Assumes patches can see each other.
+     */
+    float calcPatchViewfactor(PatchRef &patch1, PatchRef &patch2);
+
+#if 0
     /**
      * Calculates how many patch can any patch see.
      */
@@ -75,6 +103,7 @@ private:
      * View factor worker.
      */
     void worker(appfw::ThreadPool::ThreadInfo &ti);
+#endif
 };
 
 } // namespace rad

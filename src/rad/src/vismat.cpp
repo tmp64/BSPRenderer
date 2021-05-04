@@ -1,7 +1,11 @@
+#include <iostream>
 #include <appfw/binary_file.h>
+#include <appfw/timer.h>
 #include <rad/vismat.h>
 #include <rad/rad_sim.h>
 #include "plat.h"
+
+//#define VISMAT_DEBUG 1
 
 rad::VisMat::VisMat(RadSim *pRadSim) { m_pRadSim = pRadSim; }
 
@@ -11,86 +15,12 @@ bool rad::VisMat::isValid() { return m_bIsLoaded && m_PatchHash == m_pRadSim->ge
 
 size_t rad::VisMat::getCurrentSize() { return m_Data.size(); }
 
-size_t rad::VisMat::getValidSize() {
-    size_t patches = m_pRadSim->m_Patches.size();
-    return ((patches + 1) * (((patches + 1) + 15) / 16)); // TODO: Magic
-}
-
-void rad::VisMat::loadFromFile(const fs::path &path) {
-    m_bIsLoaded = false;
-    m_PatchHash = {};
-    
-    appfw::BinaryReader file(path);
-
-    // Read magic
-    char magic[sizeof(VISMAT_MAGIC)];
-    file.readBytes(magic, sizeof(VISMAT_MAGIC));
-    if (memcmp(magic, VISMAT_MAGIC, sizeof(VISMAT_MAGIC))) {
-        logInfo("VisMat discarded: unsupported format.");
-        return;
-    }
-
-    // Read pointer size
-    uint8_t ptrSize;
-    file.read(ptrSize);
-    if (ptrSize != sizeof(void *)) {
-        logInfo("VisMat discarded: different pointer size.");
-        return;
-    }
-
-    // Read patch hash
-    appfw::SHA256::Digest patchHash;
-    file.readArray(appfw::span(patchHash));
-
-    if (patchHash != m_pRadSim->m_PatchHash) {
-        logInfo("VisMat discarded: different patch hash.");
-        return;
-    }
-
-    // Read size
-    size_t size;
-    size_t validSize = getValidSize();
-    file.read(size);
-
-    if (size != validSize) {
-        logInfo("VisMat discarded: invalid size ({} instead of {}).", size, validSize);
-        return;
-    }
-
-    // Resize
-    if (m_Data.size() != size) {
-        std::vector<uint8_t>().swap(m_Data);
-        m_Data.resize(size);
-    }
-
-    // Read data
-    file.readArray(appfw::span(m_Data));
-    m_bIsLoaded = true;
-    m_PatchHash = patchHash;
-
-    logInfo("Reusing previous vismat.");
-}
-
-void rad::VisMat::saveToFile(const fs::path &path) {
-    if (!m_bIsLoaded) {
-        throw std::logic_error("VisMat::saveToFile: vismat not loaded");
-    }
-
-    appfw::BinaryWriter file(path);
-    file.writeBytes(VISMAT_MAGIC, sizeof(VISMAT_MAGIC));
-    file.write<uint8_t>(sizeof(void *));
-    file.writeArray(appfw::span(m_PatchHash));
-    file.write(m_Data.size());
-    file.writeArray(appfw::span(m_Data));
-}
-
 void rad::VisMat::buildVisMat() {
     m_pRadSim->updateProgress(0);
-    m_bIsLoaded = false;
-    std::vector<uint8_t>().swap(m_Data); // Free allocated memory
+    unloadVisMat();
     m_PatchHash = m_pRadSim->getPatchHash();
 
-    size_t size = getValidSize();
+    size_t size = calculateOffsets(m_Offsets);
     logInfo("Visibility matrix: {:5.1f} MiB", size / (1024 * 1024.0));
     m_Data.resize(size);
 
@@ -117,21 +47,83 @@ void rad::VisMat::buildVisMat() {
     m_bIsLoaded = true;
 }
 
-bool rad::VisMat::checkVisBit(PatchIndex _p1, PatchIndex _p2) {
-    if (_p1 > _p2) {
-        std::swap(_p1, _p2);
+bool rad::VisMat::checkVisBit(PatchIndex p1, PatchIndex p2) {
+    if (p1 > p2) {
+        std::swap(p1, p2);
+    } else if (p1 == p2) {
+        return false;
     }
 
-    size_t p1 = _p1;
-    size_t p2 = _p2;
-    size_t patches = m_pRadSim->m_Patches.size();
-    size_t bitpos = p1 * patches - (p1 * (p1 + 1)) / 2 + p2;
+    // p1 < p2 is always true
+    size_t bitpos = getPatchBitPos(p1, p2);
+
+#ifdef VISMAT_DEBUG
+    if ((bitpos >> 3) > m_Data.size()) {
+        logFatal("p1: {}", p1);
+        logFatal("p2: {}", p2);
+        logFatal("ol: {}", m_Offsets[p1]);
+        logFatal("or: {}", m_Offsets[p1 + 1]);
+        logFatal("d:  {}", (p2 - p1 - 1));
+        abort();
+    }
+#endif
 
     if (m_Data[bitpos >> 3] & (1 << (bitpos & 7))) {
         return true;
     } else {
         return false;
     }
+}
+
+void rad::VisMat::unloadVisMat() {
+    m_bIsLoaded = false;
+    std::vector<size_t>().swap(m_Offsets);
+    std::vector<uint8_t>().swap(m_Data);
+}
+
+size_t rad::VisMat::calculateOffsets(std::vector<size_t> &offsets) {
+    logInfo("Calculating vismat offsets...");
+    appfw::Timer timer;
+    timer.start();
+
+    size_t totalSize = 0;
+    PatchIndex patchCount = m_pRadSim->m_Patches.size();
+
+    offsets.resize(patchCount);
+
+    for (PatchIndex i = 0; i < patchCount; i++) {
+        offsets[i] = totalSize;
+
+        size_t rowLen = (size_t)patchCount - i - 1;
+        
+        // Align to ROW_ALIGNMENT bytes
+        size_t align = rowLen / ROW_ALIGNMENT_BITS * ROW_ALIGNMENT_BITS; // rowLen truncated to be alined
+        rowLen += ROW_ALIGNMENT_BITS + align - rowLen; // adds some bits to make it divisable by ROW_ALIGNMENT_BITS
+
+#ifdef VISMAT_DEBUG
+        if (rowLen % ROW_ALIGNMENT_BITS != 0) {
+            logFatal("Vis row {} is unaligned {}", i, rowLen);
+            abort();
+        }
+
+        if (rowLen < patchCount - i - 1) {
+            abort();
+        }
+#endif
+
+        totalSize += rowLen;
+    }
+
+
+    timer.stop();
+    logInfo("Calculate vismat offsets: {:.3f} s", timer.elapsedSeconds());
+
+    if (totalSize % ROW_ALIGNMENT_BITS != 0) {
+        logFatal("Vismat is unaligned {}", totalSize);
+        abort();
+    }
+
+    return totalSize / 8;
 }
 
 void rad::VisMat::buildVisLeaves(appfw::ThreadPool::ThreadInfo &ti) {
@@ -179,7 +171,7 @@ void rad::VisMat::buildVisLeaves(appfw::ThreadPool::ThreadInfo &ti) {
                 //     continue;
                 // }
 
-                size_t bitpos = patchnum * m_pRadSim->m_Patches.size() - (patchnum * (patchnum + 1)) / 2;
+                size_t bitpos = getRowOffset(patchnum);
 
                 // build to all other world leafs
                 buildVisRow(patchnum, pvs, bitpos, face_tested);
@@ -240,7 +232,22 @@ void rad::VisMat::testPatchToFace(PatchIndex patchnum, int facenum, size_t bitpo
 
             // patchnum can see patch m
             size_t bitset = bitpos + m;
-            plat::atomicSetBit(&m_Data[bitset >> 3], bitset & 7);
+
+#ifdef VISMAT_DEBUG
+            if ((bitset >> 3) >= m_Data.size()) {
+                std::cerr << fmt::format("testPatchToFace: bitset overflow\n");
+                std::cerr << fmt::format("Size:   {}\n", m_Data.size());
+                std::cerr << fmt::format("Set>>3: {}\n", bitset >> 3);
+                std::cerr << fmt::format("Bitpos: {}\n", bitpos);
+                std::cerr << fmt::format("m:      {}\n", m);
+                std::cerr << fmt::format("Bitset: {}\n", bitset);
+                abort();
+            }
+#endif
+            // Each row is aligned to byte boundary
+            // Data race is not possible, atomic bit set not needed.
+            m_Data[bitset >> 3] |= 1 << (bitset & 7);
+            //plat::atomicSetBit(&m_Data[bitset >> 3], bitset & 7);
         }
     }
 }

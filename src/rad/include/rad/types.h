@@ -5,7 +5,6 @@
 namespace rad {
 
 using PatchIndex = uint32_t;
-using ViewFactor = std::tuple<PatchIndex, float>;
 
 /**
  * Maximum number of patches.

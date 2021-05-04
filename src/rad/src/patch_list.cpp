@@ -9,7 +9,6 @@ void rad::PatchList::allocate(PatchIndex size) {
     m_pPlane.resize(size);
     m_FinalColor.resize(size);
     m_pLMPixel.resize(size);
-    m_ViewFactors.resize(size);
 }
 
 void rad::PatchList::clear() {
@@ -20,7 +19,6 @@ void rad::PatchList::clear() {
     m_pPlane.clear();
     m_FinalColor.clear();
     m_pLMPixel.clear();
-    m_ViewFactors.clear();
 }
 
 rad::PatchRef rad::PatchList::Iterator::operator*() { return PatchRef(*m_pList, m_iIndex); }
