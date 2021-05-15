@@ -103,9 +103,16 @@ public:
      */
     inline const Material &getMaterial(size_t index) { return m_Materials[index]; }
 
+    /**
+     * Checks if anisotropic filtering is supported.
+     */
+    bool isAnisoSupported();
+
 private:
+    float m_flMaxAniso = 0;
     bool m_bLinearFiltering = false;
     int m_iMipMapping = 0;
+    int m_iAniso = 0;
     std::vector<std::string> m_LoadedWadNames;
     std::vector<Material> m_Materials;
     std::unordered_map<std::string, size_t> m_Map;

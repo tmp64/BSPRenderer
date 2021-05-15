@@ -11,7 +11,8 @@
 
 ConVar<bool> mat_ui("mat_ui", false, "Enable material manager dev UI");
 ConVar<bool> mat_linear("mat_linear", true, "Enable material linear filtering");
-ConVar<int> mat_mipmap("mat_mipmap", 0, "Enable material mip-mapping, 2 - also enable mipmap lerping");
+ConVar<int> mat_mipmap("mat_mipmap", 2, "Enable material mip-mapping, 2 - also enable mipmap lerping");
+ConVar<int> mat_aniso("mat_aniso", 16, "Material anisotropic filtering");
 
 //----------------------------------------------------------------
 // CheckerboardImage
@@ -104,6 +105,14 @@ MaterialManager &MaterialManager::get() {
 void MaterialManager::init() {
     AFW_ASSERT(m_Materials.empty());
     m_Materials.emplace_back(nullptr);
+
+    if (isAnisoSupported()) {
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &m_flMaxAniso);
+    } else {
+        logWarn("Anisotropic filtering not supported by the GPU.");
+        logWarn("Mip-mapping will cause textures to appear blurry.");
+        m_flMaxAniso = 0;
+    }
 }
 
 void MaterialManager::shutdown() {
@@ -114,8 +123,9 @@ void MaterialManager::shutdown() {
 void MaterialManager::tick() {
     bool bLinear = mat_linear.getValue();
     int iMipMap = std::clamp(mat_mipmap.getValue(), 0, 2);
+    int iAniso = std::clamp(mat_aniso.getValue(), 1, (int)m_flMaxAniso);
 
-    if (m_bLinearFiltering != bLinear || m_iMipMapping != iMipMap) {
+    if (m_bLinearFiltering != bLinear || m_iMipMapping != iMipMap || m_iAniso != iAniso) {
         int min = 0;
         int mag = 0;
 
@@ -154,6 +164,10 @@ void MaterialManager::tick() {
             m_Materials[i].bindTextures();
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag);
+            
+            if (isAnisoSupported()) {
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, (float)iAniso);
+            }
         }
 
         m_bLinearFiltering = bLinear;
@@ -180,6 +194,10 @@ void MaterialManager::tick() {
                         ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
+            }
+
+            if (ImGui::SliderInt("Anisotropic filtering", &iAniso, 1, (int)m_flMaxAniso)) {
+                mat_aniso.setValue(iAniso);
             }
         }
 
@@ -241,4 +259,8 @@ size_t MaterialManager::findMaterial(const std::string &name) {
     } else {
         return it->second;    
     }
+}
+
+bool MaterialManager::isAnisoSupported() {
+    return GLAD_GL_ARB_texture_filter_anisotropic || GLAD_GL_EXT_texture_filter_anisotropic;
 }
