@@ -112,6 +112,34 @@ void WorldState::loadBrushModels() {
             throw std::runtime_error(fmt::format("model {}: invalid faces [{};{})", i, model.m_iFirstFace,
                                                  model.m_iFirstFace + model.m_iFaceNum));
         }
+
+        // Calculate radius
+        float radius = 0;
+        auto &lvlSurfEdges = m_pLevel->getSurfEdges();
+        auto &lvlVertices = m_pLevel->getVertices();
+
+        for (int faceidx = model.m_iFirstFace; faceidx < model.m_iFirstFace + model.m_iFaceNum; faceidx++) {
+            const bsp::BSPFace &face = m_pLevel->getFaces().at(faceidx);
+            for (int j = 0; j < face.nEdges; j++) {
+                glm::vec3 vertex;
+                bsp::BSPSurfEdge iEdgeIdx = lvlSurfEdges.at((size_t)face.iFirstEdge + j);
+
+                if (iEdgeIdx > 0) {
+                    const bsp::BSPEdge &edge = m_pLevel->getEdges().at(iEdgeIdx);
+                    vertex = lvlVertices.at(edge.iVertex[0]);
+                } else {
+                    const bsp::BSPEdge &edge = m_pLevel->getEdges().at(-iEdgeIdx);
+                    vertex = lvlVertices.at(edge.iVertex[1]);
+                }
+
+                radius = std::max(radius, std::abs(vertex.x));
+                radius = std::max(radius, std::abs(vertex.y));
+                radius = std::max(radius, std::abs(vertex.z));
+            }
+
+        }
+
+        model.m_flRadius = radius;
     }
 }
 

@@ -1516,9 +1516,9 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
         mins = clent->getOrigin() + model->getMins();
         maxs = clent->getOrigin() + model->getMaxs();
     } else {
-        // TODO:
-        mins = clent->getOrigin() + model->getMins();
-        maxs = clent->getOrigin() + model->getMaxs();
+        glm::vec3 radius = glm::vec3(model->getRadius());
+        mins = clent->getOrigin() - radius;
+        maxs = clent->getOrigin() + radius;
     }
 
     if (m_Surf.cullBox(mins, maxs)) {
@@ -1576,9 +1576,9 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
         mins = clent->getOrigin() + model->getMins();
         maxs = clent->getOrigin() + model->getMaxs();
     } else {
-        // TODO:
-        mins = clent->getOrigin() + model->getMins();
-        maxs = clent->getOrigin() + model->getMaxs();
+        glm::vec3 radius = glm::vec3(model->getRadius());
+        mins = clent->getOrigin() - radius;
+        maxs = clent->getOrigin() + radius;
     }
 
     if (m_Surf.cullBox(mins, maxs)) {
