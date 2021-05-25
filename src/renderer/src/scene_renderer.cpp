@@ -808,7 +808,8 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
 
         vertices.clear();
         vertices.reserve(surf.m_iVertexCount);
-        maxEboSize += surf.m_iVertexCount + 1;
+        maxEboSize += surf.m_iVertexCount + 1; //!< +1 to account for primitive reset
+        surf.m_nFirstVertex = (uint16_t)m_pLoadingState->allVertices.size();
 
         glm::vec3 normal = baseSurf.pPlane->vNormal;
         if (baseSurf.iFlags & SURF_PLANEBACK) {
@@ -855,17 +856,12 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
 
             vertices.push_back(v);
 
-            // Add vertex to world vertex list
-            unsigned eboIdx = (unsigned)m_pLoadingState->allVertices.size();
-            m_pLoadingState->allVertices.push_back(v);
-
-            if (eboIdx >= std::numeric_limits<uint16_t>::max()) {
+            if (m_pLoadingState->allVertices.size() >= std::numeric_limits<uint16_t>::max()) {
                 logError("Surface objects: vertex limit reached.");
                 throw std::runtime_error("vertex limit reached");
-                return;
             }
 
-            surf.m_VertexIndices.push_back((uint16_t)eboIdx);
+            m_pLoadingState->allVertices.push_back(v);
         }
 
         auto fnGetRandColor = []() { return (rand() % 256) / 255.f; };
@@ -878,32 +874,14 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
 }
 
 void SceneRenderer::finishCreateSurfaceObjects() {
-    for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
-        Surface &surf = m_Data.surfaces[i];
-        std::vector<SurfaceVertex> &vertices = m_pLoadingState->surfVertices[i];
-        surf.m_Vao.create();
-        surf.m_Vbo.create();
-
-        AFW_ASSERT(vertices.size() == (size_t)surf.m_iVertexCount);
-
-        glBindVertexArray(surf.m_Vao);
-        glBindBuffer(GL_ARRAY_BUFFER, surf.m_Vbo);
-
-        glBufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * surf.m_iVertexCount, vertices.data(),
-                     GL_STATIC_DRAW);
-        enableSurfaceAttribs();
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-    }
-
     unsigned maxEboSize = m_pLoadingState->maxEboSize;
     auto &allVertices = m_pLoadingState->allVertices;
 
     // VAO for world geometry
-    m_Data.worldVao.create();
-    m_Data.worldVbo.create();
-    glBindVertexArray(m_Data.worldVao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_Data.worldVbo);
+    m_Data.surfVao.create();
+    m_Data.surfVbo.create();
+    glBindVertexArray(m_Data.surfVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_Data.surfVbo);
 
     glBufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * allVertices.size(), allVertices.data(), GL_STATIC_DRAW);
     enableSurfaceAttribs();
@@ -913,9 +891,9 @@ void SceneRenderer::finishCreateSurfaceObjects() {
     // Create EBO
     logInfo("Maximum EBO size: {} B", maxEboSize * sizeof(uint16_t));
     logInfo("Vertex count: {}", allVertices.size());
-    m_Data.worldEboData.resize(maxEboSize);
-    m_Data.worldEbo.create();
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.worldEbo);
+    m_Data.surfEboData.resize(maxEboSize);
+    m_Data.surfEbo.create();
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.surfEbo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, maxEboSize * sizeof(uint16_t), nullptr, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
@@ -1199,6 +1177,8 @@ void SceneRenderer::drawWorldSurfacesVao() {
     unsigned frame = m_Data.viewContext.getWorldTextureChainFrame();
     unsigned drawnSurfs = 0;
 
+    glBindVertexArray(m_Data.surfVao);
+
     for (size_t i = 0; i < textureChain.size(); i++) {
         if (textureChainFrames[i] != frame) {
             continue;
@@ -1215,8 +1195,7 @@ void SceneRenderer::drawWorldSurfacesVao() {
                 m_sWorldShader.setColor(surf.m_Color);
             }
 
-            glBindVertexArray(surf.m_Vao);
-            glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei)surf.m_iVertexCount);
+            glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
         }
 
         drawnSurfs += (unsigned)textureChain[i].size();
@@ -1230,7 +1209,7 @@ void SceneRenderer::drawWorldSurfacesVao() {
 }
 
 void SceneRenderer::drawWorldSurfacesIndexed() {
-    AFW_ASSERT(!m_Data.worldEboData.empty());
+    AFW_ASSERT(!m_Data.surfEboData.empty());
 
     m_sWorldShader.enable();
     m_sWorldShader.setupUniforms(*this);
@@ -1241,8 +1220,8 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
     unsigned drawnSurfs = 0;
 
     // Bind buffers
-    glBindVertexArray(m_Data.worldVao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.worldEbo);
+    glBindVertexArray(m_Data.surfVao);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.surfEbo);
     glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
     glEnable(GL_PRIMITIVE_RESTART);
 
@@ -1260,9 +1239,14 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 
         for (unsigned j : textureChain[i]) {
             Surface &surf = m_Data.surfaces[j];
-            std::copy(surf.m_VertexIndices.begin(), surf.m_VertexIndices.end(), m_Data.worldEboData.begin() + eboIdx);
-            eboIdx += (unsigned)surf.m_VertexIndices.size();
-            m_Data.worldEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
+            uint16_t vertCount = (uint16_t)surf.m_iVertexCount;
+
+            for (uint16_t k = 0; k < vertCount; k++) {
+                m_Data.surfEboData[eboIdx + k] = surf.m_nFirstVertex + k;
+            }
+
+            eboIdx += vertCount;
+            m_Data.surfEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
             eboIdx++;
         }
 
@@ -1270,7 +1254,7 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
         eboIdx--;
 
         // Update EBO
-        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.worldEboData.data());
+        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
 
         // Draw elements
         glDrawElements(GL_TRIANGLE_FAN, eboIdx, GL_UNSIGNED_SHORT, nullptr);
@@ -1290,10 +1274,14 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 
             for (unsigned j : textureChain[i]) {
                 Surface &surf = m_Data.surfaces[j];
-                std::copy(surf.m_VertexIndices.begin(), surf.m_VertexIndices.end(),
-                          m_Data.worldEboData.begin() + eboIdx);
-                eboIdx += (unsigned)surf.m_VertexIndices.size();
-                m_Data.worldEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
+                uint16_t vertCount = (uint16_t)surf.m_iVertexCount;
+
+                for (uint16_t k = 0; k < vertCount; k++) {
+                    m_Data.surfEboData[eboIdx + k] = surf.m_nFirstVertex + k;
+                }
+
+                eboIdx += vertCount;
+                m_Data.surfEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
                 eboIdx++;
             }
         }
@@ -1308,7 +1296,7 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
             m_sWorldShader.setColor({1.0, 1.0, 1.0});
 
             // Update EBO
-            glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.worldEboData.data());
+            glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
 
             // Draw elements
             glEnable(GL_POLYGON_OFFSET_LINE);
@@ -1357,11 +1345,11 @@ void SceneRenderer::drawSkySurfaces() {
 }
 
 void SceneRenderer::drawSkySurfacesVao() {
+    glBindVertexArray(m_Data.surfVao);
+
     for (unsigned i : m_Data.viewContext.getSkySurfaces()) {
         Surface &surf = m_Data.surfaces[i];
-
-        glBindVertexArray(surf.m_Vao);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei)surf.m_iVertexCount);
+        glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
     }
 
     glBindVertexArray(0);
@@ -1370,11 +1358,11 @@ void SceneRenderer::drawSkySurfacesVao() {
 }
 
 void SceneRenderer::drawSkySurfacesIndexed() {
-    AFW_ASSERT(!m_Data.worldEboData.empty());
+    AFW_ASSERT(!m_Data.surfEboData.empty());
 
     // Bind buffers
-    glBindVertexArray(m_Data.worldVao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.worldEbo);
+    glBindVertexArray(m_Data.surfVao);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.surfEbo);
     glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
     glEnable(GL_PRIMITIVE_RESTART);
 
@@ -1383,9 +1371,14 @@ void SceneRenderer::drawSkySurfacesIndexed() {
 
     for (unsigned j : m_Data.viewContext.getSkySurfaces()) {
         Surface &surf = m_Data.surfaces[j];
-        std::copy(surf.m_VertexIndices.begin(), surf.m_VertexIndices.end(), m_Data.worldEboData.begin() + eboIdx);
-        eboIdx += (unsigned)surf.m_VertexIndices.size();
-        m_Data.worldEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
+        uint16_t vertCount = (uint16_t)surf.m_iVertexCount;
+
+        for (uint16_t k = 0; k < vertCount; k++) {
+            m_Data.surfEboData[eboIdx + k] = surf.m_nFirstVertex + k;
+        }
+
+        eboIdx += vertCount;
+        m_Data.surfEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
         eboIdx++;
     }
 
@@ -1393,7 +1386,7 @@ void SceneRenderer::drawSkySurfacesIndexed() {
     eboIdx--;
 
     // Update EBO
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.worldEboData.data());
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
 
     // Draw elements
     glDrawElements(GL_TRIANGLE_FAN, eboIdx, GL_UNSIGNED_SHORT, nullptr);
@@ -1557,8 +1550,8 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
             m_sWorldShader.setColor(surf.m_Color);
         }
 
-        glBindVertexArray(surf.m_Vao);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei)surf.m_iVertexCount);
+        glBindVertexArray(m_Data.surfVao);
+        glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
         m_Stats.uDrawCallCount++;
         m_Stats.uRenderedBrushEntPolys++;
     }
@@ -1663,8 +1656,8 @@ void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
         m_sWorldShader.setColor(surf.m_Color);
     }
 
-    glBindVertexArray(surf.m_Vao);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, (GLsizei)surf.m_iVertexCount);
+    glBindVertexArray(m_Data.surfVao);
+    glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
     m_Stats.uDrawCallCount++;
     m_Stats.uRenderedBrushEntPolys++;
 }

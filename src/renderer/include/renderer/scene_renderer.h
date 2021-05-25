@@ -233,13 +233,11 @@ private:
     static_assert(sizeof(SurfaceVertex) == sizeof(float) * 12, "Size of Vertex is invalid");
 
     struct Surface {
-        GLVao m_Vao;
-        GLBuffer m_Vbo;
         glm::vec3 m_Color;
         GLsizei m_iVertexCount = 0;
         size_t m_nMatIdx = NULL_MATERIAL;
 
-        std::vector<uint16_t> m_VertexIndices;
+        uint16_t m_nFirstVertex; //!< Index of first vertex in the vertex buffer
 
         // BSP lightmap info
         glm::vec2 m_vTextureMins = glm::vec2(0, 0);
@@ -264,10 +262,10 @@ private:
         GLTexture customLightmapBlockTex;
 
         // World geometry indexed rendering
-        GLVao worldVao;
-        GLBuffer worldVbo;
-        GLBuffer worldEbo;
-        std::vector<uint16_t> worldEboData;
+        GLVao surfVao;
+        GLBuffer surfVbo;
+        GLBuffer surfEbo;
+        std::vector<uint16_t> surfEboData;
     };
 
     enum class LoadingStatus {
