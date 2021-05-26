@@ -202,6 +202,28 @@ void SceneRenderer::beginLoading(const bsp::Level *level, const std::string &pat
     m_pLoadingState->createSurfacesResult = std::async(std::launch::async, [this]() { asyncCreateSurfaces(); });
 }
 
+void SceneRenderer::optimizeBrushModel(Model *model) {
+    AFW_ASSERT(model->getType() == ModelType::Brush);
+    OptBrushModel om;
+
+    // Create a list of all surfaces of the brush
+    om.surfs.reserve(model->getFaceNum());
+    unsigned last = model->getFirstFace() + model->getFaceNum();
+    for (unsigned surfidx = model->getFirstFace(); surfidx < last; surfidx++) {
+        om.surfs.push_back(surfidx);
+    }
+
+    // Sort the list by material
+    std::sort(om.surfs.begin(), om.surfs.end(), [this](const unsigned &lhsidx, const unsigned &rhsidx) {
+        auto &lhs = m_Surf.getSurface(lhsidx);
+        auto &rhs = m_Surf.getSurface(rhsidx);
+        return lhs.nMatIndex < rhs.nMatIndex;
+    });
+
+    model->setOptModelIdx((unsigned)m_Data.optBrushModels.size());
+    m_Data.optBrushModels.push_back(std::move(om));
+}
+
 void SceneRenderer::unloadLevel() {
     AFW_ASSERT(!isLoading());
 
@@ -1532,22 +1554,26 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
     m_sBrushEntityShader.m_RenderMode.set(clent->getRenderMode());
 
     // Draw surfaces
-    unsigned from = model->getFirstFace();
-    unsigned to = from + model->getFaceNum();
+    auto &surfs = m_Data.optBrushModels[model->getOptModelIdx()].surfs;
+    size_t lastMat = INVALID_MATERIAL;
 
-    for (unsigned i = from; i < to; i++) {
+    for (unsigned i : surfs) {
         Surface &surf = m_Data.surfaces[i];
 
         if (m_Surf.cullSurface(m_Surf.getSurface(i))) {
             continue;
         }
 
-        // Bind material
-        const Material &mat = MaterialManager::get().getMaterial(surf.m_nMatIdx);
-        mat.bindTextures();
-
         if (r_texture.getValue() == 1) {
+            // Set color
             m_sWorldShader.setColor(surf.m_Color);
+        } else if (r_texture.getValue() == 2) {
+            // Bind material
+            if (lastMat != surf.m_nMatIdx) {
+                const Material &mat = MaterialManager::get().getMaterial(surf.m_nMatIdx);
+                mat.bindTextures();
+                lastMat = surf.m_nMatIdx;
+            }
         }
 
         glBindVertexArray(m_Data.surfVao);

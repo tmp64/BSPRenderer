@@ -41,6 +41,16 @@ public:
      */
     int getFaceNum();
 
+    /**
+     * Returns index of optimized model.
+     */
+    unsigned getOptModelIdx();
+
+    /**
+     * Sets index of optimized model.
+     */
+    void setOptModelIdx(unsigned idx);
+
 protected:
     ModelType m_Type = ModelType::Bad;
     glm::vec3 m_vMins, m_vMaxs;
@@ -49,6 +59,7 @@ protected:
     // Brush model
     int m_iFirstFace = 0;
     int m_iFaceNum = 0;
+    unsigned m_nOptBrushIdx = 0;
 
     friend class WorldState;
 };
@@ -59,5 +70,7 @@ inline const glm::vec3 &Model::getMaxs() { return m_vMaxs; }
 inline float Model::getRadius() { return m_flRadius; }
 inline int Model::getFirstFace() { return m_iFirstFace; }
 inline int Model::getFaceNum() { return m_iFaceNum; }
+inline unsigned Model::getOptModelIdx() { return m_nOptBrushIdx; }
+inline void Model::setOptModelIdx(unsigned idx) { m_nOptBrushIdx = idx; }
 
 #endif

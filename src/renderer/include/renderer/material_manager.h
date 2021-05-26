@@ -9,7 +9,8 @@
 #include <mutex>
 #include <renderer/raii.h>
 
-constexpr size_t NULL_MATERIAL = 0;
+constexpr size_t NULL_MATERIAL = 0; //!< Index of a null material (black-purple checkerboard)
+constexpr size_t INVALID_MATERIAL = std::numeric_limits<size_t>::max(); //!< Index of an invalid material (can't be used with getMaterial)
 
 struct CheckerboardImage : appfw::NoCopy {
     std::vector<uint8_t> data;

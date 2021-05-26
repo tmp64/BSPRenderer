@@ -84,6 +84,11 @@ public:
     void beginLoading(const bsp::Level *level, const std::string &path, const char *tag);
 
     /**
+     * Creates an optimized model for a brush model for more effficient solid rendering.
+     */
+    void optimizeBrushModel(Model *model);
+
+    /**
      * Unloads the level.
      */
     void unloadLevel();
@@ -250,6 +255,10 @@ private:
         glm::ivec2 m_vCustomLMOffset = glm::ivec2(0, 0);
     };
 
+    struct OptBrushModel {
+        std::vector<unsigned> surfs; //!< Contains surface indeces sorted by material
+    };
+
     struct LevelData {
         fs::path customLightmapPath;
         SurfaceRenderer::Context viewContext;
@@ -261,11 +270,14 @@ private:
         GLTexture bspLightmapBlockTex;
         GLTexture customLightmapBlockTex;
 
-        // World geometry indexed rendering
+        // Brush geometry rendering
         GLVao surfVao;
         GLBuffer surfVbo;
         GLBuffer surfEbo;
         std::vector<uint16_t> surfEboData;
+
+        // Brush entity rendering
+        std::vector<OptBrushModel> optBrushModels;
     };
 
     enum class LoadingStatus {

@@ -1,5 +1,6 @@
 #include <renderer/utils.h>
 #include "world_state.h"
+#include "renderer.h"
 
 /*
 ==================
@@ -88,6 +89,13 @@ BrushModel *WorldState::getBrushModel(size_t idx) {
         return &m_BrushModels[idx];
     } else {
         return nullptr;
+    }
+}
+
+void WorldState::onRendererReady() {
+    for (auto &i : m_BrushModels) {
+        // Optimize the model
+        Renderer::get().optimizeBrushModel(&i);
     }
 }
 

@@ -21,6 +21,9 @@ public:
 
     inline auto &getEntList() { return m_EntityList; }
 
+    //!< Called when renderer is fully loaded
+    void onRendererReady();
+
     /**
      * Returns whether AABB (mins, maxs) is visible from point origin based on PVS data.
      */

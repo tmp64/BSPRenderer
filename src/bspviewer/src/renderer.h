@@ -31,6 +31,11 @@ public:
     //! Renders the image into main framebuffer
     void draw();
 
+    /**
+     * Creates an optimized model for a brush model for more effficient solid rendering.
+     */
+    void optimizeBrushModel(Model *model);
+
 private:
     SceneRenderer m_SceneRenderer;
     std::vector<ClientEntity> m_VisEnts;

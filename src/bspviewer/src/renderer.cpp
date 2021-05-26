@@ -34,7 +34,13 @@ void Renderer::tick() {
 
 bool Renderer::loadingTick() {
     AFW_ASSERT(m_SceneRenderer.isLoading());
-    return m_SceneRenderer.loadingTick();
+    bool isFinished = m_SceneRenderer.loadingTick();
+
+    if (isFinished) {
+        WorldState::get().onRendererReady();
+    }
+
+    return isFinished;
 }
 
 void Renderer::draw() {
@@ -42,6 +48,8 @@ void Renderer::draw() {
     m_SceneRenderer.setPerspViewOrigin(BSPViewer::get().getCameraPos(), BSPViewer::get().getCameraRot());
     m_SceneRenderer.renderScene(0); // 0 is the main framebuffer
 }
+
+void Renderer::optimizeBrushModel(Model *model) { m_SceneRenderer.optimizeBrushModel(model); }
 
 void Renderer::addVisibleEnts() {
     auto &ents = WorldState::get().getEntList();
