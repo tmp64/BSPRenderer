@@ -37,6 +37,7 @@ target_link_libraries(rad
 	app_base
 	bsp
 	nlohmann_json
+	taskflow
 )
 
 source_group("Public Headers" FILES ${PUBLIC_HEADERS})

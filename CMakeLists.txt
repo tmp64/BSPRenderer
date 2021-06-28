@@ -32,6 +32,7 @@ add_subdirectory(external/glad_debug)
 add_subdirectory(external/imgui)
 add_subdirectory(external/nlohmann_json)
 add_subdirectory(external/sdl_net)
+add_subdirectory(external/taskflow)
 
 # Libraries
 add_subdirectory(src/appfw)

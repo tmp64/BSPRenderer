@@ -52,6 +52,7 @@ public:
 private:
     RadSim *m_pRadSim;
     bool m_bIsLoaded = false;
+    std::atomic_size_t m_uFinishedPatches;
     appfw::SHA256::Digest m_PatchHash = {};
     std::vector<size_t> m_Offsets;
     std::vector<float> m_Data;
@@ -70,7 +71,7 @@ private:
     /**
      * View factor worker.
      */
-    void worker(appfw::ThreadPool::ThreadInfo &ti);
+    void worker(size_t i);
 
     /**
      * Fills m_Sum[i] with sum of all viewfactors of patch i.
@@ -82,28 +83,6 @@ private:
      * Assumes patches can see each other.
      */
     float calcPatchViewfactor(PatchRef &patch1, PatchRef &patch2);
-
-#if 0
-    /**
-     * Calculates how many patch can any patch see.
-     */
-    void calcCount();
-
-    /**
-     * Sets m_Data pointers in the patches.
-     */
-    void setPointers();
-
-    /**
-     * Calculates view factors between patches 
-     */
-    void calcViewFactors();
-
-    /**
-     * View factor worker.
-     */
-    void worker(appfw::ThreadPool::ThreadInfo &ti);
-#endif
 };
 
 } // namespace rad

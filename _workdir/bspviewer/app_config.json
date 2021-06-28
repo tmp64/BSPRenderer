@@ -26,7 +26,7 @@
 		"light_color": [255, 255, 255],
 		"light_brightness": 100,
 		
-		"light_env_brightness_divisor": 20,
+		"light_env_brightness_divisor": 15,
 		
 		"map": "crossfire"
 	},

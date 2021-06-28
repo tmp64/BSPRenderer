@@ -1,7 +1,9 @@
 #ifndef RAD_RAD_SIM_H
 #define RAD_RAD_SIM_H
+#include <atomic>
 #include <functional>
 #include <nlohmann/json.hpp>
+#include <taskflow/taskflow.hpp>
 #include <appfw/sha256.h>
 #include <appfw/utils.h>
 #include <appfw/thread_pool.h>
@@ -129,8 +131,6 @@ public:
     void writeLightmaps();
 
 private:
-    appfw::ThreadPool m_ThreadPool;
-    appfw::ThreadDispatcher m_Dispatcher;
     AppConfig *m_pAppConfig = nullptr;
     ProgressCallback m_fnProgressCallback;
 
@@ -219,6 +219,8 @@ private:
 
     std::string getVisMatPath();
     std::string getVFListPath();
+
+    static inline tf::Executor m_Executor;
 
     friend class VisMat;
     friend class SparseVisMat;

@@ -70,6 +70,7 @@ private:
     static constexpr size_t ROW_ALIGNMENT_BITS = ROW_ALIGNMENT * 8;
 
     RadSim *m_pRadSim;
+    std::atomic_size_t m_uFinishedLeaves;
     bool m_bIsLoaded = false;
     appfw::SHA256::Digest m_PatchHash = {};
     std::vector<size_t> m_Offsets;
@@ -81,7 +82,7 @@ private:
      */
     size_t calculateOffsets(std::vector<size_t> &offsets);
 
-    void buildVisLeaves(appfw::ThreadPool::ThreadInfo &ti);
+    void buildVisLeaves(size_t i);
     void buildVisRow(PatchIndex patchnum, uint8_t *pvs, size_t bitpos, std::vector<uint8_t> &face_tested);
     void testPatchToFace(PatchIndex patchnum, int facenum, size_t bitpos);
 

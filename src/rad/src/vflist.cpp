@@ -142,18 +142,17 @@ void rad::VFList::calcViewFactors() {
     appfw::Timer timer;
     timer.start();
 
-    m_pRadSim->m_Dispatcher.setWorkCount(m_pRadSim->m_Patches.size());
-    m_pRadSim->m_ThreadPool.run([this](auto &ti) { worker(ti); }, 0);
+    size_t patchCount = m_pRadSim->m_Patches.size();
+    m_uFinishedPatches = 0;
+    tf::Taskflow taskflow;
+    taskflow.for_each_index_dynamic((size_t)0, patchCount, (size_t)1, [this](size_t i) { worker(i); });
+    auto result = m_pRadSim->m_Executor.run(taskflow);
 
-    while (!m_pRadSim->m_ThreadPool.isFinished()) {
-        double done = (double)m_pRadSim->m_ThreadPool.getStatus() / m_pRadSim->m_Patches.size();
+    while (!appfw::IsFutureReady(result)) {
+        size_t work = m_uFinishedPatches;
+        double done = (double)work / patchCount;
         m_pRadSim->updateProgress(done);
-        std::this_thread::sleep_for(m_pRadSim->m_ThreadPool.POLL_DELAY);
-    }
-
-    if (m_pRadSim->m_ThreadPool.getStatus() != m_pRadSim->m_Patches.size()) {
-        logError("Threading failure!");
-        abort();
+        std::this_thread::sleep_for(std::chrono::microseconds(1000 / 30));
     }
 
     m_pRadSim->updateProgress(1);
@@ -162,43 +161,40 @@ void rad::VFList::calcViewFactors() {
     logInfo("View factors: {:.3f} s", timer.elapsedSeconds());
 }
 
-void rad::VFList::worker(appfw::ThreadPool::ThreadInfo &ti) {
+void rad::VFList::worker(size_t i) {
     auto &countTable = m_pRadSim->m_SVisMat.getCountTable();
     auto &offsetTable = m_pRadSim->m_SVisMat.getOffsetTable();
     auto &listItems = m_pRadSim->m_SVisMat.getListItems();
 
-    for (size_t i = m_pRadSim->m_Dispatcher.getWork(); i != m_pRadSim->m_Dispatcher.WORK_DONE;
-         i = m_pRadSim->m_Dispatcher.getWork(), ti.iWorkDone++) {
-        PatchRef patch(m_pRadSim->m_Patches, (PatchIndex)i);
+    PatchRef patch(m_pRadSim->m_Patches, (PatchIndex)i);
 
-        PatchIndex p = (PatchIndex)i + 1;
-        size_t dataOffset = m_Offsets[i];
+    PatchIndex p = (PatchIndex)i + 1;
+    size_t dataOffset = m_Offsets[i];
 
-        // Calculate view factors for each visible path
-        for (size_t j = 0; j < countTable[i]; j++) {
-            const SparseVisMat::ListItem &item = listItems[offsetTable[i] + j];
-            p += item.offset;
+    // Calculate view factors for each visible path
+    for (size_t j = 0; j < countTable[i]; j++) {
+        const SparseVisMat::ListItem &item = listItems[offsetTable[i] + j];
+        p += item.offset;
 
-            for (PatchIndex k = 0; k < item.size; k++) {
-                PatchRef other(m_pRadSim->m_Patches, p + k);
-                float vf = calcPatchViewfactor(patch, other);
-                m_Data[dataOffset] = vf;
-                dataOffset++;
-            }
-
-            p += item.size;
+        for (PatchIndex k = 0; k < item.size; k++) {
+            PatchRef other(m_pRadSim->m_Patches, p + k);
+            float vf = calcPatchViewfactor(patch, other);
+            m_Data[dataOffset] = vf;
+            dataOffset++;
         }
 
-        AFW_ASSERT(dataOffset - m_Offsets[i] == m_pRadSim->m_SVisMat.getOnesCountTable()[i]);
-
-        // Normalize view factors
-        /*float k = 1 / sum;
-        PatchIndex visPatchCount = (PatchIndex)(dataOffset - m_Offsets[i]);
-        dataOffset = m_Offsets[i];
-        for (size_t j = 0; j < visPatchCount; j++) {
-            m_Data[dataOffset + j] *= k;
-        }*/
+        p += item.size;
     }
+
+    AFW_ASSERT(dataOffset - m_Offsets[i] == m_pRadSim->m_SVisMat.getOnesCountTable()[i]);
+
+    // Normalize view factors
+    /*float k = 1 / sum;
+    PatchIndex visPatchCount = (PatchIndex)(dataOffset - m_Offsets[i]);
+    dataOffset = m_Offsets[i];
+    for (size_t j = 0; j < visPatchCount; j++) {
+        m_Data[dataOffset + j] *= k;
+    }*/
 }
 
 void rad::VFList::sumViewFactors() {

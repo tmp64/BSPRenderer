@@ -25,21 +25,18 @@ void rad::VisMat::buildVisMat() {
     m_Data.resize(size);
 
     // Calc vismat in multiple threads
-    // Skip 0-th leaf as it's the solid leaf
-    m_pRadSim->m_Dispatcher.setWorkCount(m_pRadSim->m_pLevel->getLeaves().size(), 1);
-    m_pRadSim->m_ThreadPool.run([this](auto &ti) { buildVisLeaves(ti); }, 0);
-
     size_t leafCount = m_pRadSim->m_pLevel->getLeaves().size();
+    m_uFinishedLeaves = 1;
+    // Skip 0-th leaf as it's the solid leaf
+    tf::Taskflow taskflow;
+    taskflow.for_each_index_dynamic((size_t)1, leafCount, (size_t)1, [this](size_t i) { buildVisLeaves(i); });
+    auto result = m_pRadSim->m_Executor.run(taskflow);
 
-    while (!m_pRadSim->m_ThreadPool.isFinished()) {
-        double done = (double)m_pRadSim->m_ThreadPool.getStatus() / leafCount;
+    while (!appfw::IsFutureReady(result)) {
+        size_t work = m_uFinishedLeaves;
+        double done = (double)work / leafCount;
         m_pRadSim->updateProgress(done);
-        std::this_thread::sleep_for(m_pRadSim->m_ThreadPool.POLL_DELAY);
-    }
-
-    if (m_pRadSim->m_ThreadPool.getStatus() != leafCount - 1) {
-        logError("Threading failure!");
-        abort();
+        std::this_thread::sleep_for(std::chrono::microseconds(1000 / 30));
     }
 
     m_pRadSim->updateProgress(1);
@@ -126,64 +123,63 @@ size_t rad::VisMat::calculateOffsets(std::vector<size_t> &offsets) {
     return totalSize / 8;
 }
 
-void rad::VisMat::buildVisLeaves(appfw::ThreadPool::ThreadInfo &ti) {
+void rad::VisMat::buildVisLeaves(size_t i) {
     int lface, facenum;
     uint8_t pvs[(bsp::MAX_MAP_LEAFS + 7) / 8];
 
     auto &leaves = m_pRadSim->m_pLevel->getLeaves();
     auto &visdata = m_pRadSim->m_pLevel->getVisData();
     auto &marksurfaces = m_pRadSim->m_pLevel->getMarkSurfaces();
-    auto &dispatcher = m_pRadSim->m_Dispatcher;
 
     std::vector<uint8_t> face_tested(bsp::MAX_MAP_FACES);
 
-    for (size_t i = dispatcher.getWork(); i != dispatcher.WORK_DONE; i = dispatcher.getWork(), ti.iWorkDone++) {
-        //
-        // build a minimal BSP tree that only
-        // covers areas relevent to the PVS
-        //
-        const bsp::BSPLeaf *srcleaf = &leaves[i];
+    //
+    // build a minimal BSP tree that only
+    // covers areas relevent to the PVS
+    //
+    const bsp::BSPLeaf *srcleaf = &leaves[i];
 
-        if (srcleaf->nVisOffset == -1) {
-            // Skip leaves wothout vis data
-            continue;
-        }
+    if (srcleaf->nVisOffset == -1) {
+        // Skip leaves wothout vis data
+        return;
+    }
 
-        memset(pvs, 0, sizeof(pvs));
-        decompressVis(&visdata[srcleaf->nVisOffset], pvs);
+    memset(pvs, 0, sizeof(pvs));
+    decompressVis(&visdata[srcleaf->nVisOffset], pvs);
 
-        //
-        // go through all the faces inside the
-        // leaf, and process the patches that
-        // actually have origins inside
-        //
-        for (lface = 0; lface < srcleaf->nMarkSurfaces; lface++) {
-            facenum = marksurfaces[srcleaf->iFirstMarkSurface + lface];
-            Face &face = m_pRadSim->m_Faces[facenum];
+    //
+    // go through all the faces inside the
+    // leaf, and process the patches that
+    // actually have origins inside
+    //
+    for (lface = 0; lface < srcleaf->nMarkSurfaces; lface++) {
+        facenum = marksurfaces[srcleaf->iFirstMarkSurface + lface];
+        Face &face = m_pRadSim->m_Faces[facenum];
 
-            for (PatchIndex patchIdx = 0; patchIdx < face.iNumPatches; patchIdx++) {
-                PatchIndex patchnum = face.iFirstPatch + patchIdx;
+        for (PatchIndex patchIdx = 0; patchIdx < face.iNumPatches; patchIdx++) {
+            PatchIndex patchnum = face.iFirstPatch + patchIdx;
 
-                // FIXME: Doesn't work properly. Discards way too many patches.
-                // Patch &patch = g_Patches[patchnum];
-                // const bsp::BSPLeaf *leaf = pointInLeaf(patch.vOrigin);
-                // if (leaf != srcleaf) {
-                //     continue;
-                // }
+            // FIXME: Doesn't work properly. Discards way too many patches.
+            // Patch &patch = g_Patches[patchnum];
+            // const bsp::BSPLeaf *leaf = pointInLeaf(patch.vOrigin);
+            // if (leaf != srcleaf) {
+            //     continue;
+            // }
 
-                size_t bitpos = getRowOffset(patchnum);
+            size_t bitpos = getRowOffset(patchnum);
 
-                // build to all other world leafs
-                buildVisRow(patchnum, pvs, bitpos, face_tested);
+            // build to all other world leafs
+            buildVisRow(patchnum, pvs, bitpos, face_tested);
 
-                // build to bmodel faces (to brush entities)
-                /*if (nummodels < 2)
-                    continue;
-                for (int facenum2 = dmodels[1].firstface; facenum2 < numfaces; facenum2++)
-                    TestPatchToFace(patchnum, facenum2, head, bitpos);*/
-            }
+            // build to bmodel faces (to brush entities)
+            /*if (nummodels < 2)
+                continue;
+            for (int facenum2 = dmodels[1].firstface; facenum2 < numfaces; facenum2++)
+                TestPatchToFace(patchnum, facenum2, head, bitpos);*/
         }
     }
+
+    m_uFinishedLeaves++;
 }
 
 void rad::VisMat::buildVisRow(PatchIndex patchnum, uint8_t *pvs, size_t bitpos, std::vector<uint8_t> &face_tested) {

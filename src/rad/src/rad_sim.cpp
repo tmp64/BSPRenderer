@@ -97,15 +97,7 @@ rad::RadSim::RadSim()
     : m_VisMat(this)
     , m_VFList(this)
     , m_SVisMat(this) {
-    // Set up thread pool
-    size_t threadCount = std::thread::hardware_concurrency();
-    if (threadCount == 0) {
-        logWarn("Failed to detect CPU thread count. Falling back to 1.");
-        threadCount = 1;
-    }
-
-    m_ThreadPool.setThreadCount(threadCount);
-    logInfo("Using {} thread(s).", threadCount);
+    logInfo("Using {} thread(s).", m_Executor.num_workers());
 }
 
 void rad::RadSim::setLevel(const bsp::Level *pLevel, const std::string &path) {
