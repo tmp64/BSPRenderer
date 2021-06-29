@@ -56,8 +56,8 @@ SceneRenderer::WorldShader::WorldShader()
 
 void SceneRenderer::WorldShader::create() {
     createProgram();
-    createVertexShader("shaders/scene/world.vert", "assets");
-    createFragmentShader("shaders/scene/world.frag", "assets");
+    createVertexShader("assets:shaders/scene/world.vert");
+    createFragmentShader("assets:shaders/scene/world.frag");
     linkProgram();
 }
 
@@ -87,8 +87,8 @@ SceneRenderer::SkyBoxShader::SkyBoxShader()
 
 void SceneRenderer::SkyBoxShader::create() {
     createProgram();
-    createVertexShader("shaders/scene/skybox.vert", "assets");
-    createFragmentShader("shaders/scene/skybox.frag", "assets");
+    createVertexShader("assets:shaders/scene/skybox.vert");
+    createFragmentShader("assets:shaders/scene/skybox.frag");
     linkProgram();
 }
 
@@ -126,8 +126,8 @@ SceneRenderer::BrushEntityShader::BrushEntityShader()
 
 void SceneRenderer::BrushEntityShader::create() {
     createProgram();
-    createVertexShader("shaders/scene/brush_entity.vert", "assets");
-    createFragmentShader("shaders/scene/brush_entity.frag", "assets");
+    createVertexShader("assets:shaders/scene/brush_entity.vert");
+    createFragmentShader("assets:shaders/scene/brush_entity.frag");
     linkProgram();
 }
 
@@ -154,8 +154,8 @@ SceneRenderer::PostProcessShader::PostProcessShader()
 
 void SceneRenderer::PostProcessShader::create() {
     createProgram();
-    createVertexShader("shaders/scene/post_processing.vert", "assets");
-    createFragmentShader("shaders/scene/post_processing.frag", "assets");
+    createVertexShader("assets:shaders/scene/post_processing.vert");
+    createFragmentShader("assets:shaders/scene/post_processing.frag");
     linkProgram();
 }
 
@@ -182,7 +182,7 @@ SceneRenderer::SceneRenderer() {
 
 SceneRenderer::~SceneRenderer() {}
 
-void SceneRenderer::beginLoading(const bsp::Level *level, const std::string &path, const char *tag) {
+void SceneRenderer::beginLoading(const bsp::Level *level, std::string_view path) {
     AFW_ASSERT(level);
 
     if (m_pLevel == level) {
@@ -191,7 +191,7 @@ void SceneRenderer::beginLoading(const bsp::Level *level, const std::string &pat
 
     unloadLevel();
 
-    m_Data.customLightmapPath = getFileSystem().findFileOrEmpty(path + ".lm", tag);
+    m_Data.customLightmapPath = getFileSystem().findExistingFile(std::string(path) + ".lm", std::nothrow);
 
     m_pLevel = level;
     loadTextures();
@@ -245,7 +245,7 @@ bool SceneRenderer::loadingTick() {
     try {
         switch (m_LoadingStatus) {
         case LoadingStatus::CreateSurfaces: {
-            if (appfw::IsFutureReady(m_pLoadingState->createSurfacesResult)) {
+            if (appfw::isFutureReady(m_pLoadingState->createSurfacesResult)) {
                 m_pLoadingState->createSurfacesResult.get();
                 m_pLoadingState->createSurfacesResult = std::future<void>();
 
@@ -262,7 +262,7 @@ bool SceneRenderer::loadingTick() {
         }
         case LoadingStatus::AsyncTasks: {
             if (!m_pLoadingState->loadBSPLightmapsFinished) {
-                if (appfw::IsFutureReady(m_pLoadingState->loadBSPLightmapsResult)) {
+                if (appfw::isFutureReady(m_pLoadingState->loadBSPLightmapsResult)) {
                     m_pLoadingState->loadBSPLightmapsResult.get();
                     m_pLoadingState->loadBSPLightmapsResult = std::future<void>();
                     finishLoadBSPLightmaps();
@@ -271,7 +271,7 @@ bool SceneRenderer::loadingTick() {
             }
 
             if (!m_pLoadingState->loadCustomLightmapsFinished) {
-                if (appfw::IsFutureReady(m_pLoadingState->loadCustomLightmapsResult)) {
+                if (appfw::isFutureReady(m_pLoadingState->loadCustomLightmapsResult)) {
                     m_pLoadingState->loadCustomLightmapsResult.get();
                     m_pLoadingState->loadCustomLightmapsResult = std::future<void>();
                     finishLoadCustomLightmaps();
@@ -290,7 +290,7 @@ bool SceneRenderer::loadingTick() {
             return false;
         }
         case LoadingStatus::CreateSurfaceObjects: {
-            if (appfw::IsFutureReady(m_pLoadingState->createSurfaceObjectsResult)) {
+            if (appfw::isFutureReady(m_pLoadingState->createSurfaceObjectsResult)) {
                 m_pLoadingState->createSurfaceObjectsResult.get();
                 m_pLoadingState->createSurfaceObjectsResult = std::future<void>();
                 finishCreateSurfaceObjects();
@@ -334,7 +334,7 @@ void SceneRenderer::renderScene(GLint targetFb) {
 
     if (!m_Data.bCustomLMLoaded && r_lighting.getValue() == 3) {
         r_lighting.setValue(2);
-        logWarn("Lighting type set to shaded since custom lightmaps are not loaded");
+        printw("Lighting type set to shaded since custom lightmaps are not loaded");
     }
 
     frameSetup();
@@ -346,7 +346,7 @@ void SceneRenderer::renderScene(GLint targetFb) {
         m_pfnEntListCb();
 
         timer.stop();
-        m_Stats.uEntityListTime += (unsigned)timer.elapsedMicroseconds();
+        m_Stats.uEntityListTime += (unsigned)timer.us();
     }
 
     if (r_drawworld.getValue()) {
@@ -365,7 +365,7 @@ void SceneRenderer::renderScene(GLint targetFb) {
         drawTransEntities();
 
         timer.stop();
-        m_Stats.uEntityRenderingTime += (unsigned)timer.elapsedMicroseconds();
+        m_Stats.uEntityRenderingTime += (unsigned)timer.us();
     }
 
     frameEnd();
@@ -374,7 +374,7 @@ void SceneRenderer::renderScene(GLint targetFb) {
     doPostProcessing();
 
     renderTimer.stop();
-    m_Stats.uTotalRenderingTime += (unsigned)renderTimer.elapsedMicroseconds();
+    m_Stats.uTotalRenderingTime += (unsigned)renderTimer.us();
 }
 
 void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
@@ -540,7 +540,7 @@ void SceneRenderer::destroyFramebuffer() {
 }
 
 void SceneRenderer::asyncCreateSurfaces() {
-    logInfo("Creating surfaces...");
+    printi("Creating surfaces...");
     m_Surf.setLevel(m_pLevel);
 
     m_Data.surfaces.resize(m_Surf.getSurfaceCount());
@@ -559,11 +559,11 @@ void SceneRenderer::asyncCreateSurfaces() {
 
 void SceneRenderer::asyncLoadBSPLightmaps() {
     if (m_pLevel->getLightMaps().size() == 0) {
-        logInfo("BSP lightmaps: no lightmaps in the map file");
+        printi("BSP lightmaps: no lightmaps in the map file");
         return;
     }
 
-    logInfo("BSP lightmaps: loading...");
+    printi("BSP lightmaps: loading...");
     m_pLoadingState->bspLightmapBlock.resize(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
 
     struct Lightmap {
@@ -617,7 +617,7 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
         }
 
         if (offset + wide * tall * 3 > m_pLevel->getLightMaps().size()) {
-            logWarn("BSP lightmaps: face {} has invalid lightmap offset", i);
+            printw("BSP lightmaps: face {} has invalid lightmap offset", i);
             continue;
         }
 
@@ -655,13 +655,13 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
             surf.m_BSPLMOffset.x = x;
             surf.m_BSPLMOffset.y = y;
         } else {
-            logWarn("BSP lightmaps: no space for surface {} ({}x{})", i.surface, surf.m_BSPLMSize.x,
+            printw("BSP lightmaps: no space for surface {} ({}x{})", i.surface, surf.m_BSPLMSize.x,
                     surf.m_BSPLMSize.y);
         }
     }
 
     timer.stop();
-    logInfo("BSP lightmaps: block {:.3f} s", timer.elapsedSeconds());
+    printi("BSP lightmaps: block {:.3f} s", timer.dseconds());
 }
 
 void SceneRenderer::finishLoadBSPLightmaps() {
@@ -677,7 +677,7 @@ void SceneRenderer::finishLoadBSPLightmaps() {
     glGenerateMipmap(GL_TEXTURE_2D);
 
     m_pLoadingState->bspLightmapBlock.clear();
-    logInfo("BSP lightmaps: loaded.");
+    printi("BSP lightmaps: loaded.");
 }
 
 void SceneRenderer::asyncLoadCustomLightmaps() {
@@ -686,11 +686,11 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
     fs::path &lmPath = m_Data.customLightmapPath;
 
     if (lmPath.empty()) {
-        logInfo("Custom lightmaps: file not found - not loading.");
+        printi("Custom lightmaps: file not found - not loading.");
         return;
     }
 
-    logInfo("Custom lightmaps: loading...");
+    printi("Custom lightmaps: loading...");
 
     try {
         m_pLoadingState->customLightmapBlock.resize(CUSTOM_LIGHTMAP_BLOCK_SIZE, CUSTOM_LIGHTMAP_BLOCK_SIZE);
@@ -717,10 +717,10 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
         };
 
         // File reading
-        appfw::BinaryReader file(lmPath);
+        appfw::BinaryInputFile file(lmPath);
 
         LightmapFileHeader lmHeader;
-        file.read(lmHeader);
+        file.readObject(lmHeader);
 
         if (lmHeader.nMagic != LM_MAGIC) {
             throw std::runtime_error(fmt::format("Invalid magic: expected {}, got {}", LM_MAGIC, lmHeader.nMagic));
@@ -738,7 +738,7 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
         for (size_t i = 0; i < lmHeader.iFaceCount; i++) {
             Surface &surf = m_Data.surfaces[i];
             LightmapFaceInfo info;
-            file.read(info);
+            file.readObject(info);
 
             if (info.iVertexCount != (uint32_t)surf.m_iVertexCount) {
                 throw std::runtime_error("Face vertex count mismatch");
@@ -746,7 +746,7 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
 
             surf.m_vCustomLMSize = info.lmSize;
             surf.m_vCustomLMTexCoords.resize(info.iVertexCount);
-            file.readArray(appfw::span(surf.m_vCustomLMTexCoords));
+            file.readObjectArray(appfw::span(surf.m_vCustomLMTexCoords));
 
             Lightmap lm;
             lm.surface = (unsigned)i;
@@ -762,7 +762,7 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
             Surface &surf = m_Data.surfaces[i];
             std::vector<glm::vec3> &data = lightmapTextures[i];
             data.resize((size_t)surf.m_vCustomLMSize.x * (size_t)surf.m_vCustomLMSize.y);
-            file.readArray(appfw::span(data));
+            file.readObjectArray(appfw::span(data));
         }
 
         // Sort all lightmaps by size, large to small
@@ -782,15 +782,15 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
                 surf.m_vCustomLMOffset.x = x;
                 surf.m_vCustomLMOffset.y = y;
             } else {
-                logWarn("Custom lightmaps: no space for surface {} ({}x{})", i.surface, surf.m_vCustomLMSize.x,
+                printw("Custom lightmaps: no space for surface {} ({}x{})", i.surface, surf.m_vCustomLMSize.x,
                         surf.m_vCustomLMSize.y);
             }
         }
         
         timer.stop();
-        logInfo("Custom lightmaps: block {:.3f} s", timer.elapsedSeconds());
+        printi("Custom lightmaps: block {:.3f} s", timer.dseconds());
     } catch (const std::exception &e) {
-        logWarn("Custom lightmaps: failed to load: {}", e.what());
+        printw("Custom lightmaps: failed to load: {}", e.what());
     }
 }
 
@@ -812,11 +812,11 @@ void SceneRenderer::finishLoadCustomLightmaps() {
 
     m_pLoadingState->customLightmapBlock.clear();
     m_Data.bCustomLMLoaded = true;
-    logInfo("Custom lightmaps: loaded");
+    printi("Custom lightmaps: loaded");
 }
 
 void SceneRenderer::asyncCreateSurfaceObjects() {
-    logInfo("Surface objects: creating");
+    printi("Surface objects: creating");
 
     std::vector<SurfaceVertex> vertices;
     m_pLoadingState->allVertices.reserve(bsp::MAX_MAP_VERTS);
@@ -879,7 +879,7 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
             vertices.push_back(v);
 
             if (m_pLoadingState->allVertices.size() >= std::numeric_limits<uint16_t>::max()) {
-                logError("Surface objects: vertex limit reached.");
+                printe("Surface objects: vertex limit reached.");
                 throw std::runtime_error("vertex limit reached");
             }
 
@@ -911,15 +911,15 @@ void SceneRenderer::finishCreateSurfaceObjects() {
     glBindVertexArray(0);
 
     // Create EBO
-    logInfo("Maximum EBO size: {} B", maxEboSize * sizeof(uint16_t));
-    logInfo("Vertex count: {}", allVertices.size());
+    printi("Maximum EBO size: {} B", maxEboSize * sizeof(uint16_t));
+    printi("Vertex count: {}", allVertices.size());
     m_Data.surfEboData.resize(maxEboSize);
     m_Data.surfEbo.create();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.surfEbo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, maxEboSize * sizeof(uint16_t), nullptr, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-    logInfo("Surface objects: finished");
+    printi("Surface objects: finished");
 }
 
 void SceneRenderer::enableSurfaceAttribs() {
@@ -945,7 +945,7 @@ void SceneRenderer::loadTextures() {
     std::string wads = ws.getValue<std::string>("wad", "");
     
     if (wads.empty()) {
-        logWarn("Level doesn't reference any WAD files.");
+        printw("Level doesn't reference any WAD files.");
         return;
     }
 
@@ -970,15 +970,15 @@ void SceneRenderer::loadTextures() {
 
         // Load the WAD
         std::string wadname = wadpath.substr(pos + 1);
-        fs::path path = getFileSystem().findFileOrEmpty(wadname, "assets");
+        fs::path path = getFileSystem().findExistingFile("assets:" + wadname, std::nothrow);
 
         if (!path.empty()) {
             if (!MaterialManager::get().isWadLoaded(wadname)) {
-                logInfo("Loading WAD {}", wadname);
+                printi("Loading WAD {}", wadname);
                 MaterialManager::get().loadWadFile(path);
             }
         } else {
-            logError("WAD {} not found", wadname);
+            printe("WAD {} not found", wadname);
         }
     };
 
@@ -1006,11 +1006,13 @@ void SceneRenderer::loadSkyBox() {
     // Load images
     for (int i = 0; i < 6; i++) {
         // Try TGA first
-        fs::path path = getFileSystem().findFileOrEmpty("gfx/env/" + skyname + suffixes[i] + ".tga", "assets");
+        fs::path path = getFileSystem().findExistingFile(
+            "assets:gfx/env/" + skyname + suffixes[i] + ".tga", std::nothrow);
 
         if (path.empty()) {
             // Try BMP instead
-            path = getFileSystem().findFileOrEmpty("gfx/env/" + skyname + suffixes[i] + ".bmp", "assets");
+            path = getFileSystem().findExistingFile(
+                "assets:gfx/env/" + skyname + suffixes[i] + ".bmp", std::nothrow);
         }
 
         if (!path.empty()) {
@@ -1036,10 +1038,10 @@ void SceneRenderer::loadSkyBox() {
                 stbi_image_free(data);
                 continue;
             } else {
-                logError("Failed to load {}: ", path.u8string(), stbi_failure_reason());
+                printe("Failed to load {}: ", path.u8string(), stbi_failure_reason());
             }
         } else {
-            logError("Sky {}{} not found", skyname, suffixes[i]);
+            printe("Sky {}{} not found", skyname, suffixes[i]);
         }
 
         // Set purple checkerboard sky
@@ -1124,7 +1126,7 @@ void SceneRenderer::frameSetup() {
     bindLightmapBlock();
 
     timer.stop();
-    m_Stats.uSetupTime += (unsigned)timer.elapsedMicroseconds();
+    m_Stats.uSetupTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::frameEnd() {
@@ -1174,7 +1176,7 @@ void SceneRenderer::drawWorldSurfaces() {
     m_Surf.setContext(&m_Data.viewContext);
     m_Surf.calcWorldSurfaces();
     bspTimer.stop();
-    m_Stats.uWorldBSPTime += (unsigned)bspTimer.elapsedMicroseconds();
+    m_Stats.uWorldBSPTime += (unsigned)bspTimer.us();
 
     // Draw visible surfaces
     appfw::Timer timer;
@@ -1187,7 +1189,7 @@ void SceneRenderer::drawWorldSurfaces() {
     }
 
     timer.stop();
-    m_Stats.uWorldRenderingTime += (unsigned)timer.elapsedMicroseconds();
+    m_Stats.uWorldRenderingTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::drawWorldSurfacesVao() {
@@ -1363,7 +1365,7 @@ void SceneRenderer::drawSkySurfaces() {
     }
 
     timer.stop();
-    m_Stats.uSkyRenderingTime += (unsigned)timer.elapsedMicroseconds();
+    m_Stats.uSkyRenderingTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::drawSkySurfacesVao() {
@@ -1459,7 +1461,7 @@ void SceneRenderer::drawSolidEntities() {
     setRenderMode(kRenderNormal);
 
     timer.stop();
-    m_Stats.uSolidEntityRenderingTime += (unsigned)timer.elapsedMicroseconds();
+    m_Stats.uSolidEntityRenderingTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::drawTransEntities() {
@@ -1516,7 +1518,7 @@ void SceneRenderer::drawTransEntities() {
     setRenderMode(kRenderNormal);
 
     timer.stop();
-    m_Stats.uTransEntityRenderingTime += (unsigned)timer.elapsedMicroseconds();
+    m_Stats.uTransEntityRenderingTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
@@ -1704,7 +1706,7 @@ void SceneRenderer::doPostProcessing() {
     m_sPostProcessShader.disable();
     
     timer.stop();
-    m_Stats.uPostProcessingTime += (unsigned)timer.elapsedMicroseconds();
+    m_Stats.uPostProcessingTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::setRenderMode(RenderMode mode) {

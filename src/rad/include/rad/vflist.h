@@ -1,8 +1,7 @@
 #ifndef RAD_VFLIST_H
 #define RAD_VFLIST_H
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <appfw/sha256.h>
-#include <appfw/thread_pool.h>
 #include <rad/types.h>
 
 namespace rad {
@@ -15,7 +14,7 @@ class PatchRef;
  */
 class VFList {
 public:
-    static constexpr char VF_MAGIC[] = "VFLIST001";
+    static constexpr uint8_t VF_MAGIC[] = "VFLIST001";
 
     VFList(RadSim *pRadSim);
 

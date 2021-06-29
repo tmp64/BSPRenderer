@@ -14,7 +14,7 @@ public:
     void setViewportSize(const glm::ivec2 &size);
 
     //! Loads the level, path is passed to scene renderer to load custom lightmaps
-	void loadLevel(const std::string &path, const char *tag);
+	void loadLevel(const std::string &path);
 
     //! Unloads the level
     void unloadLevel();

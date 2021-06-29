@@ -2,6 +2,7 @@
 #define BSP_WAD_FILE_H
 #include <stdexcept>
 #include <appfw/utils.h>
+#include <appfw/span.h>
 #include <bsp/bsp_types.h>
 #include <bsp/wad_texture.h>
 

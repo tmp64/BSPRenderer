@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <appfw/utils.h>
+#include <appfw/span.h>
 #include <bsp/bsp_types.h>
 
 namespace bsp {

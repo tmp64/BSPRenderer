@@ -1,55 +1,54 @@
 #include <imgui_impl_sdl.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <gui_app/input_system.h>
 #include <gui_app/gui_app_base.h>
 
-static ConCommand cmd_bind("bind", "Binds a key to a command", [](const appfw::ParsedCommand &cmd) {
-    if (cmd.size() <= 1) {
-        logInfo("Usage: bind <key> [command] [args...]");
+static ConCommand cmd_bind("bind", "Binds a key to a command", [](const CmdString &cmd) {
+    if (cmd.size() != 2 && cmd.size() != 3) {
+        printi("Usage: bind <key> [command]");
         return;
     }
 
     SDL_Scancode key = InputSystem::get().getScancodeForKey(cmd[1]);
 
     if (key == SDL_SCANCODE_UNKNOWN) {
-        logError("Unknown key {}", cmd[1]);
+        printe("Unknown key {}", cmd[1]);
         return;
     }
 
     if (cmd.size() == 2) {
-        const appfw::ParsedCommand &keyCmd = InputSystem::get().getKeyBind(key);
+        auto &keyCmd = InputSystem::get().getKeyBind(key);
         if (keyCmd.empty()) {
-            logInfo("Key {} is unbound.", cmd[1]);
+            printi("Key {} is unbound.", cmd[1]);
         } else {
-            logInfo("Key {} is bound to {}", cmd[1], appfw::convertCommandToString(keyCmd));
+            CmdString blet; // hack around bogus "the usage of CmdString::toString requires the compiler to capture 'this'" 
+            printi("Key {} is bound to {}", cmd[1], blet.toString(keyCmd));
         }
 
         return;
     }
 
-    appfw::ParsedCommand keyCmd;
-    keyCmd.resize(cmd.size() - 2);
-    std::copy(cmd.begin() + 2, cmd.end(), keyCmd.begin());
-    InputSystem::get().bindKey(key, keyCmd);
+    InputSystem::get().bindKey(key, CmdString::parse(cmd[2]));
 });
 
-static ConCommand cmd_unbind("unbind", "Unbinds a key", [](const appfw::ParsedCommand &cmd) {
+static ConCommand cmd_unbind("unbind", "Unbinds a key", [](const CmdString &cmd) {
     if (cmd.size() <= 1) {
-        logInfo("Usage: unbind <key>");
+        printi("Usage: unbind <key>");
         return;
     }
 
     SDL_Scancode key = InputSystem::get().getScancodeForKey(cmd[1]);
 
     if (key == SDL_SCANCODE_UNKNOWN) {
-        logError("Unknown key {}", cmd[1]);
+        printe("Unknown key {}", cmd[1]);
         return;
     }
 
-    InputSystem::get().bindKey(key, appfw::ParsedCommand());
+    InputSystem::get().bindKey(key, std::vector<CmdString>());
 });
 
-static ConCommand cmd_toggleinput("toggleinput", "Enables/disables input grab", [](const appfw::ParsedCommand &) {
+static ConCommand
+    cmd_toggleinput("toggleinput", "Enables/disables input grab", [](const CmdString &) {
     // Toggle input
     InputSystem::get().setGrabInput(!InputSystem::get().isInputGrabbed());
 });
@@ -81,9 +80,11 @@ bool InputSystem::handleSDLEvent(SDL_Event event) {
 
     switch (event.type) {
     case SDL_KEYDOWN: {
-        const appfw::ParsedCommand &keyCmd = m_KeyBinds[event.key.keysym.scancode];
+        auto &keyCmd = m_KeyBinds[event.key.keysym.scancode];
         if (!keyCmd.empty()) {
-            appfw::getConsole().command(keyCmd);
+            for (auto &i : keyCmd) {
+                appfw::getConsole().command(i);
+            }
         }
 
         fnProcessImGui();
@@ -101,9 +102,11 @@ bool InputSystem::handleSDLEvent(SDL_Event event) {
     }
     case SDL_MOUSEBUTTONDOWN: {
         if (isInputGrabbed()) {
-            const appfw::ParsedCommand &keyCmd = m_MouseBinds[event.button.button];
+            auto &keyCmd = m_MouseBinds[event.button.button];
             if (!keyCmd.empty()) {
-                appfw::getConsole().command(keyCmd);
+                for (auto &i : keyCmd) {
+                    appfw::getConsole().command(i);
+                }
             }
 
             return true;
@@ -143,7 +146,7 @@ SDL_Scancode InputSystem::getScancodeForKey(const std::string &key) {
     }
 }
 
-const appfw::ParsedCommand &InputSystem::getKeyBind(SDL_Scancode key) {
+const std::vector<CmdString> &InputSystem::getKeyBind(SDL_Scancode key) {
     if (key < 0) {
         return m_MouseBinds[-key];
     } else {
@@ -152,11 +155,10 @@ const appfw::ParsedCommand &InputSystem::getKeyBind(SDL_Scancode key) {
 }
 
 void InputSystem::bindKey(SDL_Scancode key, const std::string &cmd) {
-    appfw::ParsedCommand pcmd = appfw::parseCommand(cmd);
-    bindKey(key, pcmd);
+    bindKey(key, CmdString::parse(cmd));
 }
 
-void InputSystem::bindKey(SDL_Scancode key, const appfw::ParsedCommand &cmd) {
+void InputSystem::bindKey(SDL_Scancode key, const std::vector<CmdString> &cmd) {
     if (key < 0) {
         m_MouseBinds[-key] = cmd;
     } else {

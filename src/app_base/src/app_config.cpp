@@ -1,6 +1,6 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <app_base/app_config.h>
 
 //------------------------------------------------------
@@ -75,7 +75,7 @@ void AppConfig::mountFilesystem() {
             if (path.is_absolute()) {
                 getFileSystem().addSearchPath(path, item.first.c_str());
             } else {
-                fs::path p = getFileSystem().findFile(pathStr, "base");
+                fs::path p = getFileSystem().findExistingFile("base:" + pathStr);
                 getFileSystem().addSearchPath(p, item.first.c_str());
             }
         }
@@ -107,7 +107,8 @@ void AppConfig::loadJsonFile(const fs::path &path) {
         throw std::runtime_error(fmt::format("failed to open: {}", strerror(errno)));
     }
 
-    std::vector<char> fileData = appfw::readFileContents(file);
+    std::vector<char> fileData;
+    appfw::readFileContents(file, fileData);
     fileData.push_back('\0');
     json obj = json::parse(fileData.data(), nullptr, true, true);
 

@@ -97,7 +97,7 @@ rad::RadSim::RadSim()
     : m_VisMat(this)
     , m_VFList(this)
     , m_SVisMat(this) {
-    logInfo("Using {} thread(s).", m_Executor.num_workers());
+    printi("Using {} thread(s).", m_Executor.num_workers());
 }
 
 void rad::RadSim::setLevel(const bsp::Level *pLevel, const std::string &path) {
@@ -110,7 +110,7 @@ void rad::RadSim::loadLevelConfig() {
     m_PatchHash = appfw::SHA256::Digest();
     appfw::SHA256 hash;
 
-    std::fstream configFile(getFileSystem().findFile(m_LevelPath + ".json", "assets"));
+    std::fstream configFile(getFileSystem().findExistingFile(m_LevelPath + ".json"));
     configFile >> m_LevelConfigJson;
 
     // Load patch size
@@ -145,7 +145,7 @@ void rad::RadSim::loadLevelConfig() {
 bool rad::RadSim::isVisMatValid() { return m_SVisMat.isValid(); }
 
 bool rad::RadSim::loadVisMat() {
-    fs::path path = getFileSystem().findFileOrEmpty(getVisMatPath(), "assets");
+    fs::path path = getFileSystem().findExistingFile(getVisMatPath(), std::nothrow);
 
     if (!path.empty()) {
         m_SVisMat.loadFromFile(path);
@@ -159,32 +159,32 @@ void rad::RadSim::calcVisMat() {
     appfw::Timer timer;
 
     // Build full vismat
-    logInfo("Building visibility matrix...");
+    printi("Building visibility matrix...");
     timer.start();
     m_VisMat.buildVisMat();
     timer.stop();
-    logInfo("Build vismat: {:.3} s", timer.elapsedSeconds());
+    printi("Build vismat: {:.3} s", timer.dseconds());
 
     // Build sparse vismat
-    logInfo("Building sparse vismat...");
+    printi("Building sparse vismat...");
     timer.start();
     m_SVisMat.buildSparseMat();
     timer.stop();
-    logInfo("Build sparse vismat: {:.3} s", timer.elapsedSeconds());
+    printi("Build sparse vismat: {:.3} s", timer.dseconds());
 
     // Clear normal vismat
     m_VisMat.unloadVisMat();
 
     // Save vismat
-    logInfo("Saving svismat...");
-    fs::path path = getFileSystem().getFile(getVisMatPath(), "assets");
+    printi("Saving svismat...");
+    fs::path path = getFileSystem().getFilePath(getVisMatPath());
     m_SVisMat.saveToFile(path);
 }
 
 bool rad::RadSim::isVFListValid() { return m_VFList.isValid(); }
 
 bool rad::RadSim::loadVFList() {
-    fs::path path = getFileSystem().findFileOrEmpty(getVFListPath(), "assets");
+    fs::path path = getFileSystem().findExistingFile(getVFListPath(), std::nothrow);
 
     if (!path.empty()) {
         m_VFList.loadFromFile(path);
@@ -202,18 +202,18 @@ void rad::RadSim::calcViewFactors() {
     m_VFList.calculateVFList();
 
     // Save vflist
-    /*logInfo("Saving VFList...");
+    /*printi("Saving VFList...");
     fs::path path = getFileSystem().getFile(getVFListPath(), "assets");
     m_VFList.saveToFile(path);*/
 }
 
 void rad::RadSim::bounceLight() {
-    logInfo("Applying lighting...");
+    printi("Applying lighting...");
     clearBounceArray();
     addLighting();
 
     
-    logInfo("Bouncing light...");
+    printi("Bouncing light...");
     appfw::Timer timer;
     timer.start();
     float refl = m_flReflectivity;
@@ -257,11 +257,11 @@ void rad::RadSim::bounceLight() {
     updateProgress(1);
 
     timer.stop();
-    logInfo("Bounce light: {:.3} s", timer.elapsedSeconds());
+    printi("Bounce light: {:.3} s", timer.dseconds());
 }
 
 void rad::RadSim::writeLightmaps() {
-    logInfo("Writing lightmaps...");
+    printi("Writing lightmaps...");
 
     struct LightmapFileHeader {
         uint32_t nMagic = ('1' << 24) | ('0' << 16) | ('M' << 8) | ('L' << 0);
@@ -273,10 +273,10 @@ void rad::RadSim::writeLightmaps() {
         glm::ivec2 lmSize;
     };
 
-    appfw::BinaryWriter file(getFileSystem().getFile(m_LevelPath + ".lm", "assets"));
+    appfw::BinaryOutputFile file(getFileSystem().getFilePath(m_LevelPath + ".lm"));
     LightmapFileHeader lmHeader;
     lmHeader.iFaceCount = (uint32_t)m_Faces.size();
-    file.write(lmHeader);
+    file.writeObject(lmHeader);
 
     AFW_ASSERT(m_Faces.size() == m_Lightmaps.size());
 
@@ -286,18 +286,18 @@ void rad::RadSim::writeLightmaps() {
         LightmapFaceInfo info;
         info.iVertexCount = (uint32_t)face.vertices.size();
         info.lmSize = m_Lightmaps[i].size;
-        file.write(info);
+        file.writeObject(info);
 
         // Write tex coords
         for (const Face::Vertex &v : face.vertices) {
-            file.write(v.vLMCoord);
+            file.writeObject(v.vLMCoord);
         }
     }
 
     // Write lightmaps
     for (LightmapTexture &lm : m_Lightmaps) {
 #if 1
-        file.writeArray(appfw::span(lm.data));
+        file.writeObjectArray(appfw::span(lm.data));
 #else
         // Write random pixels
         for (size_t i = 0; i < lm.data.size(); i++) {
@@ -469,7 +469,7 @@ void rad::RadSim::loadFaces() {
 }
 
 void rad::RadSim::createPatches(appfw::SHA256 &hash) {
-    logInfo("Creating patches...");
+    printi("Creating patches...");
     appfw::Timer timer;
     timer.start();
     size_t luxelCount = 0;
@@ -502,17 +502,17 @@ void rad::RadSim::createPatches(appfw::SHA256 &hash) {
     }
 
     if (luxelCount > MAX_PATCH_COUNT) {
-        logError("Patch limit reached.");
-        logError("Patch count: {}", luxelCount);
-        logError("Patch limit: {}", MAX_PATCH_COUNT);
+        printe("Patch limit reached.");
+        printe("Patch count: {}", luxelCount);
+        printe("Patch limit: {}", MAX_PATCH_COUNT);
         throw std::runtime_error("patch limit reached");
     }
 
     m_Patches.allocate((PatchIndex)luxelCount);
-    logInfo("Patch count: {}", luxelCount);
-    logInfo("Total lightmap size: {:.3} megapixels ({:.3} MiB)", luxelCount / 1000000.0,
+    printi("Patch count: {}", luxelCount);
+    printi("Total lightmap size: {:.3} megapixels ({:.3} MiB)", luxelCount / 1000000.0,
             luxelCount * sizeof(glm::vec3) / 1024.0 / 1024.0);
-    logInfo("Memory used by patches: {:.3} MiB", luxelCount * m_Patches.getPatchMemoryUsage() / 1024.0 / 1024.0);
+    printi("Memory used by patches: {:.3} MiB", luxelCount * m_Patches.getPatchMemoryUsage() / 1024.0 / 1024.0);
 
     {
         // Add patch count to hash
@@ -561,7 +561,7 @@ void rad::RadSim::createPatches(appfw::SHA256 &hash) {
 
     AFW_ASSERT(patchIdx == m_Patches.size());
 
-    logInfo("Create patches: {:.3} s", timer.elapsedSeconds());
+    printi("Create patches: {:.3} s", timer.dseconds());
 }
 
 void rad::RadSim::loadLevelEntities() {
@@ -605,7 +605,7 @@ void rad::RadSim::loadLevelEntities() {
                 }
 
                 if (isEnvLightFound) {
-                    logWarn("Level has multiple light_environment. Only first one is used.");
+                    printw("Level has multiple light_environment. Only first one is used.");
                 }
 
                 isEnvLightFound = true;

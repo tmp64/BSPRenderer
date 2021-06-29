@@ -1,4 +1,4 @@
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <gui_app/dev_console_dialog.h>
 
 DevConsoleDialog::DevConsoleDialog() {
@@ -66,7 +66,7 @@ void DevConsoleDialog::AddLog(const char *fmt, ...) {
     Items.push_back({Strdup(buf), ImVec4(0, 0, 0, 0)});
 }
 
-void DevConsoleDialog::AddLog(appfw::Color color, const char *fmt, ...) {
+void DevConsoleDialog::AddLog(ImVec4 color, const char *fmt, ...) {
     // FIXME-OPT
     char buf[1024];
     va_list args;
@@ -74,8 +74,7 @@ void DevConsoleDialog::AddLog(appfw::Color color, const char *fmt, ...) {
     vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
     buf[IM_ARRAYSIZE(buf) - 1] = 0;
     va_end(args);
-    ImVec4 colorVec = ImVec4(color.r() / 255.f, color.g() / 255.f, color.b() / 255.f, color.a() != 0 ? 1.f : 0.f);
-    Items.push_back({Strdup(buf), colorVec});
+    Items.push_back({Strdup(buf), color});
 }
 
 void DevConsoleDialog::Draw(const char *title, bool *p_open) {
@@ -148,20 +147,24 @@ void DevConsoleDialog::Draw(const char *title, bool *p_open) {
     if (copy_to_clipboard)
         ImGui::LogToClipboard();
 
-    for (int i = 0; i < Items.Size; i++) {
-        const LogEntry &item = Items[i];
-        if (!Filter.PassFilter(item.text))
-            continue;
+    {
+        std::lock_guard lock(m_Mutex);
 
-        bool has_color = item.color.w != 0;
+        for (int i = 0; i < Items.Size; i++) {
+            const LogEntry &item = Items[i];
+            if (!Filter.PassFilter(item.text))
+                continue;
 
-        if (has_color)
-            ImGui::PushStyleColor(ImGuiCol_Text, item.color);
+            bool has_color = item.color.w != 0;
 
-        ImGui::TextUnformatted(item.text);
+            if (has_color)
+                ImGui::PushStyleColor(ImGuiCol_Text, item.color);
 
-        if (has_color)
-            ImGui::PopStyleColor();
+            ImGui::TextUnformatted(item.text);
+
+            if (has_color)
+                ImGui::PopStyleColor();
+        }
     }
     if (copy_to_clipboard)
         ImGui::LogFinish();
@@ -197,8 +200,8 @@ void DevConsoleDialog::Draw(const char *title, bool *p_open) {
 }
 
 void DevConsoleDialog::ExecCommand(const char *command_line) {
-    appfw::ConsoleMsgInfo msgInfo(appfw::ConsoleMsgType::ConInput);
-    msgInfo.moduleName = "imgui console";
+    appfw::ConMsgInfo msgInfo;
+    msgInfo.setType(ConMsgType::Input).setTag("imgui console");
     m_pConSystem->print(msgInfo,
                         std::string("> ") + command_line);
     m_pConSystem->command(command_line);
@@ -242,7 +245,7 @@ int DevConsoleDialog::TextEditCallback(ImGuiInputTextCallbackData *data) {
         // Build a list of candidates
         ImVector<const char *> candidates;
 
-        auto &cmdMap = appfw::getConsole().getMap();
+        auto &cmdMap = appfw::getConsole().getItemMap();
         for (auto &i : cmdMap) {
             if (Strnicmp(i.first.c_str(), word_start, (int)(word_end - word_start)) == 0) {
                 candidates.push_back(i.first.c_str());
@@ -312,34 +315,37 @@ int DevConsoleDialog::TextEditCallback(ImGuiInputTextCallbackData *data) {
     return 0;
 }
 
-void DevConsoleDialog::onAdd(appfw::IConsoleSystem *conSystem) {
+void DevConsoleDialog::onAdd(appfw::ConsoleSystem *conSystem) {
     AFW_ASSERT(!m_pConSystem);
     m_pConSystem = static_cast <appfw::ConsoleSystem *>(conSystem);
     m_pConSystem->printPreviousMessages(this);
 }
 
-void DevConsoleDialog::onRemove([[maybe_unused]] appfw::IConsoleSystem *conSystem) {
+void DevConsoleDialog::onRemove([[maybe_unused]] appfw::ConsoleSystem *conSystem) {
     AFW_ASSERT(m_pConSystem == conSystem);
     m_pConSystem = nullptr;
 }
 
-void DevConsoleDialog::print(const appfw::ConsoleMsgInfo &msgInfo, const std::string &msg) {
-    appfw::Color color = msgInfo.color;
-
-    if (color.a() == 0) {
-        static appfw::Color colors[(int)appfw::ConsoleMsgType::TypeCount] = {
-            appfw::Color(128, 0, 0),     // Fatal
-            appfw::Color(255, 0, 0),     // Error
-            appfw::Color(255, 255, 0),   // Warn
-            appfw::Color(160, 160, 160), // Info
-            appfw::Color(99, 172, 255),  // Debug
-            appfw::Color(255, 255, 255), // ConInput
-            appfw::Color(160, 160, 160), // ConOutput
-            appfw::Color(255, 255, 255), // ConOutputStrong
-        };
-
-        color = colors[std::clamp(msgInfo.type, 0, (int)std::size(colors))];
+void DevConsoleDialog::print(const appfw::ConMsgInfo &info, std::string_view msg) {
+    std::lock_guard lock(m_Mutex);
+    ConMsgColor color = info.color;
+    if (color == ConMsgColor::Default) {
+        color = appfw::getMsgTypeColor(info.type);
     }
 
-    AddLog(color, "%s", msg.c_str());
+    int colorInt = (int)color;
+
+    int intensity = (colorInt & 0b1000) ? 255 : 128;
+    ImColor conColor(
+        (colorInt & 0b0100) ? intensity : 0,
+        (colorInt & 0b0010) ? intensity : 0,
+        (colorInt & 0b0001) ? intensity : 0,
+        255
+    );
+
+    AddLog(conColor, "%s", std::string(msg).c_str());
+}
+
+bool DevConsoleDialog::isThreadSafe() {
+    return true;
 }

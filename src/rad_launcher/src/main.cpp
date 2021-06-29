@@ -1,7 +1,7 @@
 #include <nlohmann/json.hpp>
 #include <appfw/timer.h>
 #include <appfw/init.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <appfw/command_line.h>
 #include <app_base/app_config.h>
 #include <rad/rad_sim.h>
@@ -46,15 +46,14 @@ void progressCallback(double progress) {
 
 int main(int argc, char **argv) {
     int returnCode = 0;
-    appfw::init::init();
+    appfw::InitComponent appfwInit(appfw::InitOptions().setArgs(argc, argv));
 
-    conPrintStrong("---------------------------------------------------");
-    conPrintStrong("Radiosity simulator for Half-Life BSP Renderer");
-    conPrintStrong("https://github.com/tmp64/BSPRenderer");
-    conPrintStrong("---------------------------------------------------");
+    printn("---------------------------------------------------");
+    printn("Radiosity simulator for Half-Life BSP Renderer");
+    printn("https://github.com/tmp64/BSPRenderer");
+    printn("---------------------------------------------------");
 
     try {
-        getCommandLine().parseCommandLine(argc, argv);
         initApp();
 
         appfw::Timer timer;
@@ -74,11 +73,11 @@ int main(int argc, char **argv) {
 
         bool bCanReuseFiles = !getCommandLine().isFlagSet("no-reuse");
 
-        logInfo("Base patch size: {}", rad.getPatchSize());
-        logInfo("Bounce count: {}", rad.getBounceCount());
+        printi("Base patch size: {}", rad.getPatchSize());
+        printi("Bounce count: {}", rad.getBounceCount());
 
         if (bCanReuseFiles) {
-            logInfo("Loading vismat...");
+            printi("Loading vismat...");
             if (!rad.loadVisMat()) {
                 rad.calcVisMat();
             }
@@ -92,31 +91,30 @@ int main(int argc, char **argv) {
         rad.writeLightmaps();
 
         timer.stop();
-        logInfo("Done! Time taken: {:.3} s.", timer.elapsedSeconds());
+        printi("Done! Time taken: {:.3} s.", timer.dseconds());
     }
     catch (const std::exception &e) {
-        logError("{}", e.what());
+        printe("{}", e.what());
         returnCode = 1;
     }
 
-    appfw::init::shutdown();
     return returnCode;
 }
 
 void initApp() {
     // Init file system
     fs::path baseAppPath = fs::current_path();
-    logInfo("Base app path: {}", baseAppPath.u8string());
+    printi("Base app path: {}", baseAppPath.u8string());
     getFileSystem().addSearchPath(baseAppPath, "base");
 
     // Load app config
-    g_AppConfig.loadJsonFile(getFileSystem().findFile("bspviewer/app_config.json", "base"));
+    g_AppConfig.loadJsonFile(getFileSystem().findExistingFile("base::bspviewer/app_config.json"));
     g_AppConfig.mountFilesystem();
 }
 
 void loadLevel() {
     std::string map = getCommandLine().getArgString("map");
-    g_LevelPath = fmt::format("maps/{}.bsp", map);
-    logInfo("Loading level {}", g_LevelPath);
-    g_Level.loadFromFile(getFileSystem().findFile(g_LevelPath, "assets"));
+    g_LevelPath = fmt::format("assets:maps/{}.bsp", map);
+    printi("Loading level {}", g_LevelPath);
+    g_Level.loadFromFile(getFileSystem().findExistingFile(g_LevelPath));
 }

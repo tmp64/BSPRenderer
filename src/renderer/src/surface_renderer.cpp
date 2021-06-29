@@ -157,7 +157,7 @@ void SurfaceRenderer::createSurfaces() {
         Surface &surface = m_Data.surfaces[i];
 
         if (face.iFirstEdge + face.nEdges > (uint32_t)lvlSurfEdges.size()) {
-            logWarn("SurfaceRenderer::createSurfaces: Bad surface {}", i);
+            printw("SurfaceRenderer::createSurfaces: Bad surface {}", i);
             continue;
         }
 
@@ -178,7 +178,7 @@ void SurfaceRenderer::createSurfaces() {
 
         for (int j = 0; j < surface.iNumEdges; j++) {
             if (j == MAX_SIDE_VERTS) {
-                logWarn("createBaseSurfaces(): polygon {} is too large (exceeded {} vertices)", j, MAX_SIDE_VERTS);
+                printw("createBaseSurfaces(): polygon {} is too large (exceeded {} vertices)", j, MAX_SIDE_VERTS);
                 break;
             }
 

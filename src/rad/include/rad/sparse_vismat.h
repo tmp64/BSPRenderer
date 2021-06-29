@@ -1,8 +1,7 @@
 #ifndef RAD_SPARSE_VISMAT_H
 #define RAD_SPARSE_VISMAT_H
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <appfw/sha256.h>
-#include <appfw/thread_pool.h>
 #include <rad/types.h>
 #include <vector>
 
@@ -12,7 +11,7 @@ class RadSim;
 
 class SparseVisMat {
 public:
-    static constexpr char SVISMAT_MAGIC[] = "SVISMAT001";
+    static constexpr uint8_t SVISMAT_MAGIC[] = "SVISMAT001";
 
     /**
      * One list item. All of it's contents are ones

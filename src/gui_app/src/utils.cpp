@@ -4,7 +4,7 @@
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl.h>
 #include <appfw/init.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <appfw/dbg.h>
 #include <renderer/shader_manager.h>
 #include <renderer/material_manager.h>
@@ -28,13 +28,12 @@ SDLAppComponent::~SDLAppComponent() {
 }
 
 AppFWAppComponent::AppFWAppComponent() {
-    using namespace appfw::init;
-    init();
+    appfw::initialize(appfw::InitOptions());
 }
 
-AppFWAppComponent::~AppFWAppComponent() { appfw::init::shutdown(); }
+AppFWAppComponent::~AppFWAppComponent() { appfw::shutdown(); }
 
-void AppFWAppComponent::tick() { appfw::init::mainLoopTick(); }
+void AppFWAppComponent::tick() { appfw::mainLoopTick(); }
 
 FileSystemAppComponent::FileSystemAppComponent() {
     m_BaseAppPath = app_getInitInfo().baseAppPath;
@@ -43,7 +42,7 @@ FileSystemAppComponent::FileSystemAppComponent() {
         m_BaseAppPath = fs::current_path();
     }
 
-    logInfo("Base app path: {}", m_BaseAppPath.u8string());
+    printi("Base app path: {}", m_BaseAppPath.u8string());
 
     // Add paths
     getFileSystem().addSearchPath(m_BaseAppPath, "base");
@@ -59,8 +58,8 @@ OpenGLAppComponent::OpenGLAppComponent() {
         app_fatalError("Failed to load OpenGL library: {}", SDL_GetError());
     }
 
-    if (appfw::platform::isDebugBuild()) {
-        logDebug("OpenGL: Using debug context.");
+    if (appfw::isDebugBuild()) {
+        printd("OpenGL: Using debug context.");
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
     }
 }
@@ -111,7 +110,7 @@ MainWindowAppComponent::MainWindowAppComponent(AppConfig &config) {
 
     glad_set_post_callback(gladPostCallback);
 
-    logInfo("OpenGL Version {}.{} loaded", GLVersion.major, GLVersion.minor);
+    printi("OpenGL Version {}.{} loaded", GLVersion.major, GLVersion.minor);
     bIsGladLoaded = true;
 }
 
@@ -131,7 +130,7 @@ void MainWindowAppComponent::gladPostCallback(const char *name, void *, int, ...
     GLenum errorCode = glad_glGetError();
 
     if (errorCode != GL_NO_ERROR) {
-        logError("OpenGL Error: {} (0x{:X}) in {}", getGlErrorString(errorCode), (int)errorCode, name);
+        printe("OpenGL Error: {} (0x{:X}) in {}", getGlErrorString(errorCode), (int)errorCode, name);
         if (gl_break_on_error.getValue()) {
             AFW_DEBUG_BREAK();
         }

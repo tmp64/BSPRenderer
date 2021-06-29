@@ -7,24 +7,25 @@ ConVar<double> app_tps_max("app_tps_max", 100, "Application tickrate");
 ConVar<double> app_fps_max("app_fps_max", 60, "Application framerate");
 ConVar<bool> app_sync_rates("app_sync_rates", false, "Syncs TPS and FPS, uses value from app_fps_max for the rate.");
 
-static ConCommand cmd_toggleconsole("toggleconsole", "Toggles console dialog", [](const appfw::ParsedCommand &) {
+static ConCommand cmd_toggleconsole("toggleconsole", "Toggles console dialog", [](const CmdString &) {
     GuiAppBase::getBaseInstance().setConsoleVisible(!GuiAppBase::getBaseInstance().isConsoleVisible());
 });
 
-static ConCommand cmd_quit("quit", "Quits the app", [](const appfw::ParsedCommand &) {
+static ConCommand cmd_quit("quit", "Quits the app", [](const CmdString &) {
     GuiAppBase::getBaseInstance().quit();
 });
 
 GuiAppBase::GuiAppBase()
-    : m_AppConfig(getFileSystem().findFile(app_getInitInfo().appDirName + "/app_config.json", "base"))
+    : m_AppConfig(
+          getFileSystem().findExistingFile("base:" +  app_getInitInfo().appDirName + "/app_config.json"))
     , m_AppConfigInit(m_AppConfig)
     , m_Window(m_AppConfig)
     , m_ImGui(m_Window) {
     AFW_ASSERT(!m_sBaseInstance);
     m_sBaseInstance = this;
 
-    // Enable extcon
-    appfw::init::setExtconPort(getConfig().getItem("appfw").get<int>("extcon_port"));
+    // TODO: Enable extcon
+    //appfw::init::setExtconPort(getConfig().getItem("appfw").get<int>("extcon_port"));
 
     // ImGUI font scale
     float fontScale = getConfig().getItem("gui").get<float>("imgui_font_scale", 0.0f);
@@ -36,16 +37,16 @@ GuiAppBase::GuiAppBase()
             if (dpi > NORMAL_DPI) {
                 ImGui::GetIO().FontGlobalScale = dpi / NORMAL_DPI;
 
-                if (appfw::platform::isAndroid()) {
+                if (appfw::isAndroid()) {
                     ImGui::GetIO().FontGlobalScale *= 3.f / 5.f;
                 }
 
-                logDebug("Display DPI: {}, font scale: {}", dpi, ImGui::GetIO().FontGlobalScale);
+                printd("Display DPI: {}, font scale: {}", dpi, ImGui::GetIO().FontGlobalScale);
             } else if (dpi < NORMAL_DPI) {
-                logWarn("DPI is lower than normal DPI ({} < {})", dpi, NORMAL_DPI);
+                printw("DPI is lower than normal DPI ({} < {})", dpi, NORMAL_DPI);
             }
         } else {
-            logWarn("Failed to get display DPI: {}", SDL_GetError());
+            printw("Failed to get display DPI: {}", SDL_GetError());
         }
     } else {
         ImGui::GetIO().FontGlobalScale = fontScale;
@@ -55,7 +56,7 @@ GuiAppBase::GuiAppBase()
     appfw::getConsole().addConsoleReceiver(&m_DevConsole);
     InputSystem::get().bindKey(SDL_SCANCODE_GRAVE, "toggleconsole");
 
-    logInfo("GuiAppBase initialized.");
+    printi("GuiAppBase initialized.");
 }
 
 GuiAppBase::~GuiAppBase() {
@@ -64,7 +65,7 @@ GuiAppBase::~GuiAppBase() {
     appfw::getConsole().removeConsoleReceiver(&m_DevConsole);
 
     m_sBaseInstance = nullptr;
-    logInfo("Shutting down GuiAppBase.");
+    printi("Shutting down GuiAppBase.");
 }
 
 int GuiAppBase::run() {
@@ -91,7 +92,7 @@ int GuiAppBase::run() {
         long long timeToWait = 0;
 
         if (syncRates) {
-            m_flLastTickTime = m_TickTimer.elapsedSeconds();
+            m_flLastTickTime = m_TickTimer.dseconds();
             m_TickTimer.start();
             internalTick();
 
@@ -100,35 +101,35 @@ int GuiAppBase::run() {
 
             m_flTime += m_flLastTickTime;
 
-            double timeLeft = targetFrametime - m_TickTimer.elapsedSeconds();
+            double timeLeft = targetFrametime - m_TickTimer.dseconds();
             timeToWait = (long long)(timeLeft * 1000000);
         } else {
-            if (m_TickTimer.elapsedSeconds() >= targetTicktime) {
-                m_flLastTickTime = m_TickTimer.elapsedSeconds();
+            if (m_TickTimer.dseconds() >= targetTicktime) {
+                m_flLastTickTime = m_TickTimer.dseconds();
                 m_TickTimer.start();
                 internalTick();
                 m_flTime += m_flLastTickTime;
             }
 
-            if (m_DrawTimer.elapsedSeconds() >= targetFrametime) {
-                m_flLastFrameTime = m_DrawTimer.elapsedSeconds();
+            if (m_DrawTimer.dseconds() >= targetFrametime) {
+                m_flLastFrameTime = m_DrawTimer.dseconds();
                 m_DrawTimer.start();
                 internalDraw();
             }
 
-            double tickTimeLeft = targetTicktime - m_TickTimer.elapsedSeconds();
-            double frameTimeLeft = targetFrametime - m_DrawTimer.elapsedSeconds();
+            double tickTimeLeft = targetTicktime - m_TickTimer.dseconds();
+            double frameTimeLeft = targetFrametime - m_DrawTimer.dseconds();
 
             timeToWait = (long long)(std::min(tickTimeLeft, frameTimeLeft) * 1000000);
         }
 
         waitTimer.start();
 
-        while (waitTimer.elapsedMicroseconds() < timeToWait - 4000) {
+        while (waitTimer.us() < timeToWait - 4000) {
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
 
-        while (waitTimer.elapsedMicroseconds() < timeToWait) {
+        while (waitTimer.us() < timeToWait) {
             std::this_thread::yield();
         }
     }
@@ -189,7 +190,7 @@ void GuiAppBase::onWindowSizeChange(int wide, int tall) {
 }
 
 void GuiAppBase::quit() {
-    logInfo("Quitting the app");
+    printi("Quitting the app");
     m_bIsRunning = false;
 }
 
@@ -251,8 +252,8 @@ void app_vfatalError(const char *format, fmt::format_args args) {
     if (SDLAppComponent::isInitialized()) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Fatal Error", msg.c_str(), nullptr);
 
-        if (appfw::init::isInitialized()) {
-            logFatal("Fatal Error: {}\n", msg);
+        if (appfw::isInitialized()) {
+            printfatal("Fatal Error: {}\n", msg);
         }
     }
 

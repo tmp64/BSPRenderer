@@ -5,6 +5,7 @@
 #include <string>
 #include <SDL.h>
 #include <appfw/utils.h>
+#include <appfw/appfw.h>
 
 class InputSystem : appfw::NoCopy {
 public:
@@ -45,7 +46,7 @@ public:
     /**
      * Returns command bound to the key.
      */
-    const appfw::ParsedCommand &getKeyBind(SDL_Scancode key);
+    const std::vector<CmdString> &getKeyBind(SDL_Scancode key);
 
     /**
      * Binds a command to a key.
@@ -55,7 +56,7 @@ public:
     /**
      * Binds a command to a key.
      */
-    void bindKey(SDL_Scancode key, const appfw::ParsedCommand &cmd);
+    void bindKey(SDL_Scancode key, const std::vector<CmdString> &cmd);
 
     /**
      * Returns how much mouse has moved since last call to getMouseMovement.
@@ -86,8 +87,8 @@ private:
     int m_iMouseRelX = 0;
     int m_iMouseRelY = 0;
     std::unordered_map<std::string, SDL_Scancode> m_ScancodeMap;
-    std::array<appfw::ParsedCommand, SDL_NUM_SCANCODES> m_KeyBinds;
-    std::array<appfw::ParsedCommand, MAX_MOUSE_BUTTONS + 1> m_MouseBinds;
+    std::array<std::vector<CmdString>, SDL_NUM_SCANCODES> m_KeyBinds;
+    std::array<std::vector<CmdString>, MAX_MOUSE_BUTTONS + 1> m_MouseBinds;
 
     void createScancodeMap();
 };

@@ -1,6 +1,7 @@
 #ifndef DEMO_H
 #define DEMO_H
 #include <appfw/utils.h>
+#include <appfw/span.h>
 #include <cstdint>
 #include <string>
 #include <vector>

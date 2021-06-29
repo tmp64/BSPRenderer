@@ -1,4 +1,4 @@
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include "bsp_tree.h"
 #include "bspviewer.h"
 
@@ -6,22 +6,22 @@ BSPTree g_BSPTree;
 
 static glm::vec3 s_Points[2];
 
-static ConCommand cmd_trace1("trace1", "", [](const appfw::ParsedCommand &) {
+static ConCommand cmd_trace1("trace1", "", []() {
     s_Points[0] = BSPViewer::get().getCameraPos();
-    logInfo("Trace: point 1 ({}; {}; {})", s_Points[0].x, s_Points[0].y, s_Points[0].z);
+    printi("Trace: point 1 ({}; {}; {})", s_Points[0].x, s_Points[0].y, s_Points[0].z);
 });
 
-static ConCommand cmd_trace2("trace2", "", [](const appfw::ParsedCommand &) {
+static ConCommand cmd_trace2("trace2", "", []() {
     s_Points[1] = BSPViewer::get().getCameraPos();
-    logInfo("Trace: point 2 ({}; {}; {})", s_Points[1].x, s_Points[1].y, s_Points[1].z);
+    printi("Trace: point 2 ({}; {}; {})", s_Points[1].x, s_Points[1].y, s_Points[1].z);
 
-    logInfo("Trace: distance {}", glm::length(s_Points[1] - s_Points[0]));
+    printi("Trace: distance {}", glm::length(s_Points[1] - s_Points[0]));
     bsp::Level *lvl = g_BSPTree.getLevel();
     int traceRes = lvl->traceLine(s_Points[0], s_Points[1]);
     if (traceRes != bsp::CONTENTS_EMPTY) {
-        logError("HIT {}", traceRes);
+        printe("HIT {}", traceRes);
     } else {
-        logWarn("CLEAR");
+        printw("CLEAR");
     }
 });
 
@@ -62,7 +62,7 @@ BSPTree::Leaf::Leaf(const bsp::BSPLeaf &bspLeaf) {
 }
 
 void BSPTree::createTree() {
-    logDebug("Loading BSP tree");
+    printd("Loading BSP tree");
     m_Leaves.clear();
     m_Nodes.clear();
     createLeaves();

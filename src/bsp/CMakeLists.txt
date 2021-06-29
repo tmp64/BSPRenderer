@@ -23,6 +23,7 @@ add_library(bsp STATIC
 	${BSP_PRIVATE_SOURCES}
 )
 
+appfw_module(bsp)
 target_include_directories(bsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(bsp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -33,6 +34,13 @@ target_compile_definitions(bsp PUBLIC
 target_link_libraries(bsp
 	appfw
 	glm::glm
+)
+
+appfw_get_std_pch(PCH_STD_HEADERS)
+appfw_get_pch(PCH_APPFW_HEADERS)
+target_precompile_headers(bsp PRIVATE
+    ${PCH_STD_HEADERS}
+    ${PCH_APPFW_HEADERS}
 )
 
 source_group("Public Headers" FILES ${BSP_PUBLIC_HEADERS})

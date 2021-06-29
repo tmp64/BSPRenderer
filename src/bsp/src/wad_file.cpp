@@ -1,6 +1,6 @@
 #include <fstream>
 #include <fmt/format.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <bsp/wad_file.h>
 
 bsp::WADFile::WADFile(appfw::span<uint8_t> data) { loadFromBytes(data); }
@@ -72,7 +72,7 @@ void bsp::WADFile::loadFromBytesInternal() {
         }
 
         if (dirEntry.nDiskSize < sizeof(BSPMipTex)) {
-            logWarn("Invalid WAD entry");
+            printw("Invalid WAD entry");
             continue;
         }
 

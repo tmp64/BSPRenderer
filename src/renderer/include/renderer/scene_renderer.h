@@ -81,7 +81,7 @@ public:
      * @param   path    Path to the .bsp file to load lightmap from (can be empty)
      * @param   tag     Tag of .bsp
      */
-    void beginLoading(const bsp::Level *level, const std::string &path, const char *tag);
+    void beginLoading(const bsp::Level *level, std::string_view path);
 
     /**
      * Creates an optimized model for a brush model for more effficient solid rendering.

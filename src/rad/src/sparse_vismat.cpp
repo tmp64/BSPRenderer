@@ -16,45 +16,45 @@ bool rad::SparseVisMat::isValid() { return m_bIsLoaded && m_PatchHash == m_pRadS
 void rad::SparseVisMat::loadFromFile(const fs::path &path) {
     unloadMatrix();
 
-    appfw::BinaryReader file(path);
+    appfw::BinaryInputFile file(path);
 
     // Read magic
-    char magic[sizeof(SVISMAT_MAGIC)];
+    uint8_t magic[sizeof(SVISMAT_MAGIC)];
     file.readBytes(magic, sizeof(SVISMAT_MAGIC));
     if (memcmp(magic, SVISMAT_MAGIC, sizeof(SVISMAT_MAGIC))) {
-        logInfo("SVisMat discarded: unsupported format.");
+        printi("SVisMat discarded: unsupported format.");
         return;
     }
 
     // Read pointer size
     uint8_t ptrSize;
-    file.read(ptrSize);
+    ptrSize = file.readByte();
     if (ptrSize != sizeof(void *)) {
-        logInfo("SVisMat discarded: different pointer size.");
+        printi("SVisMat discarded: different pointer size.");
         return;
     }
 
     // Read patch hash
     appfw::SHA256::Digest patchHash;
-    file.readArray(appfw::span(patchHash));
+    file.readByteSpan(appfw::span(patchHash));
 
     if (patchHash != m_pRadSim->m_PatchHash) {
-        logInfo("SVisMat discarded: different patch hash.");
+        printi("SVisMat discarded: different patch hash.");
         return;
     }
 
     // Read patch count
     size_t patchCount = 0;
-    file.read(patchCount);
+    file.readObject(patchCount);
 
     if (patchCount != m_pRadSim->m_Patches.size()) {
-        logInfo("SVisMat discarded: patch count mismatch ({} instead of {}).", patchCount, m_pRadSim->m_Patches.size());
+        printi("SVisMat discarded: patch count mismatch ({} instead of {}).", patchCount, m_pRadSim->m_Patches.size());
         return;
     }
 
     // Read list size
     size_t listSize = 0;
-    file.read(listSize);
+    file.readObject(listSize);
 
     // Allocate memory
     m_OffsetTable.resize(patchCount);
@@ -63,16 +63,16 @@ void rad::SparseVisMat::loadFromFile(const fs::path &path) {
     m_ListItems.resize(listSize);
 
     // Read data
-    file.read(m_uTotalOnesCount);
-    file.readArray(appfw::span(m_OffsetTable));
-    file.readArray(appfw::span(m_CountTable));
-    file.readArray(appfw::span(m_OnesCountTable));
-    file.readArray(appfw::span(m_ListItems));
+    file.readObject(m_uTotalOnesCount);
+    file.readObjectArray(appfw::span(m_OffsetTable));
+    file.readObjectArray(appfw::span(m_CountTable));
+    file.readObjectArray(appfw::span(m_OnesCountTable));
+    file.readObjectArray(appfw::span(m_ListItems));
 
     m_bIsLoaded = true;
     m_PatchHash = patchHash;
 
-    logInfo("Reusing previous vismat.");
+    printi("Reusing previous vismat.");
 }
 
 void rad::SparseVisMat::saveToFile(const fs::path &path) {
@@ -80,17 +80,17 @@ void rad::SparseVisMat::saveToFile(const fs::path &path) {
         throw std::logic_error("VisMat::saveToFile: vismat not loaded");
     }
 
-    appfw::BinaryWriter file(path);
+    appfw::BinaryOutputFile file(path);
     file.writeBytes(SVISMAT_MAGIC, sizeof(SVISMAT_MAGIC));
-    file.write<uint8_t>(sizeof(void *));
-    file.writeArray(appfw::span(m_PatchHash));
-    file.write(m_OffsetTable.size());
-    file.write(m_ListItems.size());
-    file.write(m_uTotalOnesCount);
-    file.writeArray(appfw::span(m_OffsetTable));
-    file.writeArray(appfw::span(m_CountTable));
-    file.writeArray(appfw::span(m_OnesCountTable));
-    file.writeArray(appfw::span(m_ListItems));
+    file.writeByte(sizeof(void *));
+    file.writeByteSpan(appfw::span(m_PatchHash));
+    file.writeObject(m_OffsetTable.size());
+    file.writeObject(m_ListItems.size());
+    file.writeObject(m_uTotalOnesCount);
+    file.writeObjectArray(appfw::span(m_OffsetTable));
+    file.writeObjectArray(appfw::span(m_CountTable));
+    file.writeObjectArray(appfw::span(m_OnesCountTable));
+    file.writeObjectArray(appfw::span(m_ListItems));
 }
 
 void rad::SparseVisMat::buildSparseMat() {
@@ -116,7 +116,7 @@ void rad::SparseVisMat::unloadMatrix() {
 }
 
 void rad::SparseVisMat::calcSize() {
-    logInfo("Calculating sparse matrix size...");
+    printi("Calculating sparse matrix size...");
     appfw::Timer timer;
     timer.start();
 
@@ -164,10 +164,10 @@ void rad::SparseVisMat::calcSize() {
     }
 
     timer.stop();
-    logInfo("Calculate sparse vismat: {:.3f} s", timer.elapsedSeconds());
+    printi("Calculate sparse vismat: {:.3f} s", timer.dseconds());
 
     size_t vismatSize = patchCount * (sizeof(size_t) + 2 * sizeof(PatchIndex)) + totalListItemCount * sizeof(ListItem);
-    logInfo("Sparse vismat size: {:.3f} MiB", vismatSize / 1024.f / 1024.f);
+    printi("Sparse vismat size: {:.3f} MiB", vismatSize / 1024.f / 1024.f);
 
     m_OffsetTable.resize(patchCount);
     m_CountTable.resize(patchCount);
@@ -176,7 +176,7 @@ void rad::SparseVisMat::calcSize() {
 }
 
 void rad::SparseVisMat::compressMat() {
-    logInfo("Compress vismat into sparse matrix...");
+    printi("Compress vismat into sparse matrix...");
     appfw::Timer timer;
     timer.start();
 
@@ -238,11 +238,11 @@ void rad::SparseVisMat::compressMat() {
     m_uTotalOnesCount = totalOnesCount;
 
     timer.stop();
-    logInfo("Compress vismat: {:.1f} s", timer.elapsedSeconds());
+    printi("Compress vismat: {:.1f} s", timer.dseconds());
 }
 
 void rad::SparseVisMat::validateMat() {
-    logInfo("Validating sparse matrix...");
+    printi("Validating sparse matrix...");
     appfw::Timer timer;
     timer.start();
 
@@ -253,7 +253,7 @@ void rad::SparseVisMat::validateMat() {
         if (m_CountTable[i] > 0) {
             for (PatchIndex j = i + 1; j < m_ListItems[m_OffsetTable[i]].offset; j++) {
                 if (m_pRadSim->m_VisMat.checkVisBit(i, j)) {
-                    logFatal("sparse matrix validation failed 1: {} {}", i, j);
+                    printfatal("sparse matrix validation failed 1: {} {}", i, j);
                     abort();
                 }
             }
@@ -268,7 +268,7 @@ void rad::SparseVisMat::validateMat() {
             // Check that all bits are ones
             for (PatchIndex k = 0; k < item.size; k++) {
                 if (!m_pRadSim->m_VisMat.checkVisBit(i, p + k)) {
-                    logFatal("sparse matrix validation failed 2: {} {} {}", i, j, k);
+                    printfatal("sparse matrix validation failed 2: {} {} {}", i, j, k);
                     abort();
                 }
             }
@@ -279,7 +279,7 @@ void rad::SparseVisMat::validateMat() {
             if (j + 1 < m_CountTable[i]) {
                 for (PatchIndex k = 0; k < m_ListItems[m_OffsetTable[i] + j + 1].offset; k++) {
                     if (m_pRadSim->m_VisMat.checkVisBit(i, p + k)) {
-                        logFatal("sparse matrix validation failed 3: {} {} {}", i, j, k);
+                        printfatal("sparse matrix validation failed 3: {} {} {}", i, j, k);
                         abort();
                     }
                 }
@@ -288,5 +288,5 @@ void rad::SparseVisMat::validateMat() {
     }
 
     timer.stop();
-    logInfo("Validate sparse vismat: {:.3f} s", timer.elapsedSeconds());
+    printi("Validate sparse vismat: {:.3f} s", timer.dseconds());
 }

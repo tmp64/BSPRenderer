@@ -12,7 +12,7 @@ void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) 
             BrushModel *pModel = WorldState::get().getBrushModel(modelidx);
 
             if (!pModel) {
-                logError("Entity {}: invalid model index '{}'", idx, model);
+                printe("Entity {}: invalid model index '{}'", idx, model);
             }
 
             m_pModel = pModel;
@@ -25,7 +25,7 @@ void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) 
         glm::vec3 origin;
 
         if (sscanf(originstr.c_str(), "%f %f %f", &origin.x, &origin.y, &origin.z) != 3) {
-            logError("Entity {}: invalid origin string '{}'", idx, originstr);
+            printe("Entity {}: invalid origin string '{}'", idx, originstr);
         }
 
         m_vOrigin = origin;
@@ -36,7 +36,7 @@ void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) 
         glm::vec3 angles;
 
         if (sscanf(anglesstr.c_str(), "%f %f %f", &angles.x, &angles.y, &angles.z) != 3) {
-            logError("Entity {}: invalid angles string '{}'", idx, anglesstr);
+            printe("Entity {}: invalid angles string '{}'", idx, anglesstr);
         }
 
         m_vAngles = angles;
@@ -51,7 +51,7 @@ void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) 
         glm::ivec3 color;
 
         if (sscanf(colorstr.c_str(), "%d %d %d", &color.x, &color.y, &color.z) != 3) {
-            logError("Entity {}: invalid rendercolor string '{}'", idx, colorstr);
+            printe("Entity {}: invalid rendercolor string '{}'", idx, colorstr);
         }
 
         m_vFxColor = color;

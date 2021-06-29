@@ -6,7 +6,6 @@
 #include <taskflow/taskflow.hpp>
 #include <appfw/sha256.h>
 #include <appfw/utils.h>
-#include <appfw/thread_pool.h>
 #include <bsp/level.h>
 #include <app_base/app_config.h>
 #include <rad/types.h>

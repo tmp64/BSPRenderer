@@ -17,10 +17,19 @@ add_executable(bspviewer
 	src/world_state.h
 )
 
+appfw_module(bspviewer)
+
 target_include_directories(bspviewer PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(bspviewer
 	gui_app
+)
+
+appfw_get_std_pch(PCH_STD_HEADERS)
+appfw_get_pch(PCH_APPFW_HEADERS)
+target_precompile_headers(bspviewer PRIVATE
+    ${PCH_STD_HEADERS}
+    ${PCH_APPFW_HEADERS}
 )

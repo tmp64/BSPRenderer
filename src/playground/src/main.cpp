@@ -5,7 +5,7 @@
 #include <appfw/console/con_item.h>
 #include <appfw/dbg.h>
 #include <appfw/init.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <appfw/command_line.h>
 #include <appfw/timer.h>
 #include <renderer/texture_block.h>
@@ -48,23 +48,23 @@ void testBlockByte() {
 
     TextureBlock<glm::u8vec3> block(SIZE, SIZE);
     /*AFW_ASSERT(block.insert(test1.data, test1.wide, test1.tall, x, y, 0));
-    logInfo("test1: {} {}", x, y);
+    printi("test1: {} {}", x, y);
     AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    logInfo("test2: {} {}", x, y);
+    printi("test2: {} {}", x, y);
     AFW_ASSERT(block.insert(test1.data, test1.wide, test1.tall, x, y, 0));
-    logInfo("test1: {} {}", x, y);
+    printi("test1: {} {}", x, y);
     AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    logInfo("test2: {} {}", x, y);
+    printi("test2: {} {}", x, y);
     //AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    //logInfo("test2: {} {}", x, y);
+    //printi("test2: {} {}", x, y);
     //AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    //logInfo("test2: {} {}", x, y);
+    //printi("test2: {} {}", x, y);
     AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    logInfo("test2: {} {}", x, y);
+    printi("test2: {} {}", x, y);
     AFW_ASSERT(block.insert(test1.data, test1.wide, test1.tall, x, y, 0));
-    logInfo("test1: {} {}", x, y);
+    printi("test1: {} {}", x, y);
     //AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    //logInfo("test2: {} {}", x, y);*/
+    //printi("test2: {} {}", x, y);*/
 
     appfw::Timer timer;
     timer.start();
@@ -76,7 +76,7 @@ void testBlockByte() {
         ;
 
     timer.stop();
-    logDebug("Time: {:.3f} ms", timer.elapsedSeconds() * 1000);
+    printd("Time: {:.3f} ms", timer.dseconds() * 1000);
 
     bitMapImage<32> out(SIZE, SIZE);
 
@@ -120,23 +120,23 @@ void testBlockFloat() {
 
     TextureBlock<glm::vec3> block(SIZE, SIZE);
     /*AFW_ASSERT(block.insert(test1.data, test1.wide, test1.tall, x, y, 0));
-    logInfo("test1: {} {}", x, y);
+    printi("test1: {} {}", x, y);
     AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    logInfo("test2: {} {}", x, y);
+    printi("test2: {} {}", x, y);
     AFW_ASSERT(block.insert(test1.data, test1.wide, test1.tall, x, y, 0));
-    logInfo("test1: {} {}", x, y);
+    printi("test1: {} {}", x, y);
     AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    logInfo("test2: {} {}", x, y);
+    printi("test2: {} {}", x, y);
     //AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    //logInfo("test2: {} {}", x, y);
+    //printi("test2: {} {}", x, y);
     //AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    //logInfo("test2: {} {}", x, y);
+    //printi("test2: {} {}", x, y);
     AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    logInfo("test2: {} {}", x, y);
+    printi("test2: {} {}", x, y);
     AFW_ASSERT(block.insert(test1.data, test1.wide, test1.tall, x, y, 0));
-    logInfo("test1: {} {}", x, y);
+    printi("test1: {} {}", x, y);
     //AFW_ASSERT(block.insert(test2.data, test2.wide, test2.tall, x, y, 0));
-    //logInfo("test2: {} {}", x, y);*/
+    //printi("test2: {} {}", x, y);*/
 
     appfw::Timer timer;
     timer.start();
@@ -148,7 +148,7 @@ void testBlockFloat() {
         ;
 
     timer.stop();
-    logDebug("Time: {:.3f} ms", timer.elapsedSeconds() * 1000);
+    printd("Time: {:.3f} ms", timer.dseconds() * 1000);
 
     bitMapImage<32> out(SIZE, SIZE);
 
@@ -162,10 +162,10 @@ void testBlockFloat() {
     out.saveToFile("out_float.bmp");
 }
 
-int realMain(int, char **) {
-    appfw::init::init();
+int realMain(int argc, char **argv) {
+    appfw::InitComponent appfwInit (appfw::InitOptions().setArgs(argc, argv));
 
-    logWarn("Test");
+    printw("Test");
 
     /*try {
         // --arg1 "val1 with spaces" --fl1 -fA +cmd cmdarg
@@ -173,10 +173,10 @@ int realMain(int, char **) {
         char *argv[] = {"exec_name", "--arg1", "val1 with spaces", "--fl1", "-fA", "+cmd", "cmdarg"};
         appfw::CommandLine cmd;
         cmd.parseCommandLine(argc, argv);
-        logInfo("parsed");
+        printi("parsed");
     }
     catch (const std::exception &e) {
-        logError("{}", e.what());
+        printe("{}", e.what());
     }*/
     
 
@@ -190,8 +190,7 @@ int realMain(int, char **) {
     testBlockByte();
     testBlockFloat();
 
-    logDebug("Quitting...");
-    appfw::init::shutdown();
+    printd("Quitting...");
     return 0;
 }
 

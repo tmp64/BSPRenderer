@@ -1,8 +1,7 @@
 #ifndef RAD_VISMAT_H
 #define RAD_VISMAT_H
 #include <vector>
-#include <appfw/thread_pool.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <appfw/sha256.h>
 #include <rad/types.h>
 

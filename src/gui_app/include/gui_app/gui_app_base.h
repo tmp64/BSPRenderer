@@ -3,7 +3,7 @@
 #include <fmt/format.h>
 #include <glm/glm.hpp>
 #include <appfw/utils.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <appfw/timer.h>
 #include <appfw/compiler.h>
 #include <app_base/app_config.h>

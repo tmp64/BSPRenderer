@@ -21,7 +21,7 @@ public:
     void ClearLog();
 
     void AddLog(const char *fmt, ...);
-    void AddLog(appfw::Color color, const char *fmt, ...);
+    void AddLog(ImVec4 color, const char *fmt, ...);
 
     void Draw(const char *title, bool *p_open);
 
@@ -33,9 +33,10 @@ public:
     int TextEditCallback(ImGuiInputTextCallbackData *data);
 
     // IConsoleReceiver
-    virtual void onAdd(appfw::IConsoleSystem *conSystem) override;
-    virtual void onRemove(appfw::IConsoleSystem *conSystem) override;
-    virtual void print(const appfw::ConsoleMsgInfo &msgInfo, const std::string &msg) override;
+    void onAdd(appfw::ConsoleSystem *conSystem) override;
+    void onRemove(appfw::ConsoleSystem *conSystem) override;
+    void print(const appfw::ConMsgInfo &info, std::string_view msg) override;
+    bool isThreadSafe() override;
 
 private:
     struct LogEntry {
@@ -51,6 +52,7 @@ private:
     bool AutoScroll;
     bool ScrollToBottom;
     appfw::ConsoleSystem *m_pConSystem = nullptr;
+    std::mutex m_Mutex;
 };
 
 #endif

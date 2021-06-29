@@ -3,19 +3,9 @@
 #include <cmath>
 #include <glm/glm.hpp>
 #include <bsp/bsp_types.h>
-#include <appfw/color.h>
 #include <appfw/utils.h>
 
 enum { ANGLE_PITCH = 0, ANGLE_YAW = 1, ANGLE_ROLL = 2 };
-
-inline glm::vec4 colorToVec(appfw::Color c) {
-    return {
-        c.r() / 255.f,
-        c.g() / 255.f,
-        c.b() / 255.f,
-        c.a() / 255.f
-    };
-}
 
 inline void angleVectors(glm::vec3 angles, glm::vec3 *forward, glm::vec3 *right, glm::vec3 *up) {
     float sr, sp, sy, cr, cp, cy;

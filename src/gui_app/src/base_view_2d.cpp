@@ -13,8 +13,8 @@ public:
 
     virtual void create() override {
         createProgram();
-        createVertexShader("shaders/base_view_2d/texture.vert", "assets");
-        createFragmentShader("shaders/base_view_2d/texture.frag", "assets");
+        createVertexShader("assets:shaders/base_view_2d/texture.vert");
+        createFragmentShader("assets:shaders/base_view_2d/texture.frag");
         linkProgram();
     }
 

@@ -1,6 +1,3 @@
-[submodule "external/fmt"]
-	path = external/fmt
-	url = https://github.com/fmtlib/fmt.git
-[submodule "src/appfw"]
-	path = src/appfw
-	url = ssh://git.home.lan:/home/tmp64/bare_repos/appfw
+[submodule "external/appfw"]
+	path = external/appfw
+	url = https://github.com/tmp64/appfw.git

@@ -62,7 +62,7 @@ static void loadFileToString(const fs::path &path, std::string &string) {
     input.close();
 }
 
-void BaseShader::createVertexShader(const fs::path &filepath) {
+void BaseShader::createVertexShaderFromPath(const fs::path &filepath) {
     AFW_ASSERT(m_nProgId);
     AFW_ASSERT(!m_nVertexShaderId);
 
@@ -87,7 +87,7 @@ void BaseShader::createVertexShader(const fs::path &filepath) {
     }
 }
 
-void BaseShader::createFragmentShader(const fs::path &filepath) {
+void BaseShader::createFragmentShaderFromPath(const fs::path &filepath) {
     AFW_ASSERT(m_nProgId);
     AFW_ASSERT(!m_nFragShaderId);
 
@@ -141,12 +141,12 @@ void BaseShader::linkProgram() {
         i->loadLocation();
 }
 
-void BaseShader::createVertexShader(const std::string &filepath, const char *tag) {
-    createVertexShader(getFileSystem().findFile(filepath, tag));
+void BaseShader::createVertexShader(std::string_view filepath) {
+    createVertexShaderFromPath(getFileSystem().findExistingFile(filepath));
 }
 
-void BaseShader::createFragmentShader(const std::string &filepath, const char *tag) {
-    createFragmentShader(getFileSystem().findFile(filepath, tag));
+void BaseShader::createFragmentShader(std::string_view filepath) {
+    createFragmentShaderFromPath(getFileSystem().findExistingFile(filepath));
 }
 
 std::forward_list<BaseShader *> &BaseShader::getUnregItems() {

@@ -2,8 +2,6 @@ set(RNDR_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/base_shader.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/client_entity.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/const.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/font_renderer.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/frame_console.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/material_manager.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/model.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/raii.h
@@ -22,8 +20,6 @@ set(RNDR_PRIVATE_HEADERS
 
 set(RNDR_PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_shader.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/font_renderer.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/frame_console.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/material_manager.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_renderer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/shader_manager.cpp
@@ -39,6 +35,7 @@ add_library(renderer STATIC
 	${RNDR_PRIVATE_SOURCES}
 )
 
+appfw_module(renderer)
 target_include_directories(renderer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(renderer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -54,6 +51,13 @@ target_link_libraries(renderer
 	gui_app
 	imgui
 	Freetype::Freetype
+)
+
+appfw_get_std_pch(PCH_STD_HEADERS)
+appfw_get_pch(PCH_APPFW_HEADERS)
+target_precompile_headers(renderer PRIVATE
+    ${PCH_STD_HEADERS}
+    ${PCH_APPFW_HEADERS}
 )
 
 # TextureBlock is extremely slow without optiomizations

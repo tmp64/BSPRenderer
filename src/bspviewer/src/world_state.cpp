@@ -160,16 +160,16 @@ void WorldState::loadEntities() {
             pEnt->loadKeyValues(ents[i], (int)i);
             m_EntityList.push_back(std::move(pEnt));
         } catch (const std::exception &e) {
-            logError("Entity {}: {}", i, e.what());
+            printe("Entity {}: {}", i, e.what());
         }
     }
 
-    logInfo("Loaded {} entities.", m_EntityList.size());
+    printi("Loaded {} entities.", m_EntityList.size());
     
     size_t fail = ents.size() - m_EntityList.size();
 
     if (fail > 0) {
-        logWarn("{} entities failed to load", fail);
+        printw("{} entities failed to load", fail);
     }
 }
 

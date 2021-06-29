@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16.0)
 
 project(BSPRenderer)
 
-include(src/appfw/cmake/platform_info.cmake)
+include(external/appfw/cmake/platform_info.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,9 +25,7 @@ if(NOT FREETYPE_FOUND)
 	message(FATAL_ERROR "Freetype not found")
 endif()
 
-message(STATUS ">>> FMT library begin")
-add_subdirectory(external/fmt)
-message(STATUS ">>> FMT library end")
+add_subdirectory(external/appfw)
 add_subdirectory(external/glad_debug)
 add_subdirectory(external/imgui)
 add_subdirectory(external/nlohmann_json)
@@ -35,7 +33,6 @@ add_subdirectory(external/sdl_net)
 add_subdirectory(external/taskflow)
 
 # Libraries
-add_subdirectory(src/appfw)
 add_subdirectory(src/app_base)
 add_subdirectory(src/gui_app)
 add_subdirectory(src/bsp)

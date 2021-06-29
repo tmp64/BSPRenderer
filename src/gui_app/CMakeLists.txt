@@ -29,6 +29,7 @@ add_library(gui_app STATIC
 	${PRIVATE_SOURCES}
 )
 
+appfw_module(gui_app)
 target_include_directories(gui_app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(gui_app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -42,6 +43,13 @@ target_link_libraries(gui_app
 	SDL2::SDL2
 	SDL2::SDL2main
 	nlohmann_json
+)
+
+appfw_get_std_pch(PCH_STD_HEADERS)
+appfw_get_pch(PCH_APPFW_HEADERS)
+target_precompile_headers(gui_app PRIVATE
+    ${PCH_STD_HEADERS}
+    ${PCH_APPFW_HEADERS}
 )
 
 source_group("Public Headers" FILES ${PUBLIC_HEADERS})

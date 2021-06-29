@@ -1,7 +1,7 @@
 #ifndef RENDERER_SURFACE_RENDERER_H
 #define RENDERER_SURFACE_RENDERER_H
 #include <appfw/utils.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <bsp/level.h>
 #include <glm/glm.hpp>
 #include <renderer/material_manager.h>

@@ -19,9 +19,9 @@ Renderer::~Renderer() {
 
 void Renderer::setViewportSize(const glm::ivec2 &size) { m_SceneRenderer.setViewportSize(size); }
 
-void Renderer::loadLevel(const std::string &path, const char *tag) {
+void Renderer::loadLevel(const std::string &path) {
     AFW_ASSERT(m_SceneRenderer.getLevel() == nullptr);
-    m_SceneRenderer.beginLoading(&WorldState::get().getLevel(), path, tag);
+    m_SceneRenderer.beginLoading(&WorldState::get().getLevel(), path);
 }
 
 void Renderer::unloadLevel() {

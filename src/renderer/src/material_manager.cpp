@@ -1,4 +1,4 @@
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ASSERT(x) AFW_ASSERT(x)
@@ -109,8 +109,8 @@ void MaterialManager::init() {
     if (isAnisoSupported()) {
         glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &m_flMaxAniso);
     } else {
-        logWarn("Anisotropic filtering not supported by the GPU.");
-        logWarn("Mip-mapping will cause textures to appear blurry.");
+        printw("Anisotropic filtering not supported by the GPU.");
+        printw("Mip-mapping will cause textures to appear blurry.");
         m_flMaxAniso = 0;
     }
 }
@@ -236,17 +236,17 @@ void MaterialManager::loadWadFile(const fs::path &name) {
                 m_Materials.emplace_back(tex, buffer);
                 m_Map[tex.getName()] = m_Materials.size() - 1;
             } else {
-                logWarn("{}: texture {} already loaded from other WAD", wadFileName, tex.getName());
+                printw("{}: texture {} already loaded from other WAD", wadFileName, tex.getName());
             }
             
         }
         
         timer.stop();
         m_LoadedWadNames.push_back(wadFileName);
-        logInfo("Loaded {} in {:.3f} s", name.filename().u8string(), timer.elapsedSeconds());
+        printi("Loaded {} in {:.3f} s", name.filename().u8string(), timer.dseconds());
     }
     catch (const std::exception &e) {
-        logError("Failed to load WAD {}: {}", name.filename().u8string(), e.what());
+        printe("Failed to load WAD {}: {}", name.filename().u8string(), e.what());
     }
 }
 

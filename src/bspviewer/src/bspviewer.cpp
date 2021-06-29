@@ -2,7 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <appfw/init.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <appfw/compiler.h>
 #include <glad/glad.h>
 #include <imgui.h>
@@ -10,36 +10,35 @@
 #include <imgui_impl_opengl3.h>
 #include <renderer/shader_manager.h>
 #include <renderer/material_manager.h>
-#include <renderer/frame_console.h>
 
 #include "bspviewer.h"
 #include "demo.h"
 #include "bsp_tree.h"
 
-static ConCommand quit_cmd("quit", "Exits the app", [](auto &) { BSPViewer::get().quit(); });
+static ConCommand quit_cmd("quit", "Exits the app", []() { BSPViewer::get().quit(); });
 
-static ConCommand cmd_map("map", "Loads a map", [](const appfw::ParsedCommand &cmd) {
+static ConCommand cmd_map("map", "Loads a map", [](const CmdString &cmd) {
     if (cmd.size() != 2) {
-        logInfo("Usage: map <map name>");
+        printi("Usage: map <map name>");
         return;
     }
 
     BSPViewer::get().loadLevel(cmd[1]);
 });
 
-static ConCommand cmd_toggle_debug_text("toggle_debug_text", "", [](const appfw::ParsedCommand &) {
+static ConCommand cmd_toggle_debug_text("toggle_debug_text", "", []() {
     BSPViewer::get().setDrawDebugTextEnabled(!BSPViewer::get().isDrawDebugTextEnabled());
 });
 
-static ConCommand cmd_getpos("getpos", "", [](const appfw::ParsedCommand &) {
+static ConCommand cmd_getpos("getpos", "", [](const CmdString &) {
     auto pos = BSPViewer::get().getCameraPos();
     auto rot = BSPViewer::get().getCameraRot();
-    conPrint("setpos {} {} {} {} {} {}", pos.x, pos.y, pos.z, rot.x, rot.y, rot.z);
+    printi("setpos {} {} {} {} {} {}", pos.x, pos.y, pos.z, rot.x, rot.y, rot.z);
 });
 
-static ConCommand cmd_setpos("setpos", "", [](const appfw::ParsedCommand &cmd) {
+static ConCommand cmd_setpos("setpos", "", [](const CmdString &cmd) {
     if (cmd.size() < 4) {
-        conPrint("setpos <x> <y> <z> [pitch] [yaw] [roll]");
+        printi("setpos <x> <y> <z> [pitch] [yaw] [roll]");
         return;
     }
 
@@ -155,9 +154,8 @@ void BSPViewer::showInfoDialog() {
 
     ImGui::SetNextWindowBgAlpha(0.2f);
 
-    ImColor cyan =
-        ImColor(FrameConsole::Cyan.r(), FrameConsole::Cyan.g(), FrameConsole::Cyan.b(), FrameConsole::Cyan.a());
-    ImColor red = ImColor(FrameConsole::Red.r(), FrameConsole::Red.g(), FrameConsole::Red.b(), FrameConsole::Red.a());
+    ImColor cyan = ImColor(0, 255, 255, 255);
+    ImColor red = ImColor(255, 0, 0, 255);
 
     if (ImGui::Begin("BSPViewer Stats", nullptr, window_flags)) {
         showStatsUI();
@@ -250,22 +248,22 @@ void BSPViewer::setDrawDebugTextEnabled(bool state) { m_bDrawDebugText = state; 
 
 void BSPViewer::loadLevel(const std::string &name) {
     if (m_LoadingState == LoadingState::Loading) {
-        logError("Can't load a level while loading another level.");
+        printe("Can't load a level while loading another level.");
         return;
     }
 
     unloadLevel();
 
-    std::string path = "maps/" + name + ".bsp";    
-    logInfo("Loading map {}", path);
+    std::string path = "assets:maps/" + name + ".bsp";    
+    printi("Loading map {}", path);
 
     try {
         AFW_ASSERT(!m_pWorldState);
-        fs::path bspPath = getFileSystem().findFile(path, "assets");
+        fs::path bspPath = getFileSystem().findExistingFile(path);
         m_LoadedLevel.loadFromFile(bspPath);
         m_pWorldState = new WorldState();
         WorldState::get().loadLevel(m_LoadedLevel);
-        Renderer::get().loadLevel(path, "assets");
+        Renderer::get().loadLevel(path);
 
         g_BSPTree.setLevel(&m_LoadedLevel);
         g_BSPTree.createTree();
@@ -275,7 +273,7 @@ void BSPViewer::loadLevel(const std::string &name) {
 
         m_LoadingState = LoadingState::Loading;
     } catch (const std::exception &e) {
-        logError("Failed to load the map: {}", e.what());
+        printe("Failed to load the map: {}", e.what());
         unloadLevel();
         return;
     }
@@ -301,11 +299,11 @@ void BSPViewer::unloadLevel() {
 void BSPViewer::loadingTick() {
     try {
         if (Renderer::get().loadingTick()) {
-            logInfo("Loading finished");
+            printi("Loading finished");
             m_LoadingState = LoadingState::Loaded;
         }
     } catch (const std::exception &e) {
-        logError("Failed to load the map: {}", e.what());
+        printe("Failed to load the map: {}", e.what());
         m_LoadingState = LoadingState::Loaded;
         unloadLevel();
     }

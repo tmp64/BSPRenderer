@@ -7,7 +7,8 @@
 #include <optional>
 #include <memory>
 #include <appfw/utils.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
+#include <appfw/span.h>
 #include <bsp/bsp_types.h>
 
 namespace bsp {

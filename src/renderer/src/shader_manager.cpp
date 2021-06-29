@@ -1,4 +1,4 @@
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <renderer/base_shader.h>
 #include <renderer/shader_manager.h>
 
@@ -34,7 +34,7 @@ void ShaderManager::registerAllAvailableItems() {
 }
 
 bool ShaderManager::reloadShaders() {
-    logInfo("Reloading all shaders");
+    printi("Reloading all shaders");
 
     destroyAllShaders();
 
@@ -47,16 +47,16 @@ bool ShaderManager::reloadShaders() {
             pShader->create();
             success++;
         } catch (const std::exception &e) {
-            logError("When creating shader '{}':", pShader->getShaderTitle());
-            logError("    Error: {}", e.what());
-            logError("");
+            printe("When creating shader '{}':", pShader->getShaderTitle());
+            printe("    Error: {}", e.what());
+            printe("");
 
             result = false;
             failed++;
         }
     }
 
-    logInfo("Reloaded {} shader(s), {} failed (total {})", success, failed, m_ShaderList.size());
+    printi("Reloaded {} shader(s), {} failed (total {})", success, failed, m_ShaderList.size());
     return result;
 }
 

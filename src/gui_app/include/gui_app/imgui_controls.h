@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <imgui.h>
 
 // TODO: Move all that into a .cpp file

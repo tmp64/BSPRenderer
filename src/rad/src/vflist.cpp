@@ -10,46 +10,45 @@ bool rad::VFList::isLoaded() { return m_bIsLoaded; }
 bool rad::VFList::isValid() { return m_bIsLoaded && m_PatchHash == m_pRadSim->getPatchHash(); }
 
 void rad::VFList::loadFromFile(const fs::path &path) {
-    appfw::BinaryReader file(path);
+    appfw::BinaryInputFile file(path);
 
     // Read magic
-    char magic[sizeof(VF_MAGIC)];
+    uint8_t magic[sizeof(VF_MAGIC)];
     file.readBytes(magic, sizeof(VF_MAGIC));
     if (memcmp(magic, VF_MAGIC, sizeof(VF_MAGIC))) {
-        logInfo("VFList discarded: unsupported format.");
+        printi("VFList discarded: unsupported format.");
         return;
     }
 
     // Read pointer size
-    uint8_t ptrSize;
-    file.read(ptrSize);
+    uint8_t ptrSize = file.readByte();
     if (ptrSize != sizeof(void *)) {
-        logInfo("VFList discarded: different pointer size.");
+        printi("VFList discarded: different pointer size.");
         return;
     }
 
     // Read patch hash
     appfw::SHA256::Digest patchHash;
-    file.readArray(appfw::span(patchHash));
+    file.readByteSpan(appfw::span(patchHash));
 
     if (patchHash != m_pRadSim->m_PatchHash) {
-        logInfo("VFList discarded: different patch hash.");
+        printi("VFList discarded: different patch hash.");
         return;
     }
 
     // Read count
     size_t patchCount = m_pRadSim->m_Patches.size();
     size_t offsetSize;
-    file.read(offsetSize);
+    file.readObject(offsetSize);
 
     if (offsetSize != patchCount) {
-        logInfo("VFList discarded: offset table size mismatch ({} instead of {}).", offsetSize, patchCount);
+        printi("VFList discarded: offset table size mismatch ({} instead of {}).", offsetSize, patchCount);
         return;
     }
 
     // Read data size
     size_t size;
-    file.read(size);
+    file.readObject(size);
 
     // Resize offsets
     if (m_Offsets.size() != offsetSize) {
@@ -70,26 +69,26 @@ void rad::VFList::loadFromFile(const fs::path &path) {
     }
 
     // Read arrays
-    file.readArray(appfw::span(m_Offsets));
-    file.readArray(appfw::span(m_Data));
-    file.readArray(appfw::span(m_Koeff));
+    file.readObjectArray(appfw::span(m_Offsets));
+    file.readObjectArray(appfw::span(m_Data));
+    file.readObjectArray(appfw::span(m_Koeff));
 
     m_bIsLoaded = true;
     m_PatchHash = patchHash;
 
-    logInfo("Reusing previous VFList.");
+    printi("Reusing previous VFList.");
 }
 
 void rad::VFList::saveToFile(const fs::path &path) {
-    appfw::BinaryWriter file(path);
-    file.write(VF_MAGIC);
-    file.write<uint8_t>(sizeof(void *));
-    file.writeArray(appfw::span(m_PatchHash));
-    file.write(m_Offsets.size());
-    file.write(m_Data.size());
-    file.writeArray(appfw::span(m_Offsets));
-    file.writeArray(appfw::span(m_Data));
-    file.writeArray(appfw::span(m_Koeff));
+    appfw::BinaryOutputFile file(path);
+    file.writeByteSpan(VF_MAGIC);
+    file.writeByte(sizeof(void *));
+    file.writeObjectArray(appfw::span(m_PatchHash));
+    file.writeObject(m_Offsets.size());
+    file.writeObject(m_Data.size());
+    file.writeObjectArray(appfw::span(m_Offsets));
+    file.writeObjectArray(appfw::span(m_Data));
+    file.writeObjectArray(appfw::span(m_Koeff));
 }
 
 void rad::VFList::calculateVFList() {
@@ -105,7 +104,7 @@ void rad::VFList::calculateVFList() {
     // Allocate memory
     PatchIndex patchCount = m_pRadSim->m_Patches.size();
     size_t memoryUsage = (sizeof(size_t) + sizeof(float)) * patchCount + sizeof(float) * m_pRadSim->m_SVisMat.getTotalOnesCount();
-    logInfo("Memory required for viewfactor list: {:.3f} MiB", memoryUsage / 1024.0 / 1024.0);
+    printi("Memory required for viewfactor list: {:.3f} MiB", memoryUsage / 1024.0 / 1024.0);
     m_Offsets.resize(patchCount);
     m_Data.resize(m_pRadSim->m_SVisMat.getTotalOnesCount());
     m_Koeff.resize(patchCount);
@@ -119,7 +118,7 @@ void rad::VFList::calculateVFList() {
 }
 
 void rad::VFList::calcOffsets() {
-    logInfo("Calculating vflist offsets...");
+    printi("Calculating vflist offsets...");
     appfw::Timer timer;
     timer.start();
 
@@ -131,11 +130,11 @@ void rad::VFList::calcOffsets() {
     }
 
     timer.stop();
-    logInfo("Calculate offsets: {:.3f} s", timer.elapsedSeconds());
+    printi("Calculate offsets: {:.3f} s", timer.dseconds());
 }
 
 void rad::VFList::calcViewFactors() {
-    logInfo("Calculating view factors...");
+    printi("Calculating view factors...");
 
     m_pRadSim->updateProgress(0);
 
@@ -148,7 +147,7 @@ void rad::VFList::calcViewFactors() {
     taskflow.for_each_index_dynamic((size_t)0, patchCount, (size_t)1, [this](size_t i) { worker(i); });
     auto result = m_pRadSim->m_Executor.run(taskflow);
 
-    while (!appfw::IsFutureReady(result)) {
+    while (!appfw::isFutureReady(result)) {
         size_t work = m_uFinishedPatches;
         double done = (double)work / patchCount;
         m_pRadSim->updateProgress(done);
@@ -158,7 +157,7 @@ void rad::VFList::calcViewFactors() {
     m_pRadSim->updateProgress(1);
 
     timer.stop();
-    logInfo("View factors: {:.3f} s", timer.elapsedSeconds());
+    printi("View factors: {:.3f} s", timer.dseconds());
 }
 
 void rad::VFList::worker(size_t i) {
@@ -198,7 +197,7 @@ void rad::VFList::worker(size_t i) {
 }
 
 void rad::VFList::sumViewFactors() {
-    logInfo("Summing view factors...");
+    printi("Summing view factors...");
     appfw::Timer timer;
     timer.start();
 
@@ -227,9 +226,9 @@ void rad::VFList::sumViewFactors() {
     }
 
     timer.stop();
-    logInfo("Sum view factors: {:.3f} s", timer.elapsedSeconds());
+    printi("Sum view factors: {:.3f} s", timer.dseconds());
 
-    logInfo("Inversing view factor sum...");
+    printi("Inversing view factor sum...");
     timer.start();
 
     for (PatchIndex i = 0; i < patchCount; i++) {
@@ -241,7 +240,7 @@ void rad::VFList::sumViewFactors() {
     }
 
     timer.stop();
-    logInfo("Inverse view factor sum: {:.3f} s", timer.elapsedSeconds());
+    printi("Inverse view factor sum: {:.3f} s", timer.dseconds());
 }
 
 float rad::VFList::calcPatchViewfactor(PatchRef &patch1, PatchRef &patch2) {

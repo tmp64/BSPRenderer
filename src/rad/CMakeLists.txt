@@ -29,6 +29,7 @@ add_library(rad STATIC
 	${PRIVATE_SOURCES}
 )
 
+appfw_module(rad)
 target_include_directories(rad PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(rad PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -38,6 +39,13 @@ target_link_libraries(rad
 	bsp
 	nlohmann_json
 	taskflow
+)
+
+appfw_get_std_pch(PCH_STD_HEADERS)
+appfw_get_pch(PCH_APPFW_HEADERS)
+target_precompile_headers(rad PRIVATE
+    ${PCH_STD_HEADERS}
+    ${PCH_APPFW_HEADERS}
 )
 
 source_group("Public Headers" FILES ${PUBLIC_HEADERS})

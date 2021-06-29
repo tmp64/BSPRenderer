@@ -21,7 +21,7 @@ void rad::VisMat::buildVisMat() {
     m_PatchHash = m_pRadSim->getPatchHash();
 
     size_t size = calculateOffsets(m_Offsets);
-    logInfo("Visibility matrix: {:5.1f} MiB", size / (1024 * 1024.0));
+    printi("Visibility matrix: {:5.1f} MiB", size / (1024 * 1024.0));
     m_Data.resize(size);
 
     // Calc vismat in multiple threads
@@ -32,7 +32,7 @@ void rad::VisMat::buildVisMat() {
     taskflow.for_each_index_dynamic((size_t)1, leafCount, (size_t)1, [this](size_t i) { buildVisLeaves(i); });
     auto result = m_pRadSim->m_Executor.run(taskflow);
 
-    while (!appfw::IsFutureReady(result)) {
+    while (!appfw::isFutureReady(result)) {
         size_t work = m_uFinishedLeaves;
         double done = (double)work / leafCount;
         m_pRadSim->updateProgress(done);
@@ -79,7 +79,7 @@ void rad::VisMat::unloadVisMat() {
 }
 
 size_t rad::VisMat::calculateOffsets(std::vector<size_t> &offsets) {
-    logInfo("Calculating vismat offsets...");
+    printi("Calculating vismat offsets...");
     appfw::Timer timer;
     timer.start();
 
@@ -113,10 +113,10 @@ size_t rad::VisMat::calculateOffsets(std::vector<size_t> &offsets) {
 
 
     timer.stop();
-    logInfo("Calculate vismat offsets: {:.3f} s", timer.elapsedSeconds());
+    printi("Calculate vismat offsets: {:.3f} s", timer.dseconds());
 
     if (totalSize % ROW_ALIGNMENT_BITS != 0) {
-        logFatal("Vismat is unaligned {}", totalSize);
+        printfatal("Vismat is unaligned {}", totalSize);
         abort();
     }
 

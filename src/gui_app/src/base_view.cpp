@@ -1,7 +1,7 @@
 #include <stdexcept>
 #include <set>
 #include <imgui.h>
-#include <appfw/services.h>
+#include <appfw/appfw.h>
 #include <renderer/base_shader.h>
 #include <renderer/utils.h>
 #include <gui_app/base_view.h>
@@ -18,13 +18,13 @@ int g_iMaxMSAALevel = 0;
 
 static ConVar<int> v_msaa_level("v_msaa_level", 0, "Level of MSAA (1-4)",
 [](const int &, const int &newVal) {
-    if (appfw::platform::isAndroid()) {
-        logError("MSAA is not supported on Android.");
+    if (appfw::isAndroid()) {
+        printe("MSAA is not supported on Android.");
         return false;
     }
 
     if (newVal < 0 || newVal > g_iMaxMSAALevel) {
-        logError("Invalid MSAA level: 0-{} allowed.", g_iMaxMSAALevel);
+        printe("Invalid MSAA level: 0-{} allowed.", g_iMaxMSAALevel);
         return false;
     } else {
         return true;
@@ -44,8 +44,8 @@ public:
 
     virtual void create() override {
         createProgram();
-        createVertexShader(getFileSystem().findFile("shaders/base_view/grid.vert", "assets").u8string().c_str());
-        createFragmentShader(getFileSystem().findFile("shaders/base_view/grid.frag", "assets").u8string().c_str());
+        createVertexShader("assets:shaders/base_view/grid.vert");
+        createFragmentShader("assets:shaders/base_view/grid.frag");
         linkProgram();
     }
 
@@ -71,10 +71,10 @@ BaseView::GridShader BaseView::GridShader::instance;
 BaseView::BaseView() {
     updateViewportSize({1, 1});
 
-    if (!appfw::platform::isAndroid()) {
+    if (!appfw::isAndroid()) {
         glGetIntegerv(GL_MAX_SAMPLES, &g_iMaxMSAALevel);
         v_msaa_level.setValue(g_iMaxMSAALevel);
-        logInfo("Maximum MSAA level: {}", g_iMaxMSAALevel);
+        printi("Maximum MSAA level: {}", g_iMaxMSAALevel);
     } else {
         g_iMaxMSAALevel = 0;
     }
