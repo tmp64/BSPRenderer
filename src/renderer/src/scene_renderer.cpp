@@ -1122,8 +1122,8 @@ void SceneRenderer::frameSetup() {
     // Backface culling
     if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
         glEnable(GL_CULL_FACE);
-        glFrontFace(GL_CCW);
-        glCullFace(m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
+        glFrontFace(GL_CW);
+        glCullFace(m_Data.viewContext.getCulling() == SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
     }
 
     // Bind lightmap - will be used for world and brush ents
