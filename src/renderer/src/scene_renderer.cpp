@@ -746,7 +746,11 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
 
             surf.m_vCustomLMSize = info.lmSize;
             surf.m_vCustomLMTexCoords.resize(info.iVertexCount);
-            file.readObjectArray(appfw::span(surf.m_vCustomLMTexCoords));
+
+            for (size_t j = 0; j < info.iVertexCount; j++) {
+                surf.m_vCustomLMTexCoords[j].x = file.readFloat();
+                surf.m_vCustomLMTexCoords[j].y = file.readFloat();
+            }
 
             Lightmap lm;
             lm.surface = (unsigned)i;

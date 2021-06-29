@@ -290,7 +290,8 @@ void rad::RadSim::writeLightmaps() {
 
         // Write tex coords
         for (const Face::Vertex &v : face.vertices) {
-            file.writeObject(v.vLMCoord);
+            file.writeFloat(v.vLMCoord.x);
+            file.writeFloat(v.vLMCoord.y);
         }
     }
 

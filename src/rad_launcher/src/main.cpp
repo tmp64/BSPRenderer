@@ -67,11 +67,11 @@ int main(int argc, char **argv) {
         rad.setLevel(&g_Level, g_LevelPath);
         rad.loadLevelConfig();
 
-        if (getCommandLine().doesArgHaveValue("bounce")) {
-            rad.setBounceCount(getCommandLine().getArgInt("bounce"));
+        if (getCommandLine().doesArgHaveValue("--bounce")) {
+            rad.setBounceCount(getCommandLine().getArgInt("--bounce"));
         }
 
-        bool bCanReuseFiles = !getCommandLine().isFlagSet("no-reuse");
+        bool bCanReuseFiles = !getCommandLine().isFlagSet("--no-reuse");
 
         printi("Base patch size: {}", rad.getPatchSize());
         printi("Bounce count: {}", rad.getBounceCount());
@@ -108,12 +108,12 @@ void initApp() {
     getFileSystem().addSearchPath(baseAppPath, "base");
 
     // Load app config
-    g_AppConfig.loadJsonFile(getFileSystem().findExistingFile("base::bspviewer/app_config.json"));
+    g_AppConfig.loadJsonFile(getFileSystem().findExistingFile("base:bspviewer/app_config.json"));
     g_AppConfig.mountFilesystem();
 }
 
 void loadLevel() {
-    std::string map = getCommandLine().getArgString("map");
+    std::string map = getCommandLine().getArgString("--map");
     g_LevelPath = fmt::format("assets:maps/{}.bsp", map);
     printi("Loading level {}", g_LevelPath);
     g_Level.loadFromFile(getFileSystem().findExistingFile(g_LevelPath));
