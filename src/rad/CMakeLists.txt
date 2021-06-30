@@ -1,4 +1,5 @@
 set(PUBLIC_HEADERS
+	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/bouncer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/patch_list.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/patch_tree.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/rad_sim.h
@@ -15,6 +16,7 @@ set(PRIVATE_HEADERS
 )
 
 set(PRIVATE_SOURCES
+	${CMAKE_CURRENT_SOURCE_DIR}/src/bouncer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/patch_list.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/patch_tree.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/plat_win.cpp

@@ -14,6 +14,7 @@
 #include <rad/vismat.h>
 #include <rad/sparse_vismat.h>
 #include <rad/vflist.h>
+#include <rad/bouncer.h>
 
 namespace rad {
 
@@ -144,7 +145,7 @@ private:
     VisMat m_VisMat;
     SparseVisMat m_SVisMat;
     VFList m_VFList;
-    std::vector<glm::vec3> m_PatchBounce;
+    Bouncer m_Bouncer;
 
     nlohmann::json m_LevelConfigJson;
     float m_flPatchSize = 0; //!< Size of a patch in units
@@ -161,68 +162,34 @@ private:
     //! Returns minimum allowed patch size
     float getMinPatchSize();
 
-    /**
-     * Loads planes from the BSP.
-     */
+    //! Loads planes from the BSP.
     void loadPlanes();
 
-    /**
-     * Loads faces from the BSP.
-     */
+    //! Loads faces from the BSP.
     void loadFaces();
 
-    /**
-     * Creates patches for every face.
-     */
+    //! Creates patches for every face.
     void createPatches(appfw::SHA256 &hash);
 
-    /**
-     * Loads lights from entities.
-     */
+    //! Loads lights from entities.
     void loadLevelEntities();
 
-    /**
-     * Converts color from gamma space to linear space.
-     */
+    //! Converts color from gamma space to linear space.
     glm::vec3 correctColorGamma(const glm::vec3 &color);
 
-    /**
-     * Returns reference to color of patch in specified bounce.
-     * Bounce 0 is initial color.
-     */
-    inline AFW_FORCE_INLINE glm::vec3 &getPatchBounce(PatchIndex patch, int bounce) {
-        AFW_ASSERT(patch < m_Patches.size() && bounce <= m_iBounceCount);
-        return m_PatchBounce[m_Patches.size() * (size_t)bounce + patch];
-    }
-
-    /**
-     * Adds initial lighting to patches (texlights, entity lights).
-     */
+    //! Adds initial lighting to patches (texlights, entity lights).
     void addLighting();
 
-    /**
-     * Clears array for light bouncing.
-     */
-    void clearBounceArray();
-
-    /**
-     * Applies environment lighting to patches.
-     */
+    //! Applies environment lighting to patches.
     void applyEnvLight();
 
-    /**
-     * Applies texture lighting to patches.
-     */
+    //! Applies texture lighting to patches.
     void applyTexLights();
-
-    void receiveLight(int bounce, PatchIndex i, std::vector<glm::vec3> &patchsum);
 
     //! Writes lightmap data into the lightmap texture
     void sampleLightmap(size_t faceIdx);
 
-    /**
-     * Calls the progress callback with specified progress.
-     */
+    //! Calls the progress callback with specified progress.
     void updateProgress(double progress);
 
     std::string getVisMatPath();
@@ -234,6 +201,7 @@ private:
     friend class SparseVisMat;
     friend class VFList;
     friend class PatchTree;
+    friend class Bouncer;
 };
 
 } // namespace rad

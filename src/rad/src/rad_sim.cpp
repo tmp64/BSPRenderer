@@ -212,46 +212,14 @@ void rad::RadSim::calcViewFactors() {
 
 void rad::RadSim::bounceLight() {
     printi("Applying lighting...");
-    clearBounceArray();
+    m_Bouncer.setup(this, m_iBounceCount);
     addLighting();
 
-    
     printi("Bouncing light...");
     appfw::Timer timer;
     timer.start();
-    float refl = m_flReflectivity;
-    PatchIndex patchCount = m_Patches.size();
-
-    // Copy bounce 0 into the lightmap
-    for (PatchIndex i = 0; i < patchCount; i++) {
-        PatchRef patch(m_Patches, i);
-        patch.getFinalColor() = getPatchBounce(i, 0);
-    }
     
-    std::vector<glm::vec3> patchSum(m_Patches.size()); //!< Sum of all light for each patch
-
-    // Bounce light
-    for (int bounce = 1; bounce <= m_iBounceCount; bounce++) {
-        updateProgress((bounce - 1.0) / (m_iBounceCount - 1.0));
-
-        std::fill(patchSum.begin(), patchSum.end(), glm::vec3(0, 0, 0));
-
-        for (PatchIndex i = 0; i < patchCount; i++) {
-            // Bounce light for each visible path
-            receiveLight(bounce, i, patchSum);
-        }
-
-        for (PatchIndex i = 0; i < patchCount; i++) {
-            // Received light from all visible patches
-            // Write it
-            PatchRef patch(m_Patches, i);
-            AFW_ASSERT(patchSum[i].r >= 0 && patchSum[i].g >= 0 && patchSum[i].b >= 0);
-            getPatchBounce(i, bounce) = patchSum[i] * refl;
-            patch.getFinalColor() += getPatchBounce(i, bounce);
-        }
-    }
-
-    updateProgress(1);
+    m_Bouncer.bounceLight();
 
     timer.stop();
     printi("Bounce light: {:.3} s", timer.dseconds());
@@ -738,11 +706,6 @@ glm::vec3 rad::RadSim::correctColorGamma(const glm::vec3 &color) {
     return c;
 }
 
-void rad::RadSim::clearBounceArray() {
-    m_PatchBounce.resize((size_t)m_Patches.size() * (m_iBounceCount + 1));
-    std::fill(m_PatchBounce.begin(), m_PatchBounce.end(), glm::vec3(0, 0, 0));
-}
-
 void rad::RadSim::applyEnvLight() {
     bool isEnvLightSet = m_EnvLight.vDirection.x != 0 || m_EnvLight.vDirection.y != 0 || m_EnvLight.vDirection.z != 0;
 
@@ -766,7 +729,7 @@ void rad::RadSim::applyEnvLight() {
 
         if (m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
             // Hit the sky, add the sun color
-            getPatchBounce(patchIdx, 0) += m_EnvLight.vColor * cosangle;
+            m_Bouncer.addPatchLight(patchIdx, m_EnvLight.vColor * cosangle);
         }
     }
 }
@@ -779,49 +742,9 @@ void rad::RadSim::applyTexLights() {
         // TODO: Actual texinfo
         if (miptex.szName[0] == '~') {
             for (PatchIndex p = face.iFirstPatch; p < face.iFirstPatch + face.iNumPatches; p++) {
-                getPatchBounce(p, 0) += glm::vec3(1, 1, 1) * 50.f;
+                m_Bouncer.addPatchLight(p, glm::vec3(1, 1, 1) * 50.f);
             }
         }
-    }
-}
-
-void rad::RadSim::receiveLight(int bounce, PatchIndex i, std::vector<glm::vec3> &patchSum) {
-    auto &countTable = m_SVisMat.getCountTable();
-    auto &offsetTable = m_SVisMat.getOffsetTable();
-    auto &listItems = m_SVisMat.getListItems();
-    auto &vfoffsets = m_VFList.getPatchOffsets();
-    auto &vfdata = m_VFList.getVFData();
-    auto &vfkoeff = m_VFList.getVFKoeff();
-
-    PatchRef patch(m_Patches, i);
-    PatchIndex poff = i + 1;
-    size_t dataOffset = vfoffsets[i];
-
-    for (size_t j = 0; j < countTable[i]; j++) {
-        const SparseVisMat::ListItem &item = listItems[offsetTable[i] + j];
-        poff += item.offset;
-
-        for (PatchIndex k = 0; k < item.size; k++) {
-            PatchIndex patch2 = poff + k;
-            float vf = vfdata[dataOffset];
-
-            AFW_ASSERT(!isnan(vf) && !isinf(vf));
-            AFW_ASSERT(!isnan(vfkoeff[i]) && !isinf(vfkoeff[i]));
-            AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
-
-            // Take light from p to i
-            patchSum[i] += getPatchBounce(patch2, bounce - 1) * (vf * vfkoeff[i]);
-
-            // Take light from i to patch2
-            patchSum[patch2] += getPatchBounce(i, bounce - 1) * (vf * vfkoeff[patch2]);
-
-            AFW_ASSERT(patchSum[i].r >= 0 && patchSum[i].g >= 0 && patchSum[i].b >= 0);
-            AFW_ASSERT(patchSum[patch2].r >= 0 && patchSum[patch2].g >= 0 && patchSum[patch2].b >= 0);
-
-            dataOffset++;
-        }
-
-        poff += item.size;
     }
 }
 
