@@ -210,6 +210,16 @@ private:
         ShaderUniform<glm::vec3> m_FxColor;
     };
 
+    class PatchesShader : public BaseShader {
+    public:
+        PatchesShader();
+        virtual void create() override;
+        void setupSceneUniforms(SceneRenderer &scene);
+        void setColor(const glm::vec3 &c);
+
+        ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
+    };
+
     class PostProcessShader : public BaseShader {
     public:
         PostProcessShader();
@@ -278,6 +288,11 @@ private:
 
         // Brush entity rendering
         std::vector<OptBrushModel> optBrushModels;
+
+        // Patches
+        uint32_t patchesVerts = 0;
+        GLVao patchesVao;
+        GLBuffer patchesVbo;
     };
 
     enum class LoadingStatus {
@@ -344,6 +359,7 @@ private:
     void enableSurfaceAttribs();
     void loadTextures();
     void loadSkyBox();
+    void loadPatches();
     void finishLoading();
     std::vector<uint8_t> rotateImage90CW(uint8_t *data, int wide, int tall);
     std::vector<uint8_t> rotateImage90CCW(uint8_t *data, int wide, int tall);
@@ -442,6 +458,7 @@ private:
     static inline WorldShader m_sWorldShader;
     static inline SkyBoxShader m_sSkyShader;
     static inline BrushEntityShader m_sBrushEntityShader;
+    static inline PatchesShader m_sPatchesShader;
     static inline PostProcessShader m_sPostProcessShader;
 };
 

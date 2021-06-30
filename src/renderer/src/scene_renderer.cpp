@@ -33,6 +33,10 @@ ConVar<bool> r_ebo("r_ebo", true, "Use indexed rendering");
 ConVar<bool> r_wireframe("r_wireframe", false, "Draw wireframes");
 ConVar<bool> r_nosort("r_nosort", false, "Disable transparent entity sorting");
 ConVar<bool> r_notrans("r_notrans", false, "Disable entity transparency");
+ConVar<bool> r_filter_lm("r_filter_lm", true, "Filter lightmaps (requires map reload)");
+
+ConCommand cmd_r_loadpatches("r_loadpatches", "Load and display patches.dat");
+ConCommand cmd_r_unloadpatches("r_unloadpatches", "Unload patches.dat");
 
 static const char *r_lighting_values[] = {
     "Fullbright", "Shaded", "BSP lightmaps", "Custom lightmaps"
@@ -144,6 +148,26 @@ void SceneRenderer::BrushEntityShader::setupSceneUniforms(SceneRenderer &scene) 
 void SceneRenderer::BrushEntityShader::setColor(const glm::vec3 &c) { m_Color.set(c); }
 
 //----------------------------------------------------------------
+// PatchesShader
+//----------------------------------------------------------------
+SceneRenderer::PatchesShader::PatchesShader()
+    : BaseShader("SceneRenderer_PatchesShader")
+    , m_ViewMat(this, "uViewMatrix")
+    , m_ProjMat(this, "uProjMatrix") {}
+
+void SceneRenderer::PatchesShader::create() {
+    createProgram();
+    createVertexShader("assets:shaders/scene/patches.vert");
+    createFragmentShader("assets:shaders/scene/patches.frag");
+    linkProgram();
+}
+
+void SceneRenderer::PatchesShader::setupSceneUniforms(SceneRenderer &scene) {
+    m_ProjMat.set(scene.m_Data.viewContext.getProjectionMatrix());
+    m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
+}
+
+//----------------------------------------------------------------
 // PostProcessShader
 //----------------------------------------------------------------
 SceneRenderer::PostProcessShader::PostProcessShader()
@@ -178,6 +202,20 @@ SceneRenderer::SceneRenderer() {
 
     m_SolidEntityList.reserve(MAX_VISIBLE_ENTS);
     m_SortBuffer.reserve(MAX_TRANS_SURFS_PER_MODEL);
+
+    cmd_r_loadpatches.setCallback([&] {
+        try {
+            loadPatches();
+        } catch (const std::exception &e) {
+            printe("Failed: {}", e.what());
+        }
+    });
+
+    cmd_r_unloadpatches.setCallback([&] {
+        m_Data.patchesVao.destroy();
+        m_Data.patchesVbo.destroy();
+        m_Data.patchesVerts = 0;
+    });
 }
 
 SceneRenderer::~SceneRenderer() {}
@@ -366,6 +404,17 @@ void SceneRenderer::renderScene(GLint targetFb) {
 
         timer.stop();
         m_Stats.uEntityRenderingTime += (unsigned)timer.us();
+    }
+
+    // Draw patches
+    if (m_Data.patchesVao.id() != 0) {
+        m_sPatchesShader.enable();
+        m_sPatchesShader.setupSceneUniforms(*this);
+        glBindVertexArray(m_Data.patchesVao);
+        glPointSize(5);
+        glDrawArrays(GL_LINES, 0, m_Data.patchesVerts);
+        glBindVertexArray(0);
+        m_sPatchesShader.disable();
     }
 
     frameEnd();
@@ -667,11 +716,12 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
 void SceneRenderer::finishLoadBSPLightmaps() {
     // Load the block into the GPU
     m_Data.bspLightmapBlockTex.create();
+    int filter = r_filter_lm.getValue() ? GL_LINEAR : GL_NEAREST;
     glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE, 0, GL_RGB,
                  GL_UNSIGNED_BYTE, m_pLoadingState->bspLightmapBlock.getData());
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -747,15 +797,19 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
             surf.m_vCustomLMSize = info.lmSize;
             surf.m_vCustomLMTexCoords.resize(info.iVertexCount);
 
+            AFW_ASSERT(info.lmSize.x != 0 || info.lmSize.y == 0);
+
             for (size_t j = 0; j < info.iVertexCount; j++) {
                 surf.m_vCustomLMTexCoords[j].x = file.readFloat();
                 surf.m_vCustomLMTexCoords[j].y = file.readFloat();
             }
 
-            Lightmap lm;
-            lm.surface = (unsigned)i;
-            lm.size = info.lmSize.x * info.lmSize.y;
-            sortedLightmaps.push_back(lm);
+            if (info.lmSize.x != 0) {
+                Lightmap lm;
+                lm.surface = (unsigned)i;
+                lm.size = info.lmSize.x * info.lmSize.y;
+                sortedLightmaps.push_back(lm);
+            }
         }
 
         std::vector<std::vector<glm::vec3>> lightmapTextures;
@@ -764,9 +818,11 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
         // Read textures
         for (size_t i = 0; i < lmHeader.iFaceCount; i++) {
             Surface &surf = m_Data.surfaces[i];
-            std::vector<glm::vec3> &data = lightmapTextures[i];
-            data.resize((size_t)surf.m_vCustomLMSize.x * (size_t)surf.m_vCustomLMSize.y);
-            file.readObjectArray(appfw::span(data));
+            if (surf.m_vCustomLMSize.x != 0) {
+                std::vector<glm::vec3> &data = lightmapTextures[i];
+                data.resize((size_t)surf.m_vCustomLMSize.x * (size_t)surf.m_vCustomLMSize.y);
+                file.readObjectArray(appfw::span(data));
+            }
         }
 
         // Sort all lightmaps by size, large to small
@@ -805,11 +861,12 @@ void SceneRenderer::finishLoadCustomLightmaps() {
 
     // Load the block into the GPU
     m_Data.customLightmapBlockTex.create();
+    int filter = r_filter_lm.getValue() ? GL_LINEAR : GL_NEAREST;
     glBindTexture(GL_TEXTURE_2D, m_Data.customLightmapBlockTex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, CUSTOM_LIGHTMAP_BLOCK_SIZE, CUSTOM_LIGHTMAP_BLOCK_SIZE, 0, GL_RGB, GL_FLOAT,
                  m_pLoadingState->customLightmapBlock.getData());
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -1060,6 +1117,23 @@ void SceneRenderer::loadSkyBox() {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+}
+
+void SceneRenderer::loadPatches() {
+    appfw::BinaryInputFile file(getFileSystem().findExistingFile("assets:patches.dat"));
+    uint32_t count = file.readUInt32();
+    std::vector<glm::vec3> verts(count);
+    file.readBytes((uint8_t *)verts.data(), count * sizeof(glm::vec3));
+
+    m_Data.patchesVerts = count;
+    m_Data.patchesVao.create();
+    m_Data.patchesVbo.create();
+
+    glBindVertexArray(m_Data.patchesVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_Data.patchesVbo);
+    glBufferData(GL_ARRAY_BUFFER, count * sizeof(glm::vec3), verts.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
 }
 
 void SceneRenderer::finishLoading() {
