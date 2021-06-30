@@ -2,7 +2,7 @@
 #include <rad/rad_sim.h>
 #include <rad/patch_list.h>
 
-// #define DISABLE_TREE
+#define DISABLE_TREE
 
 void rad::PatchTree::createPatches(RadSim *pRadSim, Face &face,
                                    std::atomic<PatchIndex> &globalPatchCount,
@@ -92,6 +92,7 @@ rad::PatchIndex rad::PatchTree::copyPatchesToTheList(PatchIndex offset, appfw::S
 }
 
 void rad::PatchTree::buildTree() {
+#ifndef DISABLE_TREE
     PatchIndex patchCount = m_pFace->iNumPatches;
     float minSize = m_pFace->flPatchSize * 2.0f;
 
@@ -130,6 +131,7 @@ void rad::PatchTree::buildTree() {
             }
         }
     }
+#endif
 }
 
 bool rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, glm::vec3 &out) {
@@ -159,7 +161,8 @@ bool rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, glm::vec3 &
         glm::vec2 d = patch.getFaceOrigin() - pos;
 
         if (std::abs(d.x) < radius && std::abs(d.y) < radius) {
-            float weight = glm::length(d);
+            float dist = glm::length(d);
+            float weight = patch.getSize() * patch.getSize() / (dist * dist);
             out += weight * patch.getFinalColor();
             weightSum += weight;
         }
@@ -304,7 +307,7 @@ void rad::PatchTree::recursiveSample(Node *node, const glm::vec2 &pos, float rad
             }
         }
 
-        if (needToCheck || true) {
+        if (needToCheck) {
             recursiveSample(n, pos, radius, out, corners, weightSum);
         }
     }
