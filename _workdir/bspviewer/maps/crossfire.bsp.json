@@ -1,6 +1,6 @@
 {
 	"base_patch_size": 32,
-	"base_reflectivity": 0.2,
+	"base_reflectivity": 0.3,
 	"bounce_count": 64,
 	"gamma": 2.2,
 	
