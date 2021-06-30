@@ -29,7 +29,8 @@ void rad::VisMat::buildVisMat() {
     m_uFinishedLeaves = 1;
     // Skip 0-th leaf as it's the solid leaf
     tf::Taskflow taskflow;
-    taskflow.for_each_index_dynamic((size_t)1, leafCount, (size_t)1, [this](size_t i) { buildVisLeaves(i); });
+    taskflow.for_each_index_dynamic((size_t)1, leafCount, (size_t)1,
+                                    [this](size_t i) { buildVisLeaves(i); }, (PatchIndex)2);
     auto result = m_pRadSim->m_Executor.run(taskflow);
 
     while (!appfw::isFutureReady(result)) {

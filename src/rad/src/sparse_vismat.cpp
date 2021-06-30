@@ -116,15 +116,15 @@ void rad::SparseVisMat::unloadMatrix() {
 }
 
 void rad::SparseVisMat::calcSize() {
-    printi("Calculating sparse matrix size...");
+    printn("Calculating sparse matrix size...");
     appfw::Timer timer;
     timer.start();
 
     PatchIndex patchCount = m_pRadSim->m_Patches.size();
     auto &visdata = m_pRadSim->m_VisMat.getData();
-    size_t totalListItemCount = 0;
+    std::atomic_size_t totalListItemCount = 0;
 
-    for (PatchIndex i = 0; i < patchCount - 1; i++) {
+    auto fnLoopBody = [&](PatchIndex i) {
         PatchIndex pos = i + 1;
         size_t bitset = m_pRadSim->m_VisMat.getRowOffset(i);
 
@@ -138,8 +138,8 @@ void rad::SparseVisMat::calcSize() {
             // Based on m_Data[bitset >> 3] |= 1 << (bitset & 7)
 
             // Skip zeroes
-            while (!(visdata[(bitset + pos) >> 3] & (1 << ((bitset + pos) & 7))) && pos < patchCount &&
-                   item.offset < item.MAX_OFFSET) {
+            while (!(visdata[(bitset + pos) >> 3] & (1 << ((bitset + pos) & 7))) &&
+                   pos < patchCount && item.offset < item.MAX_OFFSET) {
                 pos++;
                 item.offset++;
             }
@@ -150,8 +150,8 @@ void rad::SparseVisMat::calcSize() {
             }
 
             // Count ones
-            while ((visdata[(bitset + pos) >> 3] & (1 << ((bitset + pos) & 7))) && pos < patchCount &&
-                   item.size < item.MAX_SIZE) {
+            while ((visdata[(bitset + pos) >> 3] & (1 << ((bitset + pos) & 7))) &&
+                   pos < patchCount && item.size < item.MAX_SIZE) {
                 pos++;
                 item.size++;
             }
@@ -161,7 +161,11 @@ void rad::SparseVisMat::calcSize() {
                 totalListItemCount++;
             }
         }
-    }
+    };
+
+    tf::Taskflow taskflow;
+    taskflow.for_each_index_dynamic((PatchIndex)0, patchCount - 1, (PatchIndex)1, fnLoopBody);
+    m_pRadSim->m_Executor.run(taskflow).wait();
 
     timer.stop();
     printi("Calculate sparse vismat: {:.3f} s", timer.dseconds());
