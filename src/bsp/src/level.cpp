@@ -365,7 +365,7 @@ int bsp::Level::recursiveTraceLine(int nodeidx, const glm::vec3 &start, const gl
     // Based on VDC article:
     // https://developer.valvesoftware.com/wiki/BSP#How_are_BSP_trees_used_for_collision_detection.3F
     // and qrad code from HLSDK.
-    constexpr float ON_EPSILON = 0.01f;
+    constexpr float ON_EPSILON = 0.025f;
 
     if (nodeidx < 0) {
         const BSPLeaf &leaf = getLeaves()[~nodeidx];

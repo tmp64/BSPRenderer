@@ -223,8 +223,9 @@ void rad::VisMat::testPatchToFace(PatchIndex patchnum, int facenum, size_t bitpo
         // check vis between patch and patch2
         // if bit has not already been set
         // and p2 is visible from p1
-        if (m > patchnum &&
-            m_pRadSim->m_pLevel->traceLine(patch.getOrigin(), patch2.getOrigin()) == bsp::CONTENTS_EMPTY) {
+        glm::vec3 org1 = patch.getOrigin();
+        glm::vec3 org2 = patch2.getOrigin();
+        if (m > patchnum && m_pRadSim->m_pLevel->traceLine(org1, org2) == bsp::CONTENTS_EMPTY) {
 
             // patchnum can see patch m
             size_t bitset = bitpos + m;

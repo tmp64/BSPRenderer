@@ -269,7 +269,8 @@ void rad::PatchTree::recursiveSample(Node *node, const glm::vec2 &pos, float rad
         glm::vec2 d = patch.getFaceOrigin() - pos;
 
         if (std::abs(d.x) < radius && std::abs(d.y) < radius) {
-            float weight = glm::length(d) * patch.getSize() * patch.getSize();
+            float dist = glm::length(d);
+            float weight = patch.getSize() * patch.getSize() / (dist * dist);
             out += weight * patch.getFinalColor();
             weightSum += weight;
         }
