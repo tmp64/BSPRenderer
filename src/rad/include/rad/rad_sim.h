@@ -10,6 +10,7 @@
 #include <app_base/app_config.h>
 #include <rad/types.h>
 #include <rad/patch_list.h>
+#include <rad/patch_tree.h>
 #include <rad/vismat.h>
 #include <rad/sparse_vismat.h>
 #include <rad/vflist.h>
@@ -137,6 +138,7 @@ private:
     std::string m_LevelPath;
     std::vector<Plane> m_Planes;
     std::vector<Face> m_Faces;
+    std::vector<PatchTree> m_PatchTrees;
     std::vector<LightmapTexture> m_Lightmaps;
     PatchList m_Patches;
     VisMat m_VisMat;
@@ -145,7 +147,8 @@ private:
     std::vector<glm::vec3> m_PatchBounce;
 
     nlohmann::json m_LevelConfigJson;
-    float m_flPatchSize = 0;
+    float m_flPatchSize = 0; //!< Size of a patch in units
+    float m_flLuxelSize = 0; //!< Size of a luxel in units
     float m_flReflectivity = 0;
     float m_flGamma = 0;
     std::string m_PatchSizeStr;
@@ -154,6 +157,9 @@ private:
     int m_iBounceCount = 0;
 
     appfw::SHA256::Digest m_PatchHash = {};
+
+    //! Returns minimum allowed patch size
+    float getMinPatchSize();
 
     /**
      * Loads planes from the BSP.
@@ -211,6 +217,9 @@ private:
 
     void receiveLight(int bounce, PatchIndex i, std::vector<glm::vec3> &patchsum);
 
+    //! Writes lightmap data into the lightmap texture
+    void sampleLightmap(size_t faceIdx);
+
     /**
      * Calls the progress callback with specified progress.
      */
@@ -224,6 +233,7 @@ private:
     friend class VisMat;
     friend class SparseVisMat;
     friend class VFList;
+    friend class PatchTree;
 };
 
 } // namespace rad

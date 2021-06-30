@@ -5,12 +5,16 @@
 namespace rad {
 
 using PatchIndex = uint32_t;
+static_assert(std::atomic<PatchIndex>::is_always_lock_free, "PatchIndex atomic is not lock free");
 
 /**
  * Maximum number of patches.
  * Maximum patch index is (MAX_PATCH_COUNT - 1).
  */
 constexpr PatchIndex MAX_PATCH_COUNT = std::numeric_limits<PatchIndex>::max();
+
+//! Max patch size if face is too small (less than a base patch in X or Y)
+constexpr float MAX_PATCH_SIZE_FOR_SMALL_FACES = 0.5f;
 
 /**
  * Epsilon used for floating-point comparisons.
@@ -33,88 +37,65 @@ struct Plane : public bsp::BSPPlane {
 
 struct Face : public bsp::BSPFace {
     struct Vertex {
-        /**
-         * Position of vertex in world space.
-         */
+        //! Position of vertex in world space.
         glm::vec3 vWorldPos;
 
-        /**
-         * Normalized position of vertex in its plane (based on vI and vJ).
-         * Normalized means that there are vertices with X or Y = 0.
-         */
+        //! Normalized position of vertex in its plane (based on vI and vJ).
+        //! Normalized means that there are vertices with X or Y = 0.
         glm::vec2 vPlanePos;
 
-        /**
-         * Lightmap texture coordinate.
-         */
+        //! Lightmap texture coordinate.
         glm::vec2 vLMCoord;
     };
 
-    /**
-     * Plane in which face is located.
-     */
+    //! Plane in which face is located.
     const Plane *pPlane = nullptr;
 
-    /**
-     * Flags (see FACE_ constants).
-     */
+    //! Flags (see FACE_ constants).
     unsigned iFlags = 0;
 
-    /**
-     * Normal vector. +/- pPlane->vNormal
-     */
+    //! Normal vector. +/- pPlane->vNormal
     glm::vec3 vNormal;
 
-    /**
-     * X axis for lightmap and patches.
-     */
+    //! X axis for lightmap and patches.
     glm::vec3 vI;
 
-    /**
-     * Y axis for lightmap and patches.
-     */
+    //! Y axis for lightmap and patches.
     glm::vec3 vJ;
 
-    /**
-     * World position of (0, 0) plane coord.
-     */
+    //! World position of (0, 0) plane coord.
     glm::vec3 vPlaneOrigin;
 
-    /**
-     * Bounds of the face in plane coords.
-     * Should be both zero.
-     */
+    //! Bounds of the face in plane coords.
+    //! Min bounds should be {0, 0}.
     glm::vec2 planeMinBounds, planeMaxBounds;
 
-    /**
-     * List of vertices.
-     */
+    //! Center point of the face
+    glm::vec2 planeCenterPoint;
+
+    //! List of vertices.
     std::vector<Vertex> vertices;
 
-    /**
-     * Length of a side of the square patch.
-     */
+    //! Length of a side of the square patch.
     float flPatchSize = 0;
 
-    /**
-     * Index of first patch
-     */
+    //! Index of first patch
     PatchIndex iFirstPatch = 0;
 
-    /**
-     * Number of patches of this face
-     */
+    //! Number of patches of this face
     PatchIndex iNumPatches = 0;
 
-    /**
-     * Index of the lightmap in g_Lightmaps.
-     */
+    //! Index of the lightmap in g_Lightmaps.
     int iLightmapIdx = -1;
 
-    /**
-     * Size of lightmap in pixels.
-     */
-    glm::ivec2 lmSize;
+    //! Size of lightmap in pixels.
+    glm::ivec2 vLightmapSize;
+
+    //! @returns whether the face has lightmaps and should be split into patches
+    inline bool hasLightmap() {
+        // Skies don't have lightmaps
+        return !(iFlags & FACE_SKY);
+    }
 };
 
 /**
@@ -139,7 +120,7 @@ struct LightmapTexture {
     /**
      * Size of the texture in pixels.
      */
-    glm::ivec2 size;
+    glm::ivec2 size = glm::ivec2(0, 0);
 
     /**
      * Data of the lightmap image.

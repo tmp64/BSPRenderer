@@ -1,5 +1,6 @@
 set(PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/patch_list.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/patch_tree.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/rad_sim.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/sparse_vismat.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/types.h
@@ -15,6 +16,7 @@ set(PRIVATE_HEADERS
 
 set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/patch_list.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/patch_tree.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/plat_win.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/rad_sim.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/sparse_vismat.cpp

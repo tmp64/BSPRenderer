@@ -75,18 +75,19 @@ public:
             return sizeof(Type);
         };
 
-        return fn(m_flSize) + fn(m_vOrigin) + fn(m_vNormal) + fn(m_pPlane) + fn(m_FinalColor) + fn(m_pLMPixel);
+        return fn(m_flSize) + fn(m_vFaceOrigin) + fn(m_vOrigin) + fn(m_vNormal) + fn(m_pPlane) +
+               fn(m_FinalColor);
     }
 
 private:
     PatchIndex m_iSize = 0;
 
     std::vector<float> m_flSize;
+    std::vector<glm::vec2> m_vFaceOrigin;
     std::vector<glm::vec3> m_vOrigin;
     std::vector<glm::vec3> m_vNormal;
     std::vector<const Plane *> m_pPlane;
     std::vector<glm::vec3> m_FinalColor;
-    std::vector<glm::vec3 *> m_pLMPixel;
 
     friend class PatchRef;
 };
@@ -99,6 +100,11 @@ public:
      * Length of a side of the square.
      */
     inline float &getSize() { return m_List.m_flSize[m_iIndex]; }
+
+    /**
+     * Center point of the square in face-space.
+     */
+    inline glm::vec2 &getFaceOrigin() { return m_List.m_vFaceOrigin[m_iIndex]; }
 
     /**
      * Center point of the square in world-space.
@@ -119,11 +125,6 @@ public:
      * Final color of the patch.
      */
     inline glm::vec3 &getFinalColor() { return m_List.m_FinalColor[m_iIndex]; }
-
-    /**
-     * Pointer to lightmap pixel.
-     */
-    inline glm::vec3 *&getLMPixel() { return m_List.m_pLMPixel[m_iIndex]; }
 
     inline PatchRef &operator++() {
         ++m_iIndex;
