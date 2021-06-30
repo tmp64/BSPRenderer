@@ -557,6 +557,10 @@ void rad::RadSim::createPatches(appfw::SHA256 &hash) {
     printi("Memory used by patches: {:.3} MiB",
            patchCount * m_Patches.getPatchMemoryUsage() / 1024.0 / 1024.0);
 
+    if (patchCount == 0) {
+        throw std::runtime_error("No patches were created. Bug or empty map?");
+    }
+
    {
         // Add patch count to hash
         uint8_t patchCountBytes[sizeof(patchCount)];

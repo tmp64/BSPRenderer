@@ -18,7 +18,7 @@ void rad::PatchTree::createPatches(RadSim *pRadSim, Face &face,
 
     // Allow small patches for small faces
     if (baseGridSizeFloat.x < 1 || baseGridSizeFloat.y < 1) {
-        flMinPatchSize = MAX_PATCH_SIZE_FOR_SMALL_FACES;
+        flMinPatchSize = MIN_PATCH_SIZE_FOR_SMALL_FACES;
     }
 
     // Create an empty first patch. It will be removed at the end
@@ -333,7 +333,8 @@ rad::PatchTree::PatchPos rad::PatchTree::checkPatchPos(MiniPatch *patch) noexcep
         return PatchPos::Inside;
     } else if (count == 0) {
         // See if the face is inside the patch
-        for (size_t i = 0; i < count; i++) {
+        size_t verts = m_pFace->vertices.size();
+        for (size_t i = 0; i < verts; i++) {
             if (pointIntersectsWithRect(m_pFace->vertices[i].vPlanePos, patch->vFaceOrigin,
                                         patch->flSize)) {
                 return PatchPos::PartiallyInside;

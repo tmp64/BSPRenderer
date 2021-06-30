@@ -13,8 +13,8 @@ static_assert(std::atomic<PatchIndex>::is_always_lock_free, "PatchIndex atomic i
  */
 constexpr PatchIndex MAX_PATCH_COUNT = std::numeric_limits<PatchIndex>::max();
 
-//! Max patch size if face is too small (less than a base patch in X or Y)
-constexpr float MAX_PATCH_SIZE_FOR_SMALL_FACES = 0.5f;
+//! Min patch size if face is too small (less than a base patch in X or Y)
+constexpr float MIN_PATCH_SIZE_FOR_SMALL_FACES = 0.51f;
 
 /**
  * Epsilon used for floating-point comparisons.

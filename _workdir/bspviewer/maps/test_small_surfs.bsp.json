@@ -1,0 +1,21 @@
+{
+	"base_patch_size": 32,
+	"base_reflectivity": 0.4,
+	"bounce_count": 64,
+	"gamma": 2.2,
+	
+	"faces": {
+		"0": {
+			"patch_scale": 1,
+			"reflectivity_scale": 1
+		}
+	},
+	
+	"entlights": {
+		"123": {
+			"type": "point",
+			"color": [128, 128, 128],
+			"brightness": 1000
+		}
+	}
+}
