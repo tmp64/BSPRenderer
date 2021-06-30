@@ -4,6 +4,8 @@
 #include <appfw/timer.h>
 #include <rad/rad_sim.h>
 
+//#define SAMPLE_NEIGHBOURS
+
 namespace {
 
 /**
@@ -402,6 +404,9 @@ void rad::RadSim::loadFaces() {
         face.nLightmapOffset = bspFace.nLightmapOffset;
         memcpy(face.nStyles, bspFace.nStyles, sizeof(face.nStyles));
 
+        // Add to plane
+        m_Planes[face.iPlane].faces.push_back((unsigned)i);
+
         // Face vars
         face.pPlane = &m_Planes.at(face.iPlane);
 
@@ -448,6 +453,7 @@ void rad::RadSim::loadFaces() {
                 v.vPlanePos.y -= minY;
             }
 
+            face.vPlaneOriginInPlaneCoords = {minX, minY};
             face.vPlaneOrigin = face.vertices[0].vWorldPos - face.vI * face.vertices[0].vPlanePos.x -
                                 face.vJ * face.vertices[0].vPlanePos.y;
         }
@@ -821,24 +827,46 @@ void rad::RadSim::receiveLight(int bounce, PatchIndex i, std::vector<glm::vec3> 
 
 void rad::RadSim::sampleLightmap(size_t faceIdx) {
     Face &face = m_Faces[faceIdx];
-    PatchTree &tree = m_PatchTrees[faceIdx];
     LightmapTexture &lm = m_Lightmaps[face.iLightmapIdx];
     AFW_ASSERT(face.hasLightmap());
 
     glm::vec2 baseGridSizeFloat = face.planeMaxBounds / m_flLuxelSize;
+    float radius = std::max(m_flPatchSize, m_flLuxelSize) * 1.1f;
+
+#ifdef SAMPLE_NEIGHBOURS
+    int normalDir = !!face.nPlaneSide;
+    auto &neighbours = m_Planes[face.iPlane].faces;
+#endif
 
     for (int y = 0; y < face.vLightmapSize.y; y++) {
         for (int x = 0; x < face.vLightmapSize.x; x++) {
             glm::vec2 pos = glm::vec2(x, y) / baseGridSizeFloat * face.planeMaxBounds;
+#ifdef SAMPLE_NEIGHBOURS
+            pos += face.vPlaneOriginInPlaneCoords;
+#endif
 
-            float radius = std::max(m_flPatchSize, m_flLuxelSize) * 1.1f;
             glm::vec3 output = glm::vec3(0, 0, 0);
+            float weightSum = 0;
 
-            if (tree.sampleLight(pos, radius, output)) {
-                lm.getPixel({x, y}) = output;
+#ifdef SAMPLE_NEIGHBOURS
+            for (size_t i = 0; i < neighbours.size(); i++) {
+                unsigned neighbourIdx = neighbours[i];
+                Face &neighbour = m_Faces[neighbourIdx];
+
+                if (neighbour.hasLightmap() && normalDir == !!neighbour.nPlaneSide) {
+                    m_PatchTrees[neighbourIdx].sampleLight(pos - neighbour.vPlaneOriginInPlaneCoords, radius, output,
+                                     weightSum);
+                }
+            }
+#else
+            m_PatchTrees[faceIdx].sampleLight(pos, radius, output, weightSum);
+#endif
+
+            if (weightSum != 0) {
+                glm::vec3 finalColor = output / weightSum;
+                lm.getPixel({x, y}) = output / weightSum;
             } else {
                 // TODO: Fill the void with something
-                lm.getPixel({x, y}) = glm::vec3(0, 0, 0);
                 lm.getPixel({x, y}) = glm::vec3(1, 0, 1);
             }
         }

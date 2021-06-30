@@ -92,14 +92,15 @@ rad::PatchIndex rad::PatchTree::copyPatchesToTheList(PatchIndex offset, appfw::S
 }
 
 void rad::PatchTree::buildTree() {
-#ifndef DISABLE_TREE
-    PatchIndex patchCount = m_pFace->iNumPatches;
-    float minSize = m_pFace->flPatchSize * 2.0f;
-
     // Set up root node
+    float squareSize = std::max(m_pRadSim->m_flLuxelSize, m_pFace->flPatchSize);
     float size = std::max(m_pFace->planeMaxBounds.x, m_pFace->planeMaxBounds.y);
-    m_RootNode.flSize = size;
+    m_RootNode.flSize = size + 4.0f * squareSize;
     m_RootNode.vOrigin = m_pFace->planeCenterPoint;
+
+#ifndef DISABLE_TREE
+    PatchIndex patchCount = m_pFace->iNumPatches; 
+    float minSize = m_pFace->flPatchSize * 2.0f;
 
     for (PatchIndex i = 0; i < patchCount; i++) {
         PatchIndex patchIndex = m_pFace->iFirstPatch + i;
@@ -134,26 +135,37 @@ void rad::PatchTree::buildTree() {
 #endif
 }
 
-bool rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, glm::vec3 &out) {
-#ifndef DISABLE_TREE
+void rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, glm::vec3 &out,
+                                 float &weightSum) {
+    // Check if pos intersects with root node
     glm::vec2 corners[4];
     getCorners(pos, radius * 2.0f, corners);
-    out = glm::vec3(0, 0, 0);
-    float weightSum = 0;
+    glm::vec2 nodeCorners[4];
+    getCorners(m_RootNode.vOrigin, m_RootNode.flSize, nodeCorners);
+    bool needToCheck = false;
+
+    for (int j = 0; j < 4; j++) {
+        if (pointIntersectsWithRect(corners[j], m_RootNode.vOrigin, m_RootNode.flSize)) {
+            needToCheck = true;
+            break;
+        }
+
+        if (pointIntersectsWithRect(nodeCorners[j], pos, radius * 2.0f)) {
+            needToCheck = true;
+            break;
+        }
+    }
+
+    if (!needToCheck) {
+        return;
+    }
+
+#ifndef DISABLE_TREE
 
     recursiveSample(&m_RootNode, pos, radius, out, corners, weightSum);
 
-    if (weightSum == 0) {
-        return false;
-    }
-
-    out /= weightSum;
-    return true;
 #else
     PatchIndex count = m_pFace->iNumPatches;
-
-    out = glm::vec3(0, 0, 0);
-    float weightSum = 0;
 
     for (PatchIndex i = 0; i < count; i++) {
         PatchRef patch(m_pRadSim->m_Patches, m_pFace->iFirstPatch + i);
@@ -161,19 +173,21 @@ bool rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, glm::vec3 &
         glm::vec2 d = patch.getFaceOrigin() - pos;
 
         if (std::abs(d.x) < radius && std::abs(d.y) < radius) {
+            if (glm::isinf(out.r)) {
+                AFW_DEBUG_BREAK();
+            }
+
             float dist = glm::length(d);
+            dist = std::max(dist, 0.5f);
             float weight = patch.getSize() * patch.getSize() / (dist * dist);
             out += weight * patch.getFinalColor();
             weightSum += weight;
+
+            if (glm::isinf(out.r)) {
+                AFW_DEBUG_BREAK();
+            }
         }
     }
-
-    if (weightSum == 0) {
-        return false;
-    }
-
-    out /= weightSum;
-    return true;
 #endif
 }
 

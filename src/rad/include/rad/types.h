@@ -33,6 +33,9 @@ struct Plane : public bsp::BSPPlane {
      * X is calculated as cross(j, n)
      */
     glm::vec3 vJ;
+
+    //! List of faces that are in this plane
+    std::vector<unsigned> faces;
 };
 
 struct Face : public bsp::BSPFace {
@@ -65,6 +68,9 @@ struct Face : public bsp::BSPFace {
 
     //! World position of (0, 0) plane coord.
     glm::vec3 vPlaneOrigin;
+
+    //! Offset of (0, 0) to get to plane coords
+    glm::vec2 vPlaneOriginInPlaneCoords;
 
     //! Bounds of the face in plane coords.
     //! Min bounds should be {0, 0}.
