@@ -1165,11 +1165,15 @@ void SceneRenderer::frameSetup() {
         glCullFace(m_Data.viewContext.getCulling() == SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
     }
 
+    // Seamless cubemap filtering
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
     // Bind lightmap - will be used for world and brush ents
     bindLightmapBlock();
 }
 
 void SceneRenderer::frameEnd() {
+    glDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
 }
