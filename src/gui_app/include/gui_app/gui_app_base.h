@@ -6,10 +6,12 @@
 #include <appfw/appfw.h>
 #include <appfw/timer.h>
 #include <appfw/compiler.h>
+#include <appfw/prof.h>
 #include <app_base/app_config.h>
 #include <gui_app/utils.h>
 #include <gui_app/input_system.h>
 #include <gui_app/dev_console_dialog.h>
+#include <gui_app/profiler_dialog.h>
 
 class GuiAppInfo {
 public:
@@ -118,6 +120,11 @@ public:
      */
     void showStatsUI();
 
+    /**
+     * Returns the current tickrate (how many times tick() is called)
+     */
+    double getTickRate();
+
 protected:
     AppFWAppComponent m_AppFWComponent;
     FileSystemAppComponent m_FSComponent;
@@ -129,6 +136,7 @@ protected:
     RendererSystemAppComponent m_RendererSystem;
     InputSystem m_InputSystem;
     DevConsoleDialog m_DevConsole;
+    ProfilerDialog m_ProfDialog;
 
     bool m_bIsRunning = false;
     bool m_bIsConsoleVisible = false;
@@ -143,6 +151,9 @@ protected:
     double m_flLastTickTime = 0;
     double m_flLastFrameTime = 0;
     double m_flTime = 0;    // Current time in seconds, updated every tick, starts with zero.
+
+    appfw::ProfData m_DrawProfData;
+    appfw::ProfData m_TickProfData;
 
     /**
      * Called every event loop iteration.

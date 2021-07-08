@@ -83,6 +83,10 @@ int GuiAppBase::run() {
     appfw::getConsole().processAllCommands();
     appfw::getConsole().processAllCommands();
 
+    // Set up profiler
+    m_TickProfData.setName("Ticking");
+    m_DrawProfData.setName("Screen redraw");
+
     appfw::Timer waitTimer;
 
     while (m_bIsRunning) {
@@ -181,7 +185,15 @@ AppConfig &GuiAppBase::getConfig() { return m_AppConfig; }
 void GuiAppBase::showStatsUI() {
     ImColor cyan = ImColor(0, 255, 255, 255);
     ImGui::TextColored(cyan, "FPS: %4.0f (%.3f ms)", 1.f / m_flLastFrameTime, m_flLastFrameTime * 1000.f);
-    ImGui::TextColored(cyan, "TPS: %4.0f (%.3f ms)", 1.f / m_flLastTickTime, m_flLastTickTime * 1000.f);
+
+    if (!app_sync_rates.getValue()) {
+        ImGui::TextColored(cyan, "TPS: %4.0f (%.3f ms)", 1.f / m_flLastTickTime,
+                           m_flLastTickTime * 1000.f);
+    }
+}
+
+double GuiAppBase::getTickRate() {
+    return app_sync_rates.getValue() ? app_fps_max.getValue() : app_tps_max.getValue();
 }
 
 void GuiAppBase::onWindowSizeChange(int wide, int tall) {
@@ -207,9 +219,14 @@ void GuiAppBase::setConsoleVisible(bool state) {
 
 void GuiAppBase::internalTick() {
     try {
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            handleSDLEvent(event);
+        m_TickProfData.begin();
+
+        {
+            appfw::Prof prof("Poll Events");
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                handleSDLEvent(event);
+            }
         }
 
         m_AppFWComponent.tick();
@@ -221,9 +238,12 @@ void GuiAppBase::internalTick() {
             m_DevConsole.Draw("Developer Console", &m_bIsConsoleVisible);
         }
 
+        m_ProfDialog.tick();
+
         tick();
 
         ImGui::EndFrame();
+        m_TickProfData.end();
     } catch (const std::exception &e) {
         app_fatalError("Unhandled exception in GuiAppBase::internalTick:\n{}", e.what());
     }
@@ -231,6 +251,8 @@ void GuiAppBase::internalTick() {
 
 void GuiAppBase::internalDraw() { 
     try {
+        m_DrawProfData.begin();
+
         if (m_bAutoClear) {
             glClearColor(m_vAutoClearColor.r, m_vAutoClearColor.g, m_vAutoClearColor.b, m_vAutoClearColor.a);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -240,7 +262,12 @@ void GuiAppBase::internalDraw() {
 
         m_ImGui.draw();
 
-        SDL_GL_SwapWindow(m_Window.getWindow());
+        {
+            appfw::Prof prof("Swap Buffers");
+            SDL_GL_SwapWindow(m_Window.getWindow());
+        }
+
+        m_DrawProfData.end();
     } catch (const std::exception &e) {
         app_fatalError("Unhandled exception in GuiAppBase::internalDraw:\n{}", e.what());
     }

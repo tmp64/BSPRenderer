@@ -5,6 +5,7 @@ set(PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/gui_app_base.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/imgui_controls.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/input_system.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/profiler_dialog.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/utils.h
 )
 
@@ -19,6 +20,7 @@ set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/gui_app_base.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/input_system.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/profiler_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils.cpp
 )
 

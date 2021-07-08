@@ -1,4 +1,5 @@
 #include <appfw/appfw.h>
+#include <appfw/prof.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ASSERT(x) AFW_ASSERT(x)
@@ -121,6 +122,8 @@ void MaterialManager::shutdown() {
 }
 
 void MaterialManager::tick() {
+    appfw::Prof prof("MaterialManager");
+
     bool bLinear = mat_linear.getValue();
     int iMipMap = std::clamp(mat_mipmap.getValue(), 0, 2);
     int iAniso = std::clamp(mat_aniso.getValue(), 1, (int)m_flMaxAniso);
@@ -238,7 +241,6 @@ void MaterialManager::loadWadFile(const fs::path &name) {
             } else {
                 printw("{}: texture {} already loaded from other WAD", wadFileName, tex.getName());
             }
-            
         }
         
         timer.stop();

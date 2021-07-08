@@ -33,7 +33,10 @@ AppFWAppComponent::AppFWAppComponent() {
 
 AppFWAppComponent::~AppFWAppComponent() { appfw::shutdown(); }
 
-void AppFWAppComponent::tick() { appfw::mainLoopTick(); }
+void AppFWAppComponent::tick() {
+    appfw::Prof prof("appfw");
+    appfw::mainLoopTick();
+}
 
 FileSystemAppComponent::FileSystemAppComponent() {
     m_BaseAppPath = app_getInitInfo().baseAppPath;
@@ -200,12 +203,14 @@ ImGuiAppComponent::~ImGuiAppComponent() {
 }
 
 void ImGuiAppComponent::newTick() {
+    appfw::Prof prof("ImGui New Frame");
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame(m_pWindow->getWindow());
     ImGui::NewFrame();
 }
 
 void ImGuiAppComponent::draw() {
+    appfw::Prof prof("ImGui");
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

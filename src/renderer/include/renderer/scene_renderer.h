@@ -5,7 +5,6 @@
 #include <renderer/surface_renderer.h>
 #include <renderer/base_shader.h>
 #include <renderer/raii.h>
-#include <renderer/time_smoother.h>
 #include <renderer/texture_block.h>
 #include <renderer/client_entity.h>
 
@@ -32,42 +31,8 @@ public:
         //! Number of draw calls issued (glDrawArrays, ...)
         unsigned uDrawCallCount = 0;
 
-        //! Time (us) taken by frame setup
-        TimeSmoother uSetupTime;
-
-        //! Time (us) taken by entity list
-        TimeSmoother uEntityListTime;
-
-        //! Time (us) taken by world BSP traversing
-        TimeSmoother uWorldBSPTime;
-
-        //! Time (us) taken by world geometry rendering
-        TimeSmoother uWorldRenderingTime;
-
-        //! Time (us) taken by sky polygons rendering
-        TimeSmoother uSkyRenderingTime;
-
-        //! Time (us) taken by entity rendering
-        TimeSmoother uEntityRenderingTime;
-
-        //! Time (us) taken by solid entity rendering
-        TimeSmoother uSolidEntityRenderingTime;
-
-        //! Time (us) taken by transparent entity rendering
-        TimeSmoother uTransEntityRenderingTime;
-
-        //! Time (us) taken by post processing
-        TimeSmoother uPostProcessingTime;
-
-        //! Total time (us) taken by scene rendering
-        TimeSmoother uTotalRenderingTime;
-
-        inline void clear() {
-            uRenderedWorldPolys = 0;
-            uRenderedSkyPolys = 0;
-            uRenderedBrushEntPolys = 0;
-            uDrawCallCount = 0;
-        }
+        //! Time of the last frame
+        double flFrameTime = 0;
     };
 
     /**

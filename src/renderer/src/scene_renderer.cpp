@@ -1,5 +1,6 @@
 #include <appfw/binary_file.h>
 #include <appfw/timer.h>
+#include <appfw/prof.h>
 #include <renderer/stb_image.h>
 #include <renderer/scene_renderer.h>
 #include <imgui.h>
@@ -363,12 +364,16 @@ void SceneRenderer::setViewportSize(const glm::ivec2 &size) {
 }
 
 void SceneRenderer::renderScene(GLint targetFb) {
+    appfw::Timer frameTimer;
+    frameTimer.start();
+
     AFW_ASSERT(m_pLevel);
     AFW_ASSERT(!isLoading());
 
-    m_Stats.clear();
-    appfw::Timer renderTimer;
-    renderTimer.start();
+    appfw::Prof mainprof("Render Scene");
+
+    // Reset stats
+    m_Stats = RenderingStats();
 
     if (!m_Data.bCustomLMLoaded && r_lighting.getValue() == 3) {
         r_lighting.setValue(2);
@@ -378,13 +383,8 @@ void SceneRenderer::renderScene(GLint targetFb) {
     frameSetup();
 
     if (r_drawents.getValue()) {
-        appfw::Timer timer;
-        timer.start();
-
+        appfw::Prof prof("Entity list");
         m_pfnEntListCb();
-
-        timer.stop();
-        m_Stats.uEntityListTime += (unsigned)timer.us();
     }
 
     if (r_drawworld.getValue()) {
@@ -396,18 +396,14 @@ void SceneRenderer::renderScene(GLint targetFb) {
     }
 
     if (r_drawents.getValue()) {
-        appfw::Timer timer;
-        timer.start();
-
+        appfw::Prof prof("Entities");
         drawSolidEntities();
         drawTransEntities();
-
-        timer.stop();
-        m_Stats.uEntityRenderingTime += (unsigned)timer.us();
     }
 
     // Draw patches
     if (m_Data.patchesVao.id() != 0) {
+        appfw::Prof prof("Patches");
         m_sPatchesShader.enable();
         m_sPatchesShader.setupSceneUniforms(*this);
         glBindVertexArray(m_Data.patchesVao);
@@ -422,8 +418,8 @@ void SceneRenderer::renderScene(GLint targetFb) {
     glBindFramebuffer(GL_FRAMEBUFFER, targetFb);
     doPostProcessing();
 
-    renderTimer.stop();
-    m_Stats.uTotalRenderingTime += (unsigned)renderTimer.us();
+    frameTimer.stop();
+    m_Stats.flFrameTime = frameTimer.dseconds();
 }
 
 void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
@@ -435,6 +431,10 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
             return;
         }
 
+        ImGui::Text("FPS: %.3f", 1.0 / m_Stats.flFrameTime);
+        ImGui::Text("Total: %.3f ms", m_Stats.flFrameTime * 1000);
+        ImGui::Separator();
+
         ImGui::Text("World: %u (%u + %u)", m_Stats.uRenderedWorldPolys + m_Stats.uRenderedSkyPolys,
                     m_Stats.uRenderedWorldPolys, m_Stats.uRenderedSkyPolys);
         ImGui::Text("Brush ent surfs: %u", m_Stats.uRenderedBrushEntPolys);
@@ -444,40 +444,6 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         ImGui::Text("Entities: %u", m_uVisibleEntCount);
         ImGui::Text("    Solid: %lu", m_SolidEntityList.size());
         ImGui::Text("    Trans: %lu", m_TransEntityList.size());
-        ImGui::Separator();
-
-        int timeLost = m_Stats.uTotalRenderingTime.getSmoothed();
-        timeLost -= m_Stats.uSetupTime.getSmoothed();
-        timeLost -= m_Stats.uEntityListTime.getSmoothed();
-        timeLost -= m_Stats.uWorldBSPTime.getSmoothed();
-        timeLost -= m_Stats.uWorldRenderingTime.getSmoothed();
-        timeLost -= m_Stats.uSkyRenderingTime.getSmoothed();
-        timeLost -= m_Stats.uEntityRenderingTime.getSmoothed();
-        timeLost -= m_Stats.uPostProcessingTime.getSmoothed();
-
-        ImGui::Text("FPS: %.3f", 1000000.0 / m_Stats.uTotalRenderingTime.getSmoothed());
-        ImGui::Text("Total: %2d.%03d ms", m_Stats.uTotalRenderingTime.getSmoothed() / 1000,
-                    m_Stats.uTotalRenderingTime.getSmoothed() % 1000);
-        ImGui::Text("Setup: %2d.%03d ms", m_Stats.uSetupTime.getSmoothed() / 1000,
-                    m_Stats.uSetupTime.getSmoothed() % 1000);
-        ImGui::Text("Ent list: %2d.%03d ms", m_Stats.uEntityListTime.getSmoothed() / 1000,
-                    m_Stats.uEntityListTime.getSmoothed() % 1000);
-        ImGui::Text("BSP: %2d.%03d ms", m_Stats.uWorldBSPTime.getSmoothed() / 1000,
-                    m_Stats.uWorldBSPTime.getSmoothed() % 1000);
-        ImGui::Text("World: %2d.%03d ms", m_Stats.uWorldRenderingTime.getSmoothed() / 1000,
-                    m_Stats.uWorldRenderingTime.getSmoothed() % 1000);
-        ImGui::Text("Sky: %2d.%03d ms", m_Stats.uSkyRenderingTime.getSmoothed() / 1000,
-                    m_Stats.uSkyRenderingTime.getSmoothed() % 1000);
-        ImGui::Text("Entity: %2d.%03d ms", m_Stats.uEntityRenderingTime.getSmoothed() / 1000,
-                    m_Stats.uEntityRenderingTime.getSmoothed() % 1000);
-        ImGui::Text("    Solid: %2d.%03d ms", m_Stats.uSolidEntityRenderingTime.getSmoothed() / 1000,
-                    m_Stats.uSolidEntityRenderingTime.getSmoothed() % 1000);
-        ImGui::Text("    Trans: %2d.%03d ms", m_Stats.uTransEntityRenderingTime.getSmoothed() / 1000,
-                    m_Stats.uTransEntityRenderingTime.getSmoothed() % 1000);
-        ImGui::Text("Post: %2d.%03d ms", m_Stats.uPostProcessingTime.getSmoothed() / 1000,
-                    m_Stats.uPostProcessingTime.getSmoothed() % 1000);
-        ImGui::Text("Unaccounted: %6.3f ms", timeLost / 1000.0);
-
         ImGui::Separator();
 
         CvarCheckbox("World", r_drawworld);
@@ -1178,8 +1144,7 @@ std::vector<uint8_t> SceneRenderer::rotateImage90CCW(uint8_t *data, int wide, in
 }
 
 void SceneRenderer::frameSetup() {
-    appfw::Timer timer;
-    timer.start();
+    appfw::Prof prof("Frame Setup");
 
     prepareHdrFramebuffer();
     setupViewContext();
@@ -1202,9 +1167,6 @@ void SceneRenderer::frameSetup() {
 
     // Bind lightmap - will be used for world and brush ents
     bindLightmapBlock();
-
-    timer.stop();
-    m_Stats.uSetupTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::frameEnd() {
@@ -1249,25 +1211,20 @@ void SceneRenderer::bindLightmapBlock() {
 
 void SceneRenderer::drawWorldSurfaces() {
     // Prepare list of visible world surfaces
-    appfw::Timer bspTimer;
-    bspTimer.start();
-    m_Surf.setContext(&m_Data.viewContext);
-    m_Surf.calcWorldSurfaces();
-    bspTimer.stop();
-    m_Stats.uWorldBSPTime += (unsigned)bspTimer.us();
+    {
+        appfw::Prof prof("BSP traverse");
+        m_Surf.setContext(&m_Data.viewContext);
+        m_Surf.calcWorldSurfaces();
+    }
 
     // Draw visible surfaces
-    appfw::Timer timer;
-    timer.start();
+    appfw::Prof prof("Draw world");
 
     if (r_ebo.getValue()) {
         drawWorldSurfacesIndexed();
     } else {
         drawWorldSurfacesVao();
     }
-
-    timer.stop();
-    m_Stats.uWorldRenderingTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::drawWorldSurfacesVao() {
@@ -1419,8 +1376,7 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 }
 
 void SceneRenderer::drawSkySurfaces() {
-    appfw::Timer timer;
-    timer.start();
+    appfw::Prof prof("Draw sky");
 
     if (!m_Data.viewContext.getSkySurfaces().empty()) {
         glDepthFunc(GL_LEQUAL);
@@ -1441,9 +1397,6 @@ void SceneRenderer::drawSkySurfaces() {
 
         glDepthFunc(GL_LESS);
     }
-
-    timer.stop();
-    m_Stats.uSkyRenderingTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::drawSkySurfacesVao() {
@@ -1502,8 +1455,7 @@ void SceneRenderer::drawSkySurfacesIndexed() {
 }
 
 void SceneRenderer::drawSolidEntities() {
-    appfw::Timer timer;
-    timer.start();
+    appfw::Prof prof("Solid");
 
     m_sBrushEntityShader.enable();
     m_sBrushEntityShader.setupSceneUniforms(*this);
@@ -1537,14 +1489,10 @@ void SceneRenderer::drawSolidEntities() {
     }
 
     setRenderMode(kRenderNormal);
-
-    timer.stop();
-    m_Stats.uSolidEntityRenderingTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::drawTransEntities() {
-    appfw::Timer timer;
-    timer.start();
+    appfw::Prof prof("Trans");
 
     m_sBrushEntityShader.enable();
     m_sBrushEntityShader.setupSceneUniforms(*this);
@@ -1594,9 +1542,6 @@ void SceneRenderer::drawTransEntities() {
     }
 
     setRenderMode(kRenderNormal);
-
-    timer.stop();
-    m_Stats.uTransEntityRenderingTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
@@ -1769,8 +1714,7 @@ void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
 }
 
 void SceneRenderer::doPostProcessing() {
-    appfw::Timer timer;
-    timer.start();
+    appfw::Prof prof("Post-Processing");
 
     m_sPostProcessShader.enable();
     glActiveTexture(GL_TEXTURE0);
@@ -1782,9 +1726,6 @@ void SceneRenderer::doPostProcessing() {
     glBindVertexArray(0);
 
     m_sPostProcessShader.disable();
-    
-    timer.stop();
-    m_Stats.uPostProcessingTime += (unsigned)timer.us();
 }
 
 void SceneRenderer::setRenderMode(RenderMode mode) {
