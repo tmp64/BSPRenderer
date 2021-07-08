@@ -175,6 +175,7 @@ void MaterialManager::tick() {
 
         m_bLinearFiltering = bLinear;
         m_iMipMapping = iMipMap;
+        m_iAniso = iAniso;
     }
 
     // Show UI
