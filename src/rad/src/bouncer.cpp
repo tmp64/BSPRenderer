@@ -49,7 +49,7 @@ void rad::Bouncer::bounceLight() {
             // Received light from all visible patches
             // Write it
             PatchRef patch(m_pRadSim->m_Patches, i);
-            AFW_ASSERT(patchSum[i].r >= 0 && patchSum[i].g >= 0 && patchSum[i].b >= 0);
+            AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
             getPatchBounce(i, bounce) = m_PatchSum[i] * refl;
             patch.getFinalColor() += getPatchBounce(i, bounce);
         }
@@ -85,9 +85,9 @@ void rad::Bouncer::receiveLightFromThis(int bounce, PatchIndex i) {
             // Take light from i to patch2
             m_PatchSum[patch2] += getPatchBounce(i, bounce - 1) * (vf * vfkoeff[patch2]);
 
-            AFW_ASSERT(patchSum[i].r >= 0 && patchSum[i].g >= 0 && patchSum[i].b >= 0);
-            AFW_ASSERT(patchSum[patch2].r >= 0 && patchSum[patch2].g >= 0 &&
-                       patchSum[patch2].b >= 0);
+            AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
+            AFW_ASSERT(m_PatchSum[patch2].r >= 0 && m_PatchSum[patch2].g >= 0 &&
+                       m_PatchSum[patch2].b >= 0);
 
             dataOffset++;
         }
@@ -123,9 +123,9 @@ void rad::Bouncer::receiveLightFromOther(int bounce, PatchIndex i) {
             // Take light from patch2 to i
             m_PatchSum[i] += getPatchBounce(patch2, bounce - 1) * (vf * vfkoeff[i]);
 
-            AFW_ASSERT(patchSum[i].r >= 0 && patchSum[i].g >= 0 && patchSum[i].b >= 0);
-            AFW_ASSERT(patchSum[patch2].r >= 0 && patchSum[patch2].g >= 0 &&
-                       patchSum[patch2].b >= 0);
+            AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
+            AFW_ASSERT(m_PatchSum[patch2].r >= 0 && m_PatchSum[patch2].g >= 0 &&
+                       m_PatchSum[patch2].b >= 0);
 
             dataOffset++;
         }
