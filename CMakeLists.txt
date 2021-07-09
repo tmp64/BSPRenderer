@@ -18,12 +18,7 @@ endif()
 
 # External libraries
 find_package(SDL2 REQUIRED)
-find_package(Freetype REQUIRED)
 find_package(glm REQUIRED)
-
-if(NOT FREETYPE_FOUND)
-	message(FATAL_ERROR "Freetype not found")
-endif()
 
 add_subdirectory(external/appfw)
 add_subdirectory(external/glad_debug)

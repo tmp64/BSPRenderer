@@ -43,7 +43,6 @@ target_link_libraries(renderer
 	glm::glm
 	gui_app
 	imgui
-	Freetype::Freetype
 )
 
 appfw_get_std_pch(PCH_STD_HEADERS)
