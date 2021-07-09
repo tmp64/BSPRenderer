@@ -3,7 +3,6 @@ add_executable(playground
 	CMakeLists.txt
 	src/bmplib.hpp
 	src/main.cpp
-	src/this_module_info.h
 )
 
 appfw_module(playground)

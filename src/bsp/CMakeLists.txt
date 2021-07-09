@@ -3,11 +3,6 @@ set(BSP_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/level.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/wad_file.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/wad_texture.h
-
-)
-
-set(BSP_PRIVATE_HEADERS
-	${CMAKE_CURRENT_SOURCE_DIR}/src/this_module_info.h
 )
 
 set(BSP_PRIVATE_SOURCES
@@ -19,7 +14,6 @@ set(BSP_PRIVATE_SOURCES
 add_library(bsp STATIC
 	${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
 	${BSP_PUBLIC_HEADERS}
-	${BSP_PRIVATE_HEADERS}
 	${BSP_PRIVATE_SOURCES}
 )
 

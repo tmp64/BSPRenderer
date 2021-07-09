@@ -13,10 +13,6 @@ set(RNDR_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/utils.h
 )
 
-set(RNDR_PRIVATE_HEADERS
-	${CMAKE_CURRENT_SOURCE_DIR}/src/this_module_info.h
-)
-
 set(RNDR_PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_shader.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/material_manager.cpp
@@ -29,7 +25,6 @@ set(RNDR_PRIVATE_SOURCES
 add_library(renderer STATIC
 	${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
 	${RNDR_PUBLIC_HEADERS}
-	${RNDR_PRIVATE_HEADERS}
 	${RNDR_PRIVATE_SOURCES}
 )
 

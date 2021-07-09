@@ -9,10 +9,6 @@ set(PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/utils.h
 )
 
-set(PRIVATE_HEADERS
-	${CMAKE_CURRENT_SOURCE_DIR}/src/this_module_info.h
-)
-
 set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view_2d.cpp
@@ -27,7 +23,6 @@ set(PRIVATE_SOURCES
 add_library(gui_app STATIC
 	${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
 	${PUBLIC_HEADERS}
-	${PRIVATE_HEADERS}
 	${PRIVATE_SOURCES}
 )
 

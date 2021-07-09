@@ -12,7 +12,6 @@ set(PUBLIC_HEADERS
 
 set(PRIVATE_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/src/plat.h
-	${CMAKE_CURRENT_SOURCE_DIR}/src/this_module_info.h
 )
 
 set(PRIVATE_SOURCES

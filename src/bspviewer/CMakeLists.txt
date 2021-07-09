@@ -4,15 +4,10 @@ add_executable(bspviewer
 	src/base_entity.h
 	src/brush_model.cpp
 	src/brush_model.h
-	src/bsp_tree.cpp
-	src/bsp_tree.h
 	src/bspviewer.cpp
 	src/bspviewer.h
-	src/demo.cpp
-	src/demo.h
 	src/renderer.cpp
 	src/renderer.h
-	src/this_module_info.h
 	src/world_state.cpp
 	src/world_state.h
 )

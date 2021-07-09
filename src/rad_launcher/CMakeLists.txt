@@ -1,7 +1,6 @@
 add_executable(rad_launcher
 	CMakeLists.txt
 	src/main.cpp
-	src/this_module_info.h
 )
 
 appfw_module(rad_launcher)

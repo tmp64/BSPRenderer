@@ -12,8 +12,6 @@
 #include <renderer/material_manager.h>
 
 #include "bspviewer.h"
-#include "demo.h"
-#include "bsp_tree.h"
 
 static ConCommand quit_cmd("quit", "Exits the app", []() { BSPViewer::get().quit(); });
 
@@ -264,9 +262,6 @@ void BSPViewer::loadLevel(const std::string &name) {
         m_pWorldState = new WorldState();
         WorldState::get().loadLevel(m_LoadedLevel);
         Renderer::get().loadLevel(path);
-
-        g_BSPTree.setLevel(&m_LoadedLevel);
-        g_BSPTree.createTree();
 
         m_vPos = {0.f, 0.f, 0.f};
         m_vRot = {0.f, 0.f, 0.f};
