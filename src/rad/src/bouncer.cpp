@@ -83,7 +83,8 @@ void rad::Bouncer::receiveLightFromThis(int bounce, PatchIndex i) {
             AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
 
             // Take light from i to patch2
-            m_PatchSum[patch2] += getPatchBounce(i, bounce - 1) * (vf * vfkoeff[patch2]);
+            m_PatchSum[patch2] += getPatchBounce(i, bounce - 1) *
+                                  (vf * vfkoeff[patch2] * patch.getSize() * patch.getSize());
 
             AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
             AFW_ASSERT(m_PatchSum[patch2].r >= 0 && m_PatchSum[patch2].g >= 0 &&
@@ -114,6 +115,7 @@ void rad::Bouncer::receiveLightFromOther(int bounce, PatchIndex i) {
 
         for (PatchIndex k = 0; k < item.size; k++) {
             PatchIndex patch2 = poff + k;
+            PatchRef patch2ref(m_pRadSim->m_Patches, patch2);
             float vf = vfdata[dataOffset];
 
             AFW_ASSERT(!isnan(vf) && !isinf(vf));
@@ -121,7 +123,8 @@ void rad::Bouncer::receiveLightFromOther(int bounce, PatchIndex i) {
             AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
 
             // Take light from patch2 to i
-            m_PatchSum[i] += getPatchBounce(patch2, bounce - 1) * (vf * vfkoeff[i]);
+            m_PatchSum[i] += getPatchBounce(patch2, bounce - 1) *
+                             (vf * vfkoeff[i] * patch2ref.getSize() * patch2ref.getSize());
 
             AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
             AFW_ASSERT(m_PatchSum[patch2].r >= 0 && m_PatchSum[patch2].g >= 0 &&

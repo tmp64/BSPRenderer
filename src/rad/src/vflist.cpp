@@ -207,6 +207,7 @@ void rad::VFList::sumViewFactors() {
     PatchIndex patchCount = m_pRadSim->m_Patches.size();
 
     for (PatchIndex i = 0; i < patchCount; i++) {
+        PatchRef patchi(m_pRadSim->m_Patches, i);
         PatchIndex p = i + 1;
         size_t dataOffset = m_Offsets[i];
 
@@ -215,9 +216,10 @@ void rad::VFList::sumViewFactors() {
             p += item.offset;
 
             for (PatchIndex k = 0; k < item.size; k++) {
+                PatchRef patchpk(m_pRadSim->m_Patches, p + k);
                 float vf = m_Data[dataOffset];
-                m_Koeff[i] += vf;
-                m_Koeff[p + k] += vf;
+                m_Koeff[i] += vf * patchpk.getSize() * patchpk.getSize();
+                m_Koeff[p + k] += vf * patchi.getSize() * patchi.getSize();
                 dataOffset++;
             }
 
