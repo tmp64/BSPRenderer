@@ -42,6 +42,7 @@ target_link_libraries(rad
 	bsp
 	nlohmann_json
 	taskflow
+	yaml-cpp
 )
 
 appfw_get_std_pch(PCH_STD_HEADERS)
@@ -49,6 +50,7 @@ appfw_get_pch(PCH_APPFW_HEADERS)
 target_precompile_headers(rad PRIVATE
     ${PCH_STD_HEADERS}
     ${PCH_APPFW_HEADERS}
+	<yaml-cpp/yaml.h>
 )
 
 source_group("Public Headers" FILES ${PUBLIC_HEADERS})
