@@ -4,6 +4,7 @@
 #include <memory>
 #include <map>
 #include <nlohmann/json_fwd.hpp>
+#include <yaml-cpp/yaml.h>
 #include <appfw/filesystem.h>
 
 class AppConfig {
@@ -16,7 +17,7 @@ public:
         /**
          * Construct the item from a JSON value.
          */
-        Item(nlohmann::json *pJson);
+        Item(YAML::Node &node);
 
         /**
          * Returns value for a key. If not found or invalid type, throws an exception.
@@ -30,9 +31,9 @@ public:
         Item getSubItem(const std::string &key) const;
 
         /**
-         * Returns raw JSON value.
+         * Returns a raw YAML node.
          */
-        const nlohmann::json &getJson() const;
+        inline const YAML::Node &getYamlNode() const { return m_Node; }
 
         /**
          * Returns whether `key` exists.
@@ -40,7 +41,7 @@ public:
         bool contains(const std::string &key) const;
 
     private:
-        nlohmann::json *m_pValue = nullptr;
+        YAML::Node m_Node;
     };
 
     /**
@@ -54,9 +55,9 @@ public:
     AppConfig(const fs::path &path);
 
     /**
-     * Loads a JSON object file.
+     * Loads a YAML object file.
      */
-    void loadJsonFile(const fs::path &path);
+    void loadYamlFile(const fs::path &path);
 
     /**
      * Returns whether item exists in the root.
@@ -79,7 +80,7 @@ public:
     void executeCommands();
 
 private:
-    std::shared_ptr<nlohmann::json> m_pData;
+    YAML::Node m_Data;
 };
 
 #endif

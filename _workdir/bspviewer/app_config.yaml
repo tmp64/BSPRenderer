@@ -1,0 +1,35 @@
+gui:
+    win_title: BSP Viewer
+    win_width: 1600
+    win_height: 900
+    
+    imgui_font_scale: 0
+
+appfw:
+    extcon_port: 27333
+    
+rad:
+    # Size of the patch in units
+    patch_size: 64
+    
+    # Bounce count
+    bounce_count: 32
+    
+    # Base surface reflectivity
+    reflectivity: 0.4
+    
+    # Divisor of default light_environment brightness
+    light_env_brightness_divisor: 35
+
+commands:
+    - app_sync_rates 1
+    - app_fps_max 300
+
+filesystem:
+    assets:
+        - bspviewer
+        - base
+        - E:\\Steam\\steamapps\\common\\Half-Life\\valve
+        - E:\\Steam\\steamapps\\common\\Half-Life\\valve_downloads
+    config:
+        - bspviewer/cfg

@@ -6,20 +6,22 @@
 //------------------------------------------------------
 // Item
 //------------------------------------------------------
-AppConfig::Item::Item(nlohmann::json *pJson) { m_pValue = pJson; }
+AppConfig::Item::Item(YAML::Node &node) {
+    m_Node = node;
+}
 
 template <typename T>
 T AppConfig::Item::get(const std::string &key, const std::optional<T> &defVal) const {
-    auto it = m_pValue->find(key);
+    auto node = m_Node[key];
 
-    if (it == m_pValue->end()) {
+    if (node) {
+        return node.as<T>();
+    } else {
         if (defVal.has_value()) {
             return *defVal;
         } else {
             throw std::invalid_argument("key " + key + " not found");
         }
-    } else {
-        return it->get<T>();
     }
 }
 
@@ -38,45 +40,75 @@ bool AppConfig::Item::get(const std::string &key, const std::optional<bool> &def
 template
 std::string AppConfig::Item::get(const std::string &key, const std::optional<std::string> &defVal) const;
 
-AppConfig::Item AppConfig::Item::getSubItem(const std::string &key) const { return Item(&m_pValue->at(key)); }
+AppConfig::Item AppConfig::Item::getSubItem(const std::string &key) const {
+    YAML::Node node = m_Node[key];
 
-const nlohmann::json &AppConfig::Item::getJson() const { return *m_pValue; }
+    if (!node) {
+        throw std::invalid_argument("key " + key + " not found");
+    }
 
-bool AppConfig::Item::contains(const std::string &key) const { return m_pValue->contains(key); }
+    return Item(node);
+}
+
+bool AppConfig::Item::contains(const std::string &key) const {
+    return m_Node[key].IsDefined();
+}
 
 //------------------------------------------------------
 // AppConfig
 //------------------------------------------------------
 AppConfig::AppConfig(const fs::path &path) {
     try {
-        loadJsonFile(path);
+        loadYamlFile(path);
     } catch (const std::exception &e) {
         throw std::runtime_error(fmt::format("AppConfig: {}", e.what()));
     }
 }
 
 bool AppConfig::itemExists(const std::string &key) {
-    auto it = m_pData->find(key);
-    return it != m_pData->end();
+    return m_Data[key].IsDefined();
 }
 
-AppConfig::Item AppConfig::getItem(const std::string &key) { return Item(&m_pData->at(key)); }
+AppConfig::Item AppConfig::getItem(const std::string &key) {
+    YAML::Node node = m_Data[key];
+
+    if (!node) {
+        throw std::invalid_argument("key " + key + " not found");
+    }
+
+    return Item(node);
+}
 
 void AppConfig::mountFilesystem() {
     Item fs = getItem("filesystem");
+    const YAML::Node &fsNode = fs.getYamlNode();
 
-    for (auto &item : fs.getJson().get<nlohmann::json::object_t>()) {
-        const nlohmann::json &array = item.second.get<nlohmann::json>();
+    if (fsNode.IsNull()) {
+        return;
+    }
 
-        for (auto &i : array) {
-            const std::string &pathStr = i.get<std::string>();
+    if (!fsNode.IsMap()) {
+        throw std::logic_error("AppConfig: 'filesystem' is not a map");
+    }
+
+    for (auto &item : fsNode) {
+        const std::string tag = item.first.as<std::string>();
+
+        if (!item.second.IsSequence()) {
+            throw std::logic_error(fmt::format("AppConfig: 'filesystem.{}' is not a list",
+                                               item.first.as<std::string>()));
+        }
+
+        std::list<std::string> paths = item.second.as<std::list<std::string>>();
+
+        for (auto &pathStr : paths) {
             fs::path path = fs::u8path(pathStr);
 
             if (path.is_absolute()) {
-                getFileSystem().addSearchPath(path, item.first.c_str());
+                getFileSystem().addSearchPath(path, tag);
             } else {
                 fs::path p = getFileSystem().findExistingFile("base:" + pathStr);
-                getFileSystem().addSearchPath(p, item.first.c_str());
+                getFileSystem().addSearchPath(p, tag);
             }
         }
     }
@@ -87,35 +119,26 @@ void AppConfig::executeCommands() {
         return;
     }
 
-    auto &item = getItem("commands").getJson();
+    auto &item = getItem("commands").getYamlNode();
 
-    if (!item.is_array()) {
-        throw std::logic_error("AppConfig: commands is not an array");
+    if (!item.IsSequence()) {
+        throw std::logic_error("AppConfig: 'commands' is not a list");
     }
 
-    for (auto &i : item) {
-        appfw::getConsole().command(i.get<std::string>());
+    std::list<std::string> cmds = item.as<std::list<std::string>>();
+
+    for (auto &i : cmds) {
+        appfw::getConsole().command(i);
     }
 }
 
-void AppConfig::loadJsonFile(const fs::path &path) {
-    using nlohmann::json;
-    
+void AppConfig::loadYamlFile(const fs::path &path) {
     std::ifstream file(path);
 
     if (file.fail()) {
         throw std::runtime_error(fmt::format("failed to open: {}", strerror(errno)));
     }
 
-    std::vector<char> fileData;
-    appfw::readFileContents(file, fileData);
-    fileData.push_back('\0');
-    json obj = json::parse(fileData.data(), nullptr, true, true);
-
-    if (!obj.is_object()) {
-        throw std::runtime_error("JSON file is not an object");
-    }
-
-    m_pData = std::make_shared<nlohmann::json>(std::move(obj));
+    m_Data = YAML::Load(file);
 }
 

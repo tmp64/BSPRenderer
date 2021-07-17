@@ -108,7 +108,7 @@ void initApp() {
     getFileSystem().addSearchPath(baseAppPath, "base");
 
     // Load app config
-    g_AppConfig.loadJsonFile(getFileSystem().findExistingFile("base:bspviewer/app_config.json"));
+    g_AppConfig.loadYamlFile(getFileSystem().findExistingFile("base:bspviewer/app_config.yaml"));
     g_AppConfig.mountFilesystem();
 }
 

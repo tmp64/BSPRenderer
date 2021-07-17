@@ -17,7 +17,7 @@ static ConCommand cmd_quit("quit", "Quits the app", [](const CmdString &) {
 
 GuiAppBase::GuiAppBase()
     : m_AppConfig(
-          getFileSystem().findExistingFile("base:" +  app_getInitInfo().appDirName + "/app_config.json"))
+          getFileSystem().findExistingFile("base:" +  app_getInitInfo().appDirName + "/app_config.yaml"))
     , m_AppConfigInit(m_AppConfig)
     , m_Window(m_AppConfig)
     , m_ImGui(m_Window) {

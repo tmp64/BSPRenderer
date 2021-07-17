@@ -19,6 +19,7 @@ target_include_directories(app_base PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(app_base
 	appfw
 	nlohmann_json
+	yaml-cpp
 )
 
 appfw_get_std_pch(PCH_STD_HEADERS)
