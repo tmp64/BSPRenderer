@@ -102,17 +102,20 @@ rad::RadSim::RadSim()
     printi("Using {} thread(s).", m_Executor.num_workers());
 }
 
-void rad::RadSim::setLevel(const bsp::Level *pLevel, const std::string &path) {
+void rad::RadSim::setLevel(const bsp::Level *pLevel, const std::string &name) {
     m_pLevel = pLevel;
-    m_LevelPath = path;
+    m_LevelName = name;
     m_PatchHash = appfw::SHA256::Digest();
+
+    // Create build directory
+    fs::create_directories(getFileSystem().getFilePath(getBuildDirPath()));
 }
 
 void rad::RadSim::loadLevelConfig() {
     m_PatchHash = appfw::SHA256::Digest();
     appfw::SHA256 hash;
 
-    std::fstream configFile(getFileSystem().findExistingFile(m_LevelPath + ".json"));
+    std::fstream configFile(getFileSystem().findExistingFile(getLevelConfigPath()));
     configFile >> m_LevelConfigJson;
 
     // Load patch size
@@ -256,7 +259,7 @@ void rad::RadSim::writeLightmaps() {
         glm::ivec2 lmSize;
     };
 
-    appfw::BinaryOutputFile file(getFileSystem().getFilePath(m_LevelPath + ".lm"));
+    appfw::BinaryOutputFile file(getFileSystem().getFilePath(getLightmapPath()));
     LightmapFileHeader lmHeader;
     lmHeader.iFaceCount = (uint32_t)m_Faces.size();
     file.writeObject(lmHeader);
@@ -802,10 +805,22 @@ void rad::RadSim::updateProgress(double progress) {
     }
 }
 
+std::string rad::RadSim::getBuildDirPath() {
+    return fmt::format("assets:mapsrc/build/{}", m_LevelName);
+}
+
+std::string rad::RadSim::getLevelConfigPath() {
+    return fmt::format("assets:mapsrc/{}.rad.json", m_LevelName);
+}
+
 std::string rad::RadSim::getVisMatPath() {
-    return fmt::format("{}.svismat{}", m_LevelPath, m_PatchSizeStr);
+    return fmt::format("{}/svismat{}.dat", getBuildDirPath(), m_PatchSizeStr);
 }
 
 std::string rad::RadSim::getVFListPath() {
-    return fmt::format("{}.vflist{}", m_LevelPath, m_PatchSizeStr);
+    return fmt::format("{}/vflist{}.dat", getBuildDirPath(), m_PatchSizeStr);
+}
+
+std::string rad::RadSim::getLightmapPath() {
+    return fmt::format("assets:maps/{}.bsp.lm", m_LevelName);
 }

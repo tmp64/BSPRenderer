@@ -54,7 +54,7 @@ public:
     /**
      * Sets the level.
      */
-    void setLevel(const bsp::Level *pLevel, const std::string &path);
+    void setLevel(const bsp::Level *pLevel, const std::string &name);
 
     /**
      * Returns size of a patch in units.
@@ -136,7 +136,7 @@ private:
     ProgressCallback m_fnProgressCallback;
 
     const bsp::Level *m_pLevel = nullptr;
-    std::string m_LevelPath;
+    std::string m_LevelName;
     std::vector<Plane> m_Planes;
     std::vector<Face> m_Faces;
     std::vector<PatchTree> m_PatchTrees;
@@ -192,8 +192,11 @@ private:
     //! Calls the progress callback with specified progress.
     void updateProgress(double progress);
 
+    std::string getBuildDirPath();
+    std::string getLevelConfigPath();
     std::string getVisMatPath();
     std::string getVFListPath();
+    std::string getLightmapPath();
 
     static inline tf::Executor m_Executor;
 

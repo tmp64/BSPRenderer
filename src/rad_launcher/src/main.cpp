@@ -8,7 +8,7 @@
 
 AppConfig g_AppConfig;
 bsp::Level g_Level;
-std::string g_LevelPath;
+std::string g_LevelName;
 
 void initApp();
 void loadLevel();
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
         rad.setProgressCallback(progressCallback);
         
         loadLevel();
-        rad.setLevel(&g_Level, g_LevelPath);
+        rad.setLevel(&g_Level, g_LevelName);
         rad.loadLevelConfig();
 
         if (getCommandLine().doesArgHaveValue("--bounce")) {
@@ -113,8 +113,8 @@ void initApp() {
 }
 
 void loadLevel() {
-    std::string map = getCommandLine().getArgString("--map");
-    g_LevelPath = fmt::format("assets:maps/{}.bsp", map);
-    printi("Loading level {}", g_LevelPath);
-    g_Level.loadFromFile(getFileSystem().findExistingFile(g_LevelPath));
+    g_LevelName = getCommandLine().getArgString("--map");
+    std::string bspPath = fmt::format("assets:maps/{}.bsp", g_LevelName);
+    printi("Loading level {}", g_LevelName);
+    g_Level.loadFromFile(getFileSystem().findExistingFile(bspPath));
 }
