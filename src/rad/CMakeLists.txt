@@ -50,6 +50,7 @@ appfw_get_pch(PCH_APPFW_HEADERS)
 target_precompile_headers(rad PRIVATE
     ${PCH_STD_HEADERS}
     ${PCH_APPFW_HEADERS}
+	<taskflow/taskflow.hpp>
 	<yaml-cpp/yaml.h>
 )
 
