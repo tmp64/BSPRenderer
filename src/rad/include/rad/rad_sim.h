@@ -2,7 +2,7 @@
 #define RAD_RAD_SIM_H
 #include <atomic>
 #include <functional>
-#include <nlohmann/json.hpp>
+#include <memory>
 #include <taskflow/taskflow.hpp>
 #include <appfw/sha256.h>
 #include <appfw/utils.h>
@@ -15,6 +15,8 @@
 #include <rad/sparse_vismat.h>
 #include <rad/vflist.h>
 #include <rad/bouncer.h>
+#include <rad/rad_config.h>
+#include <rad/level_config.h>
 
 namespace rad {
 
@@ -27,17 +29,12 @@ class RadSim : appfw::NoMove {
 public:
     using ProgressCallback = std::function<void(double progress)>;
 
-    /**
-     * Maximum distance from any point in world to a point on a sky face.
-     */
-    static constexpr float SKY_RAY_LENGTH = 8192.f;
-
     RadSim();
 
     /**
      * Sets app config used by the rad.
      */
-    inline void setAppConfig(AppConfig *appcfg) { m_pAppConfig = appcfg; }
+    void setAppConfig(AppConfig *appcfg);
 
     /**
      * This callback will be called to update progress for long tasks.
@@ -52,27 +49,25 @@ public:
     inline const bsp::Level *getLevel() { return m_pLevel; }
 
     /**
-     * Sets the level.
+     * Sets and loads the level.
      */
-    void setLevel(const bsp::Level *pLevel, const std::string &name);
+    void setLevel(const bsp::Level *pLevel, const std::string &name, const std::string &profileName);
 
     /**
-     * Returns size of a patch in units.
+     * Returns the build profile.
      */
-    inline float getPatchSize() { return m_flPatchSize; }
+    inline const BuildProfile &getBuildProfile() { return m_Profile; }
+
+    /**
+     * Sets the bounce count.
+     */
+    inline void setBounceCount(int count) { m_Profile.iBounceCount = count; }
 
     /**
      * Returns hash of the level with this particular configuration of patches (position, count, etc).
      * Valid after loadLevelConfig.
      */
     inline appfw::SHA256::Digest getPatchHash() { return m_PatchHash; }
-
-    /**
-     * Loads config file for the level.
-     * Creates patches for faces.
-     * Can take some time.
-     */
-    void loadLevelConfig();
 
     /**
      * Returns whether a valid visibility matrix is loaded.
@@ -112,16 +107,6 @@ public:
     void calcViewFactors();
 
     /**
-     * Gets bounce count.
-     */
-    inline int getBounceCount() { return m_iBounceCount; }
-
-    /**
-     * Sets bounce count. Higher value means better global illumination.
-     */
-    inline void setBounceCount(int count) { m_iBounceCount = count; }
-
-    /**
      * Adds lighting and bounces light around patches.
      */
     void bounceLight();
@@ -132,11 +117,16 @@ public:
     void writeLightmaps();
 
 private:
+    // Rad data
     AppConfig *m_pAppConfig = nullptr;
     ProgressCallback m_fnProgressCallback;
+    RadConfig m_Config;
 
+    // Level data
     const bsp::Level *m_pLevel = nullptr;
     std::string m_LevelName;
+    LevelConfig m_LevelConfig;
+    BuildProfile m_Profile;
     std::vector<Plane> m_Planes;
     std::vector<Face> m_Faces;
     std::vector<PatchTree> m_PatchTrees;
@@ -147,20 +137,13 @@ private:
     VFList m_VFList;
     Bouncer m_Bouncer;
 
-    nlohmann::json m_LevelConfigJson;
-    float m_flPatchSize = 0; //!< Size of a patch in units
-    float m_flLuxelSize = 0; //!< Size of a luxel in units
-    float m_flReflectivity = 0;
-    float m_flGamma = 0;
-    std::string m_PatchSizeStr;
-    EnvLight m_EnvLight;
-
-    int m_iBounceCount = 0;
-
     appfw::SHA256::Digest m_PatchHash = {};
 
     //! Returns minimum allowed patch size
-    float getMinPatchSize();
+    inline float getMinPatchSize() { return m_Profile.flMinPatchSize; }
+
+    void loadLevelConfig();
+    void loadBuildProfile(const std::string &profileName);
 
     //! Loads planes from the BSP.
     void loadPlanes();
@@ -174,18 +157,6 @@ private:
     //! Loads lights from entities.
     void loadLevelEntities();
 
-    //! Converts color from gamma space to linear space.
-    glm::vec3 correctColorGamma(const glm::vec3 &color);
-
-    //! Adds initial lighting to patches (texlights, entity lights).
-    void addLighting();
-
-    //! Applies environment lighting to patches.
-    void applyEnvLight();
-
-    //! Applies texture lighting to patches.
-    void applyTexLights();
-
     //! Writes lightmap data into the lightmap texture
     void sampleLightmap(size_t faceIdx);
 
@@ -197,6 +168,9 @@ private:
     std::string getVisMatPath();
     std::string getVFListPath();
     std::string getLightmapPath();
+
+    float gammaToLinear(float val);
+    glm::vec3 gammaToLinear(const glm::vec3 &val);
 
     static inline tf::Executor m_Executor;
 

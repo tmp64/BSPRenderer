@@ -93,7 +93,7 @@ rad::PatchIndex rad::PatchTree::copyPatchesToTheList(PatchIndex offset, appfw::S
 
 void rad::PatchTree::buildTree() {
     // Set up root node
-    float squareSize = std::max(m_pRadSim->m_flLuxelSize, m_pFace->flPatchSize);
+    float squareSize = std::max(m_pRadSim->m_Profile.flLuxelSize, m_pFace->flPatchSize);
     float size = std::max(m_pFace->planeMaxBounds.x, m_pFace->planeMaxBounds.y);
     m_RootNode.flSize = size + 4.0f * squareSize;
     m_RootNode.vOrigin = m_pFace->planeCenterPoint;

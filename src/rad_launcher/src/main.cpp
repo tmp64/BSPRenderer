@@ -63,9 +63,14 @@ int main(int argc, char **argv) {
         rad.setAppConfig(&g_AppConfig);
         rad.setProgressCallback(progressCallback);
         
+        if (!getCommandLine().doesArgHaveValue("--profile")) {
+            throw std::runtime_error("--profile is not set.");
+        }
+
         loadLevel();
-        rad.setLevel(&g_Level, g_LevelName);
-        rad.loadLevelConfig();
+        rad.setLevel(&g_Level, g_LevelName, getCommandLine().getArgString("--profile"));
+
+        const rad::BuildProfile &profile = rad.getBuildProfile();
 
         if (getCommandLine().doesArgHaveValue("--bounce")) {
             rad.setBounceCount(getCommandLine().getArgInt("--bounce"));
@@ -73,8 +78,10 @@ int main(int argc, char **argv) {
 
         bool bCanReuseFiles = !getCommandLine().isFlagSet("--no-reuse");
 
-        printi("Base patch size: {}", rad.getPatchSize());
-        printi("Bounce count: {}", rad.getBounceCount());
+        printn("Build profile:");
+        printi("- Patch size: {}", profile.iBasePatchSize);
+        printi("- Luxel size: {}", profile.flLuxelSize);
+        printi("- Bounce count: {}", profile.iBounceCount);
 
         if (bCanReuseFiles) {
             printi("Loading vismat...");

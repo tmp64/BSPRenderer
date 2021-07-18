@@ -1,7 +1,9 @@
 set(PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/bouncer.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/level_config.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/patch_list.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/patch_tree.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/rad_config.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/rad_sim.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/sparse_vismat.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/types.h
@@ -16,9 +18,11 @@ set(PRIVATE_HEADERS
 
 set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/bouncer.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/level_config.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/patch_list.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/patch_tree.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/plat_win.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/rad_config.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/rad_sim.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/sparse_vismat.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/vflist.cpp
@@ -50,8 +54,7 @@ appfw_get_pch(PCH_APPFW_HEADERS)
 target_precompile_headers(rad PRIVATE
     ${PCH_STD_HEADERS}
     ${PCH_APPFW_HEADERS}
-	<taskflow/taskflow.hpp>
-	<yaml-cpp/yaml.h>
+	<rad/rad_sim.h>
 )
 
 source_group("Public Headers" FILES ${PUBLIC_HEADERS})

@@ -9,14 +9,14 @@ appfw:
     extcon_port: 27333
     
 rad:
-    # Size of the patch in units
-    patch_size: 64
+    # The gamma value for gamma correction. Don't really need to change it.
+    gamma: 2.2
+
+    # Reflectivity multiplier
+    reflectivity: 1
     
-    # Bounce count
-    bounce_count: 32
-    
-    # Base surface reflectivity
-    reflectivity: 0.4
+    # Base surface reflectivity (will be replaced by materials)
+    base_reflectivity: 0.4
     
     # Divisor of default light_environment brightness
     light_env_brightness_divisor: 35

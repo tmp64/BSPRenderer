@@ -2,6 +2,7 @@
 #include <fstream>
 #include <appfw/binary_file.h>
 #include <appfw/timer.h>
+#include <app_base/yaml.h>
 #include <rad/rad_sim.h>
 
 //#define SAMPLE_NEIGHBOURS
@@ -63,36 +64,6 @@ std::vector<glm::vec3> getFaceVertices(const bsp::Level &level, const bsp::BSPFa
     return verts;
 }
 
-/**
- * Returns vector that points in the direction given in degrees (or -1/-2 for yaw).
- * Used for sunlight calculation.
- */
-inline glm::vec3 getVecFromAngles(float pitch, float yaw) {
-    glm::vec3 dir;
-
-    if (yaw == -1) {
-        // ANGLE_UP
-        dir.x = 0;
-        dir.y = 0;
-        dir.z = 1;
-    } else if (yaw == -2) {
-        // ANGLE_DOWN
-        dir.x = 0;
-        dir.y = 0;
-        dir.z = -1;
-    } else {
-        dir.x = cos(glm::radians(yaw));
-        dir.y = sin(glm::radians(yaw));
-        dir.z = 0;
-    }
-
-    dir.x *= cos(glm::radians(pitch));
-    dir.y *= cos(glm::radians(pitch));
-    dir.z = sin(glm::radians(pitch));
-
-    return glm::normalize(dir);
-}
-
 }
 
 rad::RadSim::RadSim()
@@ -102,44 +73,23 @@ rad::RadSim::RadSim()
     printi("Using {} thread(s).", m_Executor.num_workers());
 }
 
-void rad::RadSim::setLevel(const bsp::Level *pLevel, const std::string &name) {
+void rad::RadSim::setAppConfig(AppConfig *appcfg) {
+    m_pAppConfig = appcfg;
+    m_Config.loadFromAppConfig(*appcfg);
+}
+
+void rad::RadSim::setLevel(const bsp::Level *pLevel, const std::string &name,
+                           const std::string &profileName) {
     m_pLevel = pLevel;
     m_LevelName = name;
     m_PatchHash = appfw::SHA256::Digest();
+    appfw::SHA256 hash;
 
     // Create build directory
     fs::create_directories(getFileSystem().getFilePath(getBuildDirPath()));
-}
 
-void rad::RadSim::loadLevelConfig() {
-    m_PatchHash = appfw::SHA256::Digest();
-    appfw::SHA256 hash;
-
-    std::fstream configFile(getFileSystem().findExistingFile(getLevelConfigPath()));
-    configFile >> m_LevelConfigJson;
-
-    // Load patch size
-    m_flPatchSize = m_LevelConfigJson.at("base_patch_size").get<float>();
-    m_flLuxelSize = m_flPatchSize; // FIXME:
-    m_PatchSizeStr = std::to_string(m_flPatchSize);
-    std::replace(m_PatchSizeStr.begin(), m_PatchSizeStr.end(), '.', '_');
-
-    m_flReflectivity = m_LevelConfigJson.at("base_reflectivity").get<float>();
-    m_iBounceCount = m_LevelConfigJson.at("bounce_count").get<int>();
-    m_flGamma = m_LevelConfigJson.at("gamma").get<float>();
-
-    // Load envlight
-    if (m_LevelConfigJson.contains("envlight")) {
-        const nlohmann::json &envlight = m_LevelConfigJson["envlight"];
-
-        m_EnvLight.vColor.r = envlight.at("color").at(0).get<int>() / 255.f;
-        m_EnvLight.vColor.g = envlight.at("color").at(1).get<int>() / 255.f;
-        m_EnvLight.vColor.b = envlight.at("color").at(2).get<int>() / 255.f;
-        m_EnvLight.vColor = correctColorGamma(m_EnvLight.vColor);
-        m_EnvLight.vColor *= envlight.at("brightness").get<float>();
-        m_EnvLight.vDirection = getVecFromAngles(envlight.at("pitch"), envlight.at("yaw"));
-    }
-
+    loadLevelConfig();
+    loadBuildProfile(profileName);
     loadPlanes();
     loadFaces();
     createPatches(hash);
@@ -215,8 +165,7 @@ void rad::RadSim::calcViewFactors() {
 
 void rad::RadSim::bounceLight() {
     printi("Applying lighting...");
-    m_Bouncer.setup(this, m_iBounceCount);
-    addLighting();
+    m_Bouncer.setup(this, m_Profile.iBounceCount);
 
     printi("Bouncing light...");
     appfw::Timer timer;
@@ -309,14 +258,52 @@ void rad::RadSim::writeLightmaps() {
     }
 }
 
-void rad::RadSim::addLighting() {
-    applyEnvLight();
-    applyTexLights();
+void rad::RadSim::loadLevelConfig() {
+    m_LevelConfig.loadDefaults(m_Config);
+
+    fs::path cfgPath = getFileSystem().findExistingFile(getLevelConfigPath(), std::nothrow);
+
+    if (!cfgPath.empty()) {
+        m_LevelConfig.loadLevelConfig(cfgPath);
+    }
 }
 
-float rad::RadSim::getMinPatchSize() {
-    // TODO: Read from config
-    return 4.0f;
+void rad::RadSim::loadBuildProfile(const std::string &profileName) {
+    m_Profile = BuildProfile();
+
+    std::ifstream radProfilesFile(getFileSystem().findExistingFile("assets:rad_profiles.yaml"));
+    YAML::Node radProfiles = YAML::Load(radProfilesFile);
+
+    // rad_profiles._common
+    if (radProfiles["_common"]) {
+        m_Profile.loadProfile(radProfiles["_common"]);
+    }
+
+    bool hasLevelProfiles = m_LevelConfig.yaml && m_LevelConfig.yaml["profiles"];
+    bool profileWasFound = false;
+
+    // profiles._common
+    if (hasLevelProfiles && m_LevelConfig.yaml["profiles"]["_common"]) {
+        m_Profile.loadProfile(m_LevelConfig.yaml["profiles"]["_common"]);
+    }
+
+    // rad_profiles.profile_name
+    if (radProfiles[profileName]) {
+        m_Profile.loadProfile(radProfiles[profileName]);
+        profileWasFound = true;
+    }
+
+    // profiles.profile_name
+    if (hasLevelProfiles && m_LevelConfig.yaml["profiles"][profileName]) {
+        m_Profile.loadProfile(m_LevelConfig.yaml["profiles"][profileName]);
+        profileWasFound = false;
+    }
+
+    if (!profileWasFound) {
+        throw std::runtime_error(fmt::format("Profile '{}' not found", profileName));
+    }
+
+    m_Profile.finalize();
 }
 
 void rad::RadSim::loadPlanes() {
@@ -457,17 +444,18 @@ void rad::RadSim::loadFaces() {
             AFW_ASSERT(floatEquals(minY, 0));
         }
 
-        face.flPatchSize = m_flPatchSize;
+        face.flPatchSize = (float)m_Profile.iBasePatchSize;
 
         // Lightmap size and coords
         {
-            glm::vec2 baseGridSizeFloat = face.planeMaxBounds / m_flLuxelSize;
+            float luxelSize = m_Profile.flLuxelSize;
+            glm::vec2 baseGridSizeFloat = face.planeMaxBounds / luxelSize;
             face.vLightmapSize.x = texFloatToInt(baseGridSizeFloat.x);
             face.vLightmapSize.y = texFloatToInt(baseGridSizeFloat.y);
 
             for (Face::Vertex &v : face.vertices) {
-                v.vLMCoord.x = v.vPlanePos.x / (m_flLuxelSize * face.vLightmapSize.x);
-                v.vLMCoord.y = v.vPlanePos.y / (m_flLuxelSize * face.vLightmapSize.y);
+                v.vLMCoord.x = v.vPlanePos.x / (luxelSize * face.vLightmapSize.x);
+                v.vLMCoord.y = v.vPlanePos.y / (luxelSize * face.vLightmapSize.y);
             }
         }
 
@@ -652,8 +640,7 @@ void rad::RadSim::createPatches(appfw::SHA256 &hash) {
 }
 
 void rad::RadSim::loadLevelEntities() {
-    bool isEnvLightSet = m_EnvLight.vDirection.x != 0 || m_EnvLight.vDirection.y != 0 || m_EnvLight.vDirection.z != 0;
-    bool wasEnvLightSet = isEnvLightSet;
+    bool wasEnvLightSet = m_LevelConfig.sunLight.bIsSet;
     bool isEnvLightFound = false;
 
     for (auto &ent : m_pLevel->getEntities()) {
@@ -667,8 +654,8 @@ void rad::RadSim::loadLevelEntities() {
 
         } else if (classname == "light_environment") {
             if (!wasEnvLightSet) {
-                if (!isEnvLightSet) {
-                    isEnvLightSet = true;
+                if (!m_LevelConfig.sunLight.bIsSet) {
+                    m_LevelConfig.sunLight.bIsSet = true;
 
                     // Read color
                     int color[4];
@@ -678,17 +665,14 @@ void rad::RadSim::loadLevelEntities() {
                                                              ent.getValue<std::string>("_light")));
                     }
 
-                    m_EnvLight.vColor.r = color[0] / 255.f;
-                    m_EnvLight.vColor.g = color[1] / 255.f;
-                    m_EnvLight.vColor.b = color[2] / 255.f;
-                    m_EnvLight.vColor = correctColorGamma(m_EnvLight.vColor);
-                    m_EnvLight.vColor *= color[3];
-                    m_EnvLight.vColor /= m_pAppConfig->getItem("rad").get<float>("light_env_brightness_divisor");
+                    m_LevelConfig.sunLight.vColor.r = color[0] / 255.f;
+                    m_LevelConfig.sunLight.vColor.g = color[1] / 255.f;
+                    m_LevelConfig.sunLight.vColor.b = color[2] / 255.f;
+                    m_LevelConfig.sunLight.flBrightness = color[3] / m_Config.flEnvLightDiv;
 
                     // Read angle
-                    float yaw = ent.getValue<float>("angle");
-                    float pitch = ent.getValue<float>("pitch");
-                    m_EnvLight.vDirection = getVecFromAngles(pitch, yaw);
+                    m_LevelConfig.sunLight.flYaw = ent.getValue<float>("angle");
+                    m_LevelConfig.sunLight.flPitch = ent.getValue<float>("pitch");
                 }
 
                 if (isEnvLightFound) {
@@ -701,63 +685,13 @@ void rad::RadSim::loadLevelEntities() {
     }
 }
 
-glm::vec3 rad::RadSim::correctColorGamma(const glm::vec3 &color) {
-    glm::vec3 c = color;
-    c.r = std::pow(c.r, m_flGamma);
-    c.g = std::pow(c.g, m_flGamma);
-    c.b = std::pow(c.b, m_flGamma);
-    return c;
-}
-
-void rad::RadSim::applyEnvLight() {
-    bool isEnvLightSet = m_EnvLight.vDirection.x != 0 || m_EnvLight.vDirection.y != 0 || m_EnvLight.vDirection.z != 0;
-
-    if (!isEnvLightSet) {
-        return;
-    }
-
-    for (PatchIndex patchIdx = 0; patchIdx < m_Patches.size(); patchIdx++) {
-        PatchRef patch(m_Patches, patchIdx);
-
-        // Check if patch can be hit by the sky
-        float cosangle = -glm::dot(patch.getNormal(), m_EnvLight.vDirection);
-
-        if (cosangle < 0.001f) {
-            continue;
-        }
-
-        // Cast a ray to the sky and check if it hits
-        glm::vec3 from = patch.getOrigin();
-        glm::vec3 to = from + (m_EnvLight.vDirection * -SKY_RAY_LENGTH);
-
-        if (m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
-            // Hit the sky, add the sun color
-            m_Bouncer.addPatchLight(patchIdx, m_EnvLight.vColor * cosangle);
-        }
-    }
-}
-
-void rad::RadSim::applyTexLights() {
-    for (Face &face : m_Faces) {
-        const bsp::BSPTextureInfo &texinfo = m_pLevel->getTexInfo()[face.iTextureInfo];
-        const bsp::BSPMipTex &miptex = m_pLevel->getTextures()[texinfo.iMiptex];
-
-        // TODO: Actual texinfo
-        if (miptex.szName[0] == '~') {
-            for (PatchIndex p = face.iFirstPatch; p < face.iFirstPatch + face.iNumPatches; p++) {
-                m_Bouncer.addPatchLight(p, glm::vec3(1, 1, 1) * 50.f);
-            }
-        }
-    }
-}
-
 void rad::RadSim::sampleLightmap(size_t faceIdx) {
     Face &face = m_Faces[faceIdx];
     LightmapTexture &lm = m_Lightmaps[face.iLightmapIdx];
     AFW_ASSERT(face.hasLightmap());
 
-    glm::vec2 baseGridSizeFloat = face.planeMaxBounds / m_flLuxelSize;
-    float radius = std::max(m_flPatchSize, m_flLuxelSize) * 1.1f;
+    glm::vec2 baseGridSizeFloat = face.planeMaxBounds / m_Profile.flLuxelSize;
+    float radius = std::max((float)m_Profile.iBasePatchSize, m_Profile.flLuxelSize) * 1.1f;
 
 #ifdef SAMPLE_NEIGHBOURS
     int normalDir = !!face.nPlaneSide;
@@ -810,17 +744,25 @@ std::string rad::RadSim::getBuildDirPath() {
 }
 
 std::string rad::RadSim::getLevelConfigPath() {
-    return fmt::format("assets:mapsrc/{}.rad.json", m_LevelName);
+    return fmt::format("assets:mapsrc/{}.rad.yaml", m_LevelName);
 }
 
 std::string rad::RadSim::getVisMatPath() {
-    return fmt::format("{}/svismat{}.dat", getBuildDirPath(), m_PatchSizeStr);
+    return fmt::format("{}/svismat{}.dat", getBuildDirPath(), m_Profile.iBasePatchSize);
 }
 
 std::string rad::RadSim::getVFListPath() {
-    return fmt::format("{}/vflist{}.dat", getBuildDirPath(), m_PatchSizeStr);
+    return fmt::format("{}/vflist{}.dat", getBuildDirPath(), m_Profile.iBasePatchSize);
 }
 
 std::string rad::RadSim::getLightmapPath() {
     return fmt::format("assets:maps/{}.bsp.lm", m_LevelName);
+}
+
+float rad::RadSim::gammaToLinear(float val) {
+    return std::pow(val, m_LevelConfig.flGamma);
+}
+
+glm::vec3 rad::RadSim::gammaToLinear(const glm::vec3 &val) {
+    return glm::pow(val, glm::vec3(m_LevelConfig.flGamma));
 }

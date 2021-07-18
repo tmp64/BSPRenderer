@@ -1,9 +1,11 @@
 set(PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/app_config.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/yaml.h
 )
 
 set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/app_config.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/yaml.cpp
 )
 
 add_library(app_base STATIC
@@ -18,6 +20,7 @@ target_include_directories(app_base PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_link_libraries(app_base
 	appfw
+	glm::glm
 	nlohmann_json
 	yaml-cpp
 )

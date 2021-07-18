@@ -1,6 +1,36 @@
 #include <rad/bouncer.h>
 #include <rad/rad_sim.h>
 
+/**
+ * Returns vector that points in the direction given in degrees (or -1/-2 for yaw).
+ * Used for sunlight calculation.
+ */
+static glm::vec3 getVecFromAngles(float pitch, float yaw) {
+    glm::vec3 dir;
+
+    if (yaw == -1) {
+        // ANGLE_UP
+        dir.x = 0;
+        dir.y = 0;
+        dir.z = 1;
+    } else if (yaw == -2) {
+        // ANGLE_DOWN
+        dir.x = 0;
+        dir.y = 0;
+        dir.z = -1;
+    } else {
+        dir.x = cos(glm::radians(yaw));
+        dir.y = sin(glm::radians(yaw));
+        dir.z = 0;
+    }
+
+    dir.x *= cos(glm::radians(pitch));
+    dir.y *= cos(glm::radians(pitch));
+    dir.z = sin(glm::radians(pitch));
+
+    return glm::normalize(dir);
+}
+
 void rad::Bouncer::setup(RadSim *pRadSim, int bounceCount) {
     m_pRadSim = pRadSim;
     m_iBounceCount = bounceCount;
@@ -9,6 +39,13 @@ void rad::Bouncer::setup(RadSim *pRadSim, int bounceCount) {
     m_PatchBounce.resize((size_t)m_uPatchCount * (size_t)(m_iBounceCount + 1));
     m_PatchSum.resize(m_uPatchCount);
     std::fill(m_PatchBounce.begin(), m_PatchBounce.end(), glm::vec3(0, 0, 0));
+
+    addLighting();
+}
+
+void rad::Bouncer::addLighting() {
+    addEnvLighting();
+    addTexLights();
 }
 
 void rad::Bouncer::addPatchLight(PatchIndex patch, const glm::vec3 &light) {
@@ -16,7 +53,7 @@ void rad::Bouncer::addPatchLight(PatchIndex patch, const glm::vec3 &light) {
 }
 
 void rad::Bouncer::bounceLight() {
-    float refl = m_pRadSim->m_flReflectivity;
+    float refl = m_pRadSim->m_Config.flBaseRefl * m_pRadSim->m_LevelConfig.flRefl;
 
     // Copy bounce 0 into the lightmap
     for (PatchIndex i = 0; i < m_uPatchCount; i++) {
@@ -56,6 +93,53 @@ void rad::Bouncer::bounceLight() {
     }
 
     m_pRadSim->updateProgress(1);
+}
+
+void rad::Bouncer::addEnvLighting() {
+    const SunLight &sun = m_pRadSim->m_LevelConfig.sunLight;
+    
+    if (!sun.bIsSet) {
+        return;
+    }
+
+    glm::vec3 vSunDir = -getVecFromAngles(sun.flPitch, sun.flYaw);
+    glm::vec3 vSunColor = m_pRadSim->gammaToLinear(sun.vColor) * sun.flBrightness;
+
+    PatchIndex patchCount = m_pRadSim->m_Patches.size();
+
+    for (PatchIndex patchIdx = 0; patchIdx < patchCount; patchIdx++) {
+        PatchRef patch(m_pRadSim->m_Patches, patchIdx);
+
+        // Check if patch can be hit by the sky
+        float cosangle = glm::dot(patch.getNormal(), vSunDir);
+
+        if (cosangle < 0.001f) {
+            continue;
+        }
+
+        // Cast a ray to the sky and check if it hits
+        glm::vec3 from = patch.getOrigin();
+        glm::vec3 to = from + (vSunDir * SKY_RAY_LENGTH);
+
+        if (m_pRadSim->m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
+            // Hit the sky, add the sun color
+            addPatchLight(patchIdx, vSunColor * cosangle);
+        }
+    }
+}
+
+void rad::Bouncer::addTexLights() {
+    for (Face &face : m_pRadSim->m_Faces) {
+        const bsp::BSPTextureInfo &texinfo = m_pRadSim->m_pLevel->getTexInfo()[face.iTextureInfo];
+        const bsp::BSPMipTex &miptex = m_pRadSim->m_pLevel->getTextures()[texinfo.iMiptex];
+
+        // TODO: Actual texinfo
+        if (miptex.szName[0] == '~') {
+            for (PatchIndex p = face.iFirstPatch; p < face.iFirstPatch + face.iNumPatches; p++) {
+                addPatchLight(p, glm::vec3(1, 1, 1) * 50.f);
+            }
+        }
+    }
 }
 
 void rad::Bouncer::receiveLightFromThis(int bounce, PatchIndex i) {

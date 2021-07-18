@@ -1,0 +1,17 @@
+# This file contains lightmap building configurations ("profiles").
+# They set speed and quality options.
+
+# This is the common entry. It is the default options, profiles can override them.
+_common:
+    base_patch_size: 32     # Base size of a patch in hammer units. Must be an integer.
+    min_patch_size: 4       # Minimum allowed patch size after subdivision. Float.
+    luxel_size: Null        # Size of a lightmap pixel or Null to use base patch size. Float.
+    bounce_count: 16        # Number of light bounce passes.
+
+fast:
+    base_patch_size: 32
+    bounce_count: 6
+
+full:
+    base_patch_size: 16
+    bounce_count: 16

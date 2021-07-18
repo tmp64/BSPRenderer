@@ -9,8 +9,14 @@ class RadSim;
 
 class Bouncer {
 public:
+    //! Maximum distance from any point in world to a point on a sky face.
+    static constexpr float SKY_RAY_LENGTH = 8192.f;
+
     //! Initializes the bouncer
     void setup(RadSim *pRadSim, int bounceCount);
+
+    //! Adds all lighting
+    void addLighting();
 
     //! Adds light to a patch
     void addPatchLight(PatchIndex patch, const glm::vec3 &light);
@@ -33,6 +39,9 @@ private:
         AFW_ASSERT(patch < m_uPatchCount && bounce <= m_iBounceCount);
         return m_PatchBounce[m_uPatchCount * (size_t)bounce + patch];
     }
+
+    void addEnvLighting();
+    void addTexLights();
 
     void receiveLightFromThis(int bounce, PatchIndex i);
     void receiveLightFromOther(int bounce, PatchIndex i);

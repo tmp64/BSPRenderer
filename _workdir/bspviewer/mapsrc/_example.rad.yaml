@@ -1,0 +1,37 @@
+#--------------------------------------------------------------------------------------
+# This is an example of a map lighting configuration.
+# Must be located at mapsrc/<map name>,rad,yaml
+#
+# The file and its contents are optional and are not required to make a lightmap.
+# But you'll need it to tweek the lighting to improve quality.
+#--------------------------------------------------------------------------------------
+
+# List of build profiles that set speed and quality options.
+# Options here will override options in rad_profiles.yaml.
+# Same syntax as in rad_profiles.yaml.
+# The order of application is (bottom ones will override options from the top ones)
+#     rad_profiles._common
+#     profiles._common
+#     rad_profiles.profile_name
+#     profiles.profile_name
+profiles:
+    # This is the base profile
+    _common:
+        luxel_size: 32 # This means luxel size is 32 unless a profile explicitly overrides it
+    
+    # This will override only bounce_count in "full" profile
+    full:
+        bounce_count: 64
+
+# The gamma value for gamma correction. Don't really need to change it.
+gamma: 2.2
+
+# Reflectivity multiplier
+reflectivity: 1
+
+# Configures direct sunlight. If not present, light_environment is used.
+sunlight:
+    pitch: 120              # Pitch of the light
+    yaw: -45                # Yaw of the light
+    color: [128, 64, 128]   # Light color in gamma space
+    brightness: 250         # Brightness multiplier
