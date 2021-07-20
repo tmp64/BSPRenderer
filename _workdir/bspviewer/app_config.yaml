@@ -19,7 +19,7 @@ rad:
     base_reflectivity: 0.4
     
     # Divisor of default light_environment brightness
-    light_env_brightness_divisor: 35
+    light_env_brightness_divisor: 110
 
 commands:
     - app_sync_rates 1
