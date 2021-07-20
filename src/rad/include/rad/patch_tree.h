@@ -16,7 +16,7 @@ public:
 
     //! Samples light from patches in the square of size radius and center at pos
     //! @returns true if light was sampled (there are patches in that radius)
-    void sampleLight(const glm::vec2 &pos, float radius, glm::vec3 &out, float &weightSum);
+    void sampleLight(const glm::vec2 &pos, float radius, float filterk, glm::vec3 &out, float &weightSum);
 
 private:
     enum class PatchPos

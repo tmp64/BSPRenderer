@@ -20,6 +20,8 @@
 
 namespace rad {
 
+class LightmapWriter;
+
 /**
  * Radiosity simulator.
  * Any method can throw an exception on error.
@@ -130,7 +132,6 @@ private:
     std::vector<Plane> m_Planes;
     std::vector<Face> m_Faces;
     std::vector<PatchTree> m_PatchTrees;
-    std::vector<LightmapTexture> m_Lightmaps;
     PatchList m_Patches;
     VisMat m_VisMat;
     SparseVisMat m_SVisMat;
@@ -179,6 +180,7 @@ private:
     friend class VFList;
     friend class PatchTree;
     friend class Bouncer;
+    friend class LightmapWriter;
 };
 
 } // namespace rad

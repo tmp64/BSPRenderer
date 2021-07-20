@@ -1,6 +1,7 @@
 #include <appfw/binary_file.h>
 #include <appfw/timer.h>
 #include <appfw/prof.h>
+#include <app_base/lightmap.h>
 #include <renderer/stb_image.h>
 #include <renderer/scene_renderer.h>
 #include <imgui.h>
@@ -698,7 +699,6 @@ void SceneRenderer::finishLoadBSPLightmaps() {
 
 void SceneRenderer::asyncLoadCustomLightmaps() {
     m_Data.bCustomLMLoaded = false;
-    m_pLoadingState->customLightmapBlock.clear();
     fs::path &lmPath = m_Data.customLightmapPath;
 
     if (lmPath.empty()) {
@@ -709,121 +709,89 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
     printi("Custom lightmaps: loading...");
 
     try {
-        m_pLoadingState->customLightmapBlock.resize(CUSTOM_LIGHTMAP_BLOCK_SIZE, CUSTOM_LIGHTMAP_BLOCK_SIZE);
-
-        // Lightmap file struct
-        constexpr uint32_t LM_MAGIC = ('1' << 24) | ('0' << 16) | ('M' << 8) | ('L' << 0);
-
-        struct LightmapFileHeader {
-            uint32_t nMagic;
-            uint32_t iFaceCount;
-        };
-
-        struct LightmapFaceInfo {
-            uint32_t iVertexCount;
-            glm::ivec2 lmSize;
-        };
-
-        // Lightmap struct for sorting
-        struct Lightmap {
-            unsigned surface;
-            int size;
-
-            inline bool operator<(const Lightmap &rhs) const { return size > rhs.size; }
-        };
-
-        // File reading
         appfw::BinaryInputFile file(lmPath);
 
-        LightmapFileHeader lmHeader;
-        file.readObject(lmHeader);
+        // Magic
+        uint8_t magic[sizeof(LightmapFileFormat::MAGIC)];
+        file.readBytes(magic, sizeof(magic));
 
-        if (lmHeader.nMagic != LM_MAGIC) {
-            throw std::runtime_error(fmt::format("Invalid magic: expected {}, got {}", LM_MAGIC, lmHeader.nMagic));
+        if (memcmp(magic, LightmapFileFormat::MAGIC, sizeof(magic))) {
+            throw std::runtime_error("Invalid magic");
         }
 
-        if (lmHeader.iFaceCount != m_Data.surfaces.size()) {
-            throw std::runtime_error(
-                fmt::format("Face count mismatch: expected {}, got {}", m_Data.surfaces.size(), lmHeader.iFaceCount));
+        // Level & lightmap info
+        uint32_t faceCount = file.readUInt32(); // Face count
+
+        if (faceCount != m_Data.surfaces.size()) {
+            throw std::runtime_error(fmt::format("Face count mismatch: expected {}, got {}",
+                                                 m_Data.surfaces.size(), faceCount));
         }
 
-        std::vector<Lightmap> sortedLightmaps;
-        sortedLightmaps.reserve(m_Data.surfaces.size());
+        file.readUInt32(); // Lightmap count
+        glm::ivec2 lightmapBlockSize;
+        lightmapBlockSize.x = file.readInt32(); // Lightmap texture wide
+        lightmapBlockSize.y = file.readInt32(); // Lightmap texture tall
+        m_pLoadingState->customLightmapTexSize = lightmapBlockSize;
+        LightmapFileFormat::Format format = (LightmapFileFormat::Format)file.readByte();
 
-        // Read face info
-        for (size_t i = 0; i < lmHeader.iFaceCount; i++) {
+        if (format != LightmapFileFormat::Format::RGBF32) {
+            throw std::runtime_error("Unsupported lightmap format, expected RGBF32");
+        }
+
+        // Lightmap texture
+        m_pLoadingState->customLightmapTex.resize((size_t)lightmapBlockSize.x *
+                                                  lightmapBlockSize.y);
+        file.readBytes(reinterpret_cast<uint8_t *>(m_pLoadingState->customLightmapTex.data()),
+                       m_pLoadingState->customLightmapTex.size() * sizeof(glm::vec3));
+
+        // Face info
+        for (uint32_t i = 0; i < faceCount; i++) {
             Surface &surf = m_Data.surfaces[i];
-            LightmapFaceInfo info;
-            file.readObject(info);
 
-            if (info.iVertexCount != (uint32_t)surf.m_iVertexCount) {
-                throw std::runtime_error("Face vertex count mismatch");
+            uint32_t vertCount = file.readUInt32(); // Vertex count
+
+            if (vertCount != (uint32_t)surf.m_iVertexCount) {
+                throw std::runtime_error(
+                    fmt::format("Face {}: Vertex count mismatch: expected {}, got {}", i,
+                                surf.m_iVertexCount, vertCount));
             }
 
-            surf.m_vCustomLMSize = info.lmSize;
-            surf.m_vCustomLMTexCoords.resize(info.iVertexCount);
+            file.readVec<glm::vec3>(); // vI
+            file.readVec<glm::vec3>(); // vJ
+            file.readVec<glm::vec3>(); // World position of (0, 0) plane coord.
+            file.readVec<glm::vec2>(); // Offset of (0, 0) to get to plane coords
+            file.readVec<glm::vec2>(); // Face size
 
-            AFW_ASSERT(info.lmSize.x != 0 || info.lmSize.y == 0);
+            bool hasLightmap = file.readByte(); // Has lightmap
 
-            for (size_t j = 0; j < info.iVertexCount; j++) {
-                surf.m_vCustomLMTexCoords[j].x = file.readFloat();
-                surf.m_vCustomLMTexCoords[j].y = file.readFloat();
-            }
+            if (hasLightmap) {
+                glm::ivec2 lmSize = file.readVec<glm::ivec2>(); // Lightmap size
+                surf.m_vCustomLMTexCoords.resize(surf.m_iVertexCount);
 
-            if (info.lmSize.x != 0) {
-                Lightmap lm;
-                lm.surface = (unsigned)i;
-                lm.size = info.lmSize.x * info.lmSize.y;
-                sortedLightmaps.push_back(lm);
-            }
-        }
+                // Lightmap tex coords
+                for (uint32_t j = 0; j < vertCount; j++) {
+                    glm::vec2 texCoords = file.readVec<glm::vec2>(); // Tex coord in luxels
+                    surf.m_vCustomLMTexCoords[j] = texCoords / glm::vec2(lightmapBlockSize);
+                }
 
-        std::vector<std::vector<glm::vec3>> lightmapTextures;
-        lightmapTextures.resize(lmHeader.iFaceCount);
-
-        // Read textures
-        for (size_t i = 0; i < lmHeader.iFaceCount; i++) {
-            Surface &surf = m_Data.surfaces[i];
-            if (surf.m_vCustomLMSize.x != 0) {
-                std::vector<glm::vec3> &data = lightmapTextures[i];
-                data.resize((size_t)surf.m_vCustomLMSize.x * (size_t)surf.m_vCustomLMSize.y);
-                file.readObjectArray(appfw::span(data));
+                // Patches
+                uint32_t patchCount = file.readUInt32(); // Patch count
+                file.seekRelative(patchCount * sizeof(float) * 3);
             }
         }
-
-        // Sort all lightmaps by size, large to small
-        std::sort(sortedLightmaps.begin(), sortedLightmaps.end());
-
-        // Add them to the lightmap block
-        appfw::Timer timer;
-        timer.start();
-
-        for (auto &i : sortedLightmaps) {
-            Surface &surf = m_Data.surfaces[i.surface];
-            const glm::vec3 *data = lightmapTextures[i.surface].data();
-            int x, y;
-
-            if (m_pLoadingState->customLightmapBlock.insert(data, surf.m_vCustomLMSize.x, surf.m_vCustomLMSize.y, x, y,
-                                                            CUSTOM_LIGHTMAP_PADDING)) {
-                surf.m_vCustomLMOffset.x = x;
-                surf.m_vCustomLMOffset.y = y;
-            } else {
-                printw("Custom lightmaps: no space for surface {} ({}x{})", i.surface, surf.m_vCustomLMSize.x,
-                        surf.m_vCustomLMSize.y);
-            }
-        }
-        
-        timer.stop();
-        printi("Custom lightmaps: block {:.3f} s", timer.dseconds());
     } catch (const std::exception &e) {
         printw("Custom lightmaps: failed to load: {}", e.what());
+        m_pLoadingState->customLightmapTex.clear();
     }
 }
 
 void SceneRenderer::finishLoadCustomLightmaps() {
-    if (m_pLoadingState->customLightmapBlock.getWide() == 0) {
+    if (m_pLoadingState->customLightmapTex.empty()) {
         return;
     }
+
+    auto &blockSize = m_pLoadingState->customLightmapTexSize;
+    auto &blockData = m_pLoadingState->customLightmapTex;
 
     // Load the block into the GPU
     m_Data.customLightmapBlockTex.create();
@@ -833,11 +801,11 @@ void SceneRenderer::finishLoadCustomLightmaps() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, CUSTOM_LIGHTMAP_BLOCK_SIZE, CUSTOM_LIGHTMAP_BLOCK_SIZE, 0, GL_RGB, GL_FLOAT,
-                 m_pLoadingState->customLightmapBlock.getData());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, blockSize.x, blockSize.y, 0, GL_RGB, GL_FLOAT,
+                 blockData.data());
     glGenerateMipmap(GL_TEXTURE_2D);
 
-    m_pLoadingState->customLightmapBlock.clear();
+    blockData.clear();
     m_Data.bCustomLMLoaded = true;
     printi("Custom lightmaps: loaded");
 }
@@ -896,11 +864,8 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
             }
 
             // Custom lightmap texture
-            if (m_Data.bCustomLMLoaded) {
-                glm::vec2 texCoord = surf.m_vCustomLMTexCoords[j] * glm::vec2(surf.m_vCustomLMSize);
-                texCoord += surf.m_vCustomLMOffset;
-                texCoord /= (float)CUSTOM_LIGHTMAP_BLOCK_SIZE;
-                v.customLMTexture = texCoord;
+            if (m_Data.bCustomLMLoaded && !surf.m_vCustomLMTexCoords.empty()) {
+                v.customLMTexture = surf.m_vCustomLMTexCoords[j];
             }
 
             vertices.push_back(v);

@@ -56,6 +56,22 @@ void rad::BuildProfile::loadProfile(const YAML::Node &node) {
         }
     }
 
+    if (node["block_size"]) {
+        iBlockSize = node["block_size"].as<int>();
+    }
+
+    if (node["block_padding"]) {
+        iBlockPadding = node["block_padding"].as<int>();
+    }
+    
+    if (node["oversample"]) {
+        iOversample = node["oversample"].as<int>();
+    }
+
+    if (node["sample_neighbours"]) {
+        bSampleNeighbours = node["sample_neighbours"].as<bool>();
+    }
+
     if (node["bounce_count"]) {
         iBounceCount = node["bounce_count"].as<int>();
     }
@@ -72,6 +88,18 @@ void rad::BuildProfile::finalize() {
 
     if (flLuxelSize == -1) {
         throw std::runtime_error("Profile: luxel_size not set. Check _common profile.");
+    }
+
+    if (iBlockSize == -1) {
+        throw std::runtime_error("Profile: block_size not set. Check _common profile.");
+    }
+
+    if (iBlockPadding == -1) {
+        throw std::runtime_error("Profile: block_padding not set. Check _common profile.");
+    }
+
+    if (iOversample == -1) {
+        throw std::runtime_error("Profile: oversample not set. Check _common profile.");
     }
 
     if (iBounceCount == -1) {

@@ -9,7 +9,6 @@ set(RNDR_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/shader_manager.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/stb_image.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/surface_renderer.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/texture_block.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/utils.h
 )
 
@@ -19,7 +18,6 @@ set(RNDR_PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_renderer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/shader_manager.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/surface_renderer.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/texture_block.cpp
 )
 
 add_library(renderer STATIC

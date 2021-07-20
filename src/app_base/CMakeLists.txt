@@ -1,10 +1,13 @@
 set(PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/app_config.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/lightmap.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/texture_block.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/yaml.h
 )
 
 set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/app_config.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/texture_block.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/yaml.cpp
 )
 

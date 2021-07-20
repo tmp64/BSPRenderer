@@ -47,6 +47,15 @@ struct BuildProfile {
     //! Size of a lightmap pixel.
     float flLuxelSize = -1;
 
+    //! Size of the lightmap block
+    int iBlockSize = -1;
+    //! Number of padding luxels
+    int iBlockPadding = -1;
+    //! Number of oversampled luxels
+    int iOversample = -1;
+    //! Sample neighbour faces
+    bool bSampleNeighbours = false;
+
     //! Number of light bounce passes.
     int iBounceCount = -1;
 

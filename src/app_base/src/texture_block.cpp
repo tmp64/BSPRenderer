@@ -1,4 +1,4 @@
-#include <renderer/texture_block.h>
+#include <app_base/texture_block.h>
 
 bool detail::TextureBlockBase::findFreeBlock(int wide, int tall, int &xout, int &yout) {
     if (wide > m_iWide || tall > m_iTall) {
@@ -6,11 +6,6 @@ bool detail::TextureBlockBase::findFreeBlock(int wide, int tall, int &xout, int 
     }
 
     for (int y = 0; y < m_iTall - tall; y++) {
-        // Check if can fit wide in this row at all
-        //if (m_FreeCount[y] < wide) {
-        //    continue;
-        //}
-
         for (int x = 0; x < m_iWide - wide; x++) {
             // Check if can fit wide*tall at (x, y)
             if (isFree(x, y, wide, tall, x)) {
@@ -30,8 +25,6 @@ void detail::TextureBlockBase::markBlock(int x, int y, int wide, int tall) {
             int bitpos = (y + i) * m_iWide + (x + j);
             m_AllocBits[bitpos >> 3] |= (1 << (bitpos & 7));
         }
-
-        //m_FreeCount[i] -= wide;
     }
 }
 
@@ -63,7 +56,6 @@ void TextureBlock<T>::clear() {
     m_iTall = 0;
     m_Data.clear();
     m_AllocBits.clear();
-    //m_FreeCount.clear();
 }
 
 template <typename T>
@@ -75,10 +67,8 @@ void TextureBlock<T>::resize(int wide, int tall) {
     m_iTall = tall;
     m_Data.clear();
     m_AllocBits.clear();
-    //m_FreeCount.clear();
     m_Data.resize(wide * tall);
     m_AllocBits.resize(wide * tall / 8);
-    //m_FreeCount.resize(tall, wide);
 }
 
 template <typename T>

@@ -46,9 +46,6 @@ struct Face : public bsp::BSPFace {
         //! Normalized position of vertex in its plane (based on vI and vJ).
         //! Normalized means that there are vertices with X or Y = 0.
         glm::vec2 vPlanePos;
-
-        //! Lightmap texture coordinate.
-        glm::vec2 vLMCoord;
     };
 
     //! Plane in which face is located.
@@ -91,14 +88,8 @@ struct Face : public bsp::BSPFace {
     //! Number of patches of this face
     PatchIndex iNumPatches = 0;
 
-    //! Index of the lightmap in g_Lightmaps.
-    int iLightmapIdx = -1;
-
-    //! Size of lightmap in pixels.
-    glm::ivec2 vLightmapSize;
-
     //! @returns whether the face has lightmaps and should be split into patches
-    inline bool hasLightmap() {
+    inline bool hasLightmap() const {
         // Skies don't have lightmaps
         return !(iFlags & FACE_SKY);
     }
@@ -110,33 +101,6 @@ struct Face : public bsp::BSPFace {
 struct EnvLight {
     glm::vec3 vColor = glm::vec3(0, 0, 0);     // color * brightness
     glm::vec3 vDirection = glm::vec3(0, 0, 0); // Direction of sun rays
-};
-
-/**
- * Lightmap of a face.
- */
-struct LightmapTexture {
-    LightmapTexture() = default;
-
-    LightmapTexture(glm::ivec2 s) {
-        size = s;
-        data.resize((size_t)s.x * s.y);
-    }
-
-    /**
-     * Size of the texture in pixels.
-     */
-    glm::ivec2 size = glm::ivec2(0, 0);
-
-    /**
-     * Data of the lightmap image.
-     */
-    std::vector<glm::vec3> data;
-
-    /**
-     * Returns a pixel of the image.
-     */
-    inline glm::vec3 &getPixel(glm::ivec2 pos) { return data[(size_t)pos.y * (size_t)size.x + (size_t)pos.x]; }
 };
 
 /**

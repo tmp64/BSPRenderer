@@ -1,8 +1,7 @@
-#ifndef RENDERER_TEXTURE_BLOCK_H
-#define RENDERER_TEXTURE_BLOCK_H
+#ifndef APP_BASE_TEXTURE_BLOCK_H
+#define APP_BASE_TEXTURE_BLOCK_H
 #include <vector>
 #include <glm/glm.hpp>
-#include <renderer/raii.h>
 
 namespace detail {
 
@@ -23,7 +22,6 @@ protected:
     int m_iWide = 0;
     int m_iTall = 0;
     std::vector<uint8_t> m_AllocBits;
-    //std::vector<uint16_t> m_FreeCount;
 
     /**
      * Locates a free block or returns false.

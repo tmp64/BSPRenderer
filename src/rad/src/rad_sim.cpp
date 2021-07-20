@@ -4,6 +4,7 @@
 #include <appfw/timer.h>
 #include <app_base/yaml.h>
 #include <rad/rad_sim.h>
+#include <rad/lightmap_writer.h>
 
 //#define SAMPLE_NEIGHBOURS
 
@@ -178,84 +179,8 @@ void rad::RadSim::bounceLight() {
 }
 
 void rad::RadSim::writeLightmaps() {
-    printn("Sampling lightmaps...");
-    appfw::Timer timer;
-    timer.start();
-
-    for (size_t i = 0; i < m_Faces.size(); i++) {
-        Face &face = m_Faces[i];
-        
-        if (!face.hasLightmap()) {
-            continue;
-        }
-
-        sampleLightmap(i);
-    }
-
-    timer.stop();
-    printi("Sample lightmaps: {:.3} s", timer.dseconds());
-
-    //-------------------------------------------------------------------------
-    printn("Writing lightmaps...");
-
-    struct LightmapFileHeader {
-        uint32_t nMagic = ('1' << 24) | ('0' << 16) | ('M' << 8) | ('L' << 0);
-        uint32_t iFaceCount;
-    };
-
-    struct LightmapFaceInfo {
-        uint32_t iVertexCount = 0;
-        glm::ivec2 lmSize;
-    };
-
-    appfw::BinaryOutputFile file(getFileSystem().getFilePath(getLightmapPath()));
-    LightmapFileHeader lmHeader;
-    lmHeader.iFaceCount = (uint32_t)m_Faces.size();
-    file.writeObject(lmHeader);
-
-    AFW_ASSERT(m_Faces.size() == m_Lightmaps.size());
-
-    // Write face info
-    for (size_t i = 0; i < m_Faces.size(); i++) {
-        Face &face = m_Faces[i];
-        LightmapFaceInfo info;
-        info.iVertexCount = (uint32_t)face.vertices.size();
-
-        if (face.hasLightmap()) {
-            AFW_ASSERT(face.iLightmapIdx != -1);
-            info.lmSize = m_Lightmaps[i].size;
-        } else {
-            info.lmSize = {0, 0};
-            AFW_ASSERT(m_Lightmaps[i].size == info.lmSize);
-        }
-        
-        file.writeObject(info);
-
-        // Write tex coords
-        for (const Face::Vertex &v : face.vertices) {
-            file.writeFloat(v.vLMCoord.x);
-            file.writeFloat(v.vLMCoord.y);
-        }
-    }
-
-    // Write lightmaps
-    for (LightmapTexture &lm : m_Lightmaps) {
-        if (lm.size.x != 0) {
-#if 1
-            file.writeObjectArray(appfw::span(lm.data));
-#else
-            // Write random pixels
-            for (size_t i = 0; i < lm.data.size(); i++) {
-                int rand0 = rand() % 255;
-                int rand1 = rand() % 255;
-                int rand2 = rand() % 255;
-                file.write(rand0 / 255.f);
-                file.write(rand1 / 255.f);
-                file.write(rand2 / 255.f);
-            }
-#endif
-        }
-    }
+    LightmapWriter lmwriter;
+    lmwriter.saveLightmap(this);
 }
 
 void rad::RadSim::loadLevelConfig() {
@@ -446,19 +371,6 @@ void rad::RadSim::loadFaces() {
 
         face.flPatchSize = (float)m_Profile.iBasePatchSize;
 
-        // Lightmap size and coords
-        {
-            float luxelSize = m_Profile.flLuxelSize;
-            glm::vec2 baseGridSizeFloat = face.planeMaxBounds / luxelSize;
-            face.vLightmapSize.x = texFloatToInt(baseGridSizeFloat.x);
-            face.vLightmapSize.y = texFloatToInt(baseGridSizeFloat.y);
-
-            for (Face::Vertex &v : face.vertices) {
-                v.vLMCoord.x = v.vPlanePos.x / (luxelSize * face.vLightmapSize.x);
-                v.vLMCoord.y = v.vPlanePos.y / (luxelSize * face.vLightmapSize.y);
-            }
-        }
-
         // Check for sky
         {
             const bsp::BSPTextureInfo &texInfo = m_pLevel->getTexInfo().at(bspFace.iTextureInfo);
@@ -476,7 +388,6 @@ void rad::RadSim::loadFaces() {
         }
     }
 
-    m_Lightmaps.resize(m_Faces.size()); // must have same size as faces!
     printi("{} faces have lightmaps", lightmapCount);
 }
 
@@ -487,25 +398,13 @@ void rad::RadSim::createPatches(appfw::SHA256 &hash) {
     m_PatchTrees.resize(m_Faces.size());
 
     std::atomic<PatchIndex> totalPatchCount;
-    int lightmapIdx = 0;
-    size_t luxelCount = 0;
-
-    AFW_ASSERT(m_Lightmaps.size() == m_Faces.size());
 
     for (size_t i = 0; i < m_Faces.size(); i++) {
         Face &face = m_Faces[i];
 
-        // Allocate a lightmap for the face (even if it doesn't have one)
-        face.iLightmapIdx = lightmapIdx;
-        lightmapIdx++;
-
         if (!face.hasLightmap()) {
             continue;
         }
-
-        // Allocate memory for a lightmap
-        m_Lightmaps[face.iLightmapIdx] = LightmapTexture(face.vLightmapSize);
-        luxelCount += (size_t)face.vLightmapSize.x * face.vLightmapSize.y;
 
         // This can be running in multiple threads
         // (but it takes less than a second so it's fine)
@@ -517,8 +416,6 @@ void rad::RadSim::createPatches(appfw::SHA256 &hash) {
     PatchIndex patchCount = totalPatchCount.load();
     m_Patches.allocate(patchCount);
     printi("Patch count: {}", patchCount);
-    printi("Total lightmap size: {:.3} megapixels ({:.3} MiB)", luxelCount / 1000000.0,
-           luxelCount * sizeof(glm::vec3) / 1024.0 / 1024.0);
     printi("Memory used by patches: {:.3} MiB",
            patchCount * m_Patches.getPatchMemoryUsage() / 1024.0 / 1024.0);
 
@@ -680,54 +577,6 @@ void rad::RadSim::loadLevelEntities() {
                 }
 
                 isEnvLightFound = true;
-            }
-        }
-    }
-}
-
-void rad::RadSim::sampleLightmap(size_t faceIdx) {
-    Face &face = m_Faces[faceIdx];
-    LightmapTexture &lm = m_Lightmaps[face.iLightmapIdx];
-    AFW_ASSERT(face.hasLightmap());
-
-    glm::vec2 baseGridSizeFloat = face.planeMaxBounds / m_Profile.flLuxelSize;
-    float radius = std::max((float)m_Profile.iBasePatchSize, m_Profile.flLuxelSize) * 1.1f;
-
-#ifdef SAMPLE_NEIGHBOURS
-    int normalDir = !!face.nPlaneSide;
-    auto &neighbours = m_Planes[face.iPlane].faces;
-#endif
-
-    for (int y = 0; y < face.vLightmapSize.y; y++) {
-        for (int x = 0; x < face.vLightmapSize.x; x++) {
-            glm::vec2 pos = glm::vec2(x, y) / baseGridSizeFloat * face.planeMaxBounds;
-#ifdef SAMPLE_NEIGHBOURS
-            pos += face.vPlaneOriginInPlaneCoords;
-#endif
-
-            glm::vec3 output = glm::vec3(0, 0, 0);
-            float weightSum = 0;
-
-#ifdef SAMPLE_NEIGHBOURS
-            for (size_t i = 0; i < neighbours.size(); i++) {
-                unsigned neighbourIdx = neighbours[i];
-                Face &neighbour = m_Faces[neighbourIdx];
-
-                if (neighbour.hasLightmap() && normalDir == !!neighbour.nPlaneSide) {
-                    m_PatchTrees[neighbourIdx].sampleLight(pos - neighbour.vPlaneOriginInPlaneCoords, radius, output,
-                                     weightSum);
-                }
-            }
-#else
-            m_PatchTrees[faceIdx].sampleLight(pos, radius, output, weightSum);
-#endif
-
-            if (weightSum != 0) {
-                glm::vec3 finalColor = output / weightSum;
-                lm.getPixel({x, y}) = output / weightSum;
-            } else {
-                // TODO: Fill the void with something
-                lm.getPixel({x, y}) = glm::vec3(1, 0, 1);
             }
         }
     }

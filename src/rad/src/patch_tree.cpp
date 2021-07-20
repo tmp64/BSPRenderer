@@ -4,6 +4,106 @@
 
 #define DISABLE_TREE
 
+namespace {
+
+template <typename T>
+[[maybe_unused]] float filterCubic(float x) {
+    constexpr float B = T::B;
+    constexpr float C = T::C;
+
+    float absx = std::abs(x);
+    float val = 0;
+
+    if (absx < 1.0f) {
+        val = (12 - 9 * B - 6 * C) * absx * absx * absx;
+        val += (-18 + 12 * B + 6 * C) * absx * absx;
+        val += 6 - 2 * B;
+    } else if (std::abs(x) < 2.0f) {
+        val = (-B - 6 * C) * absx * absx * absx;
+        val += (6 * B + 30 * C) * absx * absx;
+        val += (-12 * B - 48 * C) * absx;
+        val += 8 * B + 24 * C;
+    } else {
+        return 0;
+    }
+
+    return val / 6;
+}
+
+struct [[maybe_unused]] BSplineArgs {
+    static constexpr float B = 1;
+    static constexpr float C = 0;
+};
+
+// B Spline cubic filter
+// https://entropymine.com/imageworsener/bicubic/
+[[maybe_unused]] float filterCubicBSpline(float x) {
+    return filterCubic<BSplineArgs>(x);
+}
+
+struct [[maybe_unused]] MitchellArgs {
+    static constexpr float B = 1 / 3.0f;
+    static constexpr float C = 1 / 3.0f;
+};
+
+// Mitchell cubic filter
+// https://entropymine.com/imageworsener/bicubic/
+[[maybe_unused]] float filterCubicMitchell(float x) {
+    return filterCubic<MitchellArgs>(x);
+}
+
+struct [[maybe_unused]] CatRomArgs {
+    static constexpr float B = 0;
+    static constexpr float C = 0.5f;
+};
+
+// Catmull-Rom cubic filter
+// https://entropymine.com/imageworsener/bicubic/
+[[maybe_unused]] float filterCubicCatRom(float x) {
+    return filterCubic<CatRomArgs>(x);
+}
+
+// Linear filter 1
+[[maybe_unused]] float filterLinear1(float x) {
+    if (x < -1) {
+        return 0;
+    }
+
+    if (x < 0) {
+        return 1.0f + x;
+    }
+
+    if (x < 1) {
+        return 1.0f - x;
+    }
+
+    return 0;
+}
+
+// Linear filter 2
+[[maybe_unused]] float filterLinear2(float x) {
+    if (x < -2) {
+        return 0;
+    }
+
+    if (x < 0) {
+        return 1.0f + x / 2.0f;
+    }
+
+    if (x < 2) {
+        return 1.0f - x / 2.0f;
+    }
+
+    return 0;
+}
+
+// Filter used for lightmaps
+float lightmapFilter(float x) {
+    return filterCubicBSpline(x);
+}
+
+}
+
 void rad::PatchTree::createPatches(RadSim *pRadSim, Face &face,
                                    std::atomic<PatchIndex> &globalPatchCount,
                                    float flMinPatchSize) {
@@ -135,7 +235,7 @@ void rad::PatchTree::buildTree() {
 #endif
 }
 
-void rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, glm::vec3 &out,
+void rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, float filterk, glm::vec3 &out,
                                  float &weightSum) {
     // Check if pos intersects with root node
     glm::vec2 corners[4];
@@ -172,20 +272,10 @@ void rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, glm::vec3 &
 
         glm::vec2 d = patch.getFaceOrigin() - pos;
 
-        if (std::abs(d.x) < radius && std::abs(d.y) < radius) {
-            if (glm::isinf(out.r)) {
-                AFW_DEBUG_BREAK();
-            }
-
-            float dist = glm::length(d);
-            dist = std::max(dist, 0.5f);
-            float weight = patch.getSize() * patch.getSize() / (dist * dist);
+        if (std::abs(d.x) <= radius && std::abs(d.y) <= radius) {
+            float weight = lightmapFilter(d.x * filterk) * lightmapFilter(d.y * filterk);
             out += weight * patch.getFinalColor();
             weightSum += weight;
-
-            if (glm::isinf(out.r)) {
-                AFW_DEBUG_BREAK();
-            }
         }
     }
 #endif

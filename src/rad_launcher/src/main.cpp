@@ -81,6 +81,10 @@ int main(int argc, char **argv) {
         printn("Build profile:");
         printi("- Patch size: {}", profile.iBasePatchSize);
         printi("- Luxel size: {}", profile.flLuxelSize);
+        printi("- Block size: {}", profile.iBlockSize);
+        printi("- Block padding: {}", profile.iBlockPadding);
+        printi("- Oversample size: {}", profile.iOversample);
+        printi("- Sample neighbour faces: {}", profile.bSampleNeighbours);
         printi("- Bounce count: {}", profile.iBounceCount);
 
         if (bCanReuseFiles) {

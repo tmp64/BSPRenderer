@@ -5,7 +5,13 @@
 _common:
     base_patch_size: 32     # Base size of a patch in hammer units. Must be an integer.
     min_patch_size: 4       # Minimum allowed patch size after subdivision. Float.
+    
     luxel_size: Null        # Size of a lightmap pixel or Null to use base patch size. Float.
+    block_size: 2048        # Size of the lightmap block
+    block_padding: 3        # Number of padding luxels
+    oversample: 1           # Number of oversampled luxels
+    sample_neighbours: True # Sample neighbour faces
+    
     bounce_count: 16        # Number of light bounce passes.
 
 fast:

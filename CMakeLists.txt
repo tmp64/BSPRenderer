@@ -36,6 +36,7 @@ set(YAML_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(yaml_cpp_fetch)
 
+set(APPFW_ENABLE_GLM ON)
 add_subdirectory(external/appfw)
 add_subdirectory(external/glad_debug)
 add_subdirectory(external/imgui)

@@ -2,10 +2,10 @@
 #define RENDERER_SCENE_RENDERER_H
 #include <vector>
 #include <functional>
+#include <app_base/texture_block.h>
 #include <renderer/surface_renderer.h>
 #include <renderer/base_shader.h>
 #include <renderer/raii.h>
-#include <renderer/texture_block.h>
 #include <renderer/client_entity.h>
 
 class SceneRenderer : appfw::NoCopy {
@@ -121,8 +121,6 @@ private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
     static constexpr int BSP_LIGHTMAP_BLOCK_SIZE = 1024;
     static constexpr int BSP_LIGHTMAP_PADDING = 2;
-    static constexpr int CUSTOM_LIGHTMAP_BLOCK_SIZE = 2048;
-    static constexpr int CUSTOM_LIGHTMAP_PADDING = 4;
     static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
     static constexpr int MAX_TRANS_SURFS_PER_MODEL = 512; //!< Maximum number of surfaces per transparent model
 
@@ -226,8 +224,6 @@ private:
 
         // Custom lightmap info
         std::vector<glm::vec2> m_vCustomLMTexCoords;
-        glm::ivec2 m_vCustomLMSize = glm::ivec2(0, 0);
-        glm::ivec2 m_vCustomLMOffset = glm::ivec2(0, 0);
     };
 
     struct OptBrushModel {
@@ -279,7 +275,8 @@ private:
 
         // Lightmaps
         TextureBlock<glm::u8vec3> bspLightmapBlock;
-        TextureBlock<glm::vec3> customLightmapBlock;
+        std::vector<glm::vec3> customLightmapTex;
+        glm::ivec2 customLightmapTexSize;
 
         // Surface objects
         std::future<void> createSurfaceObjectsResult;
