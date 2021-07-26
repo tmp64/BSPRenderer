@@ -565,6 +565,10 @@ void rad::RadSim::loadLevelEntities() {
                     m_LevelConfig.sunLight.vColor.r = color[0] / 255.f;
                     m_LevelConfig.sunLight.vColor.g = color[1] / 255.f;
                     m_LevelConfig.sunLight.vColor.b = color[2] / 255.f;
+
+                    // Light color is interpreted as linear value in qrad
+                    m_LevelConfig.sunLight.vColor = linearToGamma(m_LevelConfig.sunLight.vColor);
+                    
                     m_LevelConfig.sunLight.flBrightness = color[3] / m_Config.flEnvLightDiv;
 
                     // Read angle
@@ -614,4 +618,12 @@ float rad::RadSim::gammaToLinear(float val) {
 
 glm::vec3 rad::RadSim::gammaToLinear(const glm::vec3 &val) {
     return glm::pow(val, glm::vec3(m_LevelConfig.flGamma));
+}
+
+float rad::RadSim::linearToGamma(float val) {
+    return std::pow(val, 1.0f / m_LevelConfig.flGamma);
+}
+
+glm::vec3 rad::RadSim::linearToGamma(const glm::vec3 &val) {
+    return glm::pow(val, glm::vec3(1.0f / m_LevelConfig.flGamma));
 }

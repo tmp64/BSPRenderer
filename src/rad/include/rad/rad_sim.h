@@ -172,6 +172,8 @@ private:
 
     float gammaToLinear(float val);
     glm::vec3 gammaToLinear(const glm::vec3 &val);
+    float linearToGamma(float val);
+    glm::vec3 linearToGamma(const glm::vec3 &val);
 
     static inline tf::Executor m_Executor;
 
