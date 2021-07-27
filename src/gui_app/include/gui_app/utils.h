@@ -26,9 +26,6 @@ private:
  */
 class AppFWAppComponent : appfw::NoCopy {
 public:
-    AppFWAppComponent();
-    ~AppFWAppComponent();
-
     void tick();
 };
 
@@ -73,6 +70,9 @@ private:
 
     static void gladPostCallback(const char *name, void *, int, ...);
     static const char *getGlErrorString(GLenum errorCode);
+    static void APIENTRY debugMsgCallback(GLenum source, GLenum type, GLuint id, GLenum severity,
+                                          GLsizei length, const GLchar *message,
+                                          const void *userParam);
 };
 
 /**

@@ -11,6 +11,10 @@
 #include <gui_app/utils.h>
 #include <gui_app/gui_app_base.h>
 
+#ifndef GL_CONTEXT_FLAG_DEBUG_BIT
+#define GL_CONTEXT_FLAG_DEBUG_BIT 2
+#endif
+
 SDLAppComponent::SDLAppComponent() {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "Fatal error!\n";
@@ -26,12 +30,6 @@ SDLAppComponent::~SDLAppComponent() {
     m_sIsInit = false;
     SDL_Quit();
 }
-
-AppFWAppComponent::AppFWAppComponent() {
-    appfw::initialize(appfw::InitOptions());
-}
-
-AppFWAppComponent::~AppFWAppComponent() { appfw::shutdown(); }
 
 void AppFWAppComponent::tick() {
     appfw::Prof prof("appfw");
@@ -61,10 +59,20 @@ OpenGLAppComponent::OpenGLAppComponent() {
         app_fatalError("Failed to load OpenGL library: {}", SDL_GetError());
     }
 
-    if (appfw::isDebugBuild()) {
-        printd("OpenGL: Using debug context.");
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+
+    int contextFlags = 0;
+
+    bool bNoDebug = getCommandLine().isFlagSet("--gl-no-debug");
+    bool bDebug = appfw::isDebugBuild() || getCommandLine().isFlagSet("--gl-debug");
+
+    if (bDebug && !bNoDebug) {
+        contextFlags |= SDL_GL_CONTEXT_DEBUG_FLAG;
     }
+
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, contextFlags);
 }
 
 OpenGLAppComponent::~OpenGLAppComponent() {}
@@ -96,8 +104,8 @@ MainWindowAppComponent::MainWindowAppComponent(AppConfig &config) {
         app_fatalError("Failed load OpenGL functions.");
     }
 
-    if (!GLAD_GL_VERSION_3_2) {
-        app_fatalError("At least OpenGL 3.2 is required. Available {}.{}", GLVersion.major, GLVersion.minor);
+    if (!GLAD_GL_VERSION_3_3) {
+        app_fatalError("At least OpenGL 3.3 is required. Available {}.{}", GLVersion.major, GLVersion.minor);
     }
 #elif defined(GLAD_OPENGL_ES)
     if (!gladLoadGLES2Loader([](const char *name) { return SDL_GL_GetProcAddress(name); })) {
@@ -113,11 +121,51 @@ MainWindowAppComponent::MainWindowAppComponent(AppConfig &config) {
 
     glad_set_post_callback(gladPostCallback);
 
-    printi("OpenGL Version {}.{} loaded", GLVersion.major, GLVersion.minor);
+    printi("OpenGL: Version {}.{} loaded", GLVersion.major, GLVersion.minor);
+    printi("GL_VENDOR: {}", glGetString(GL_VENDOR));
+    printi("GL_RENDERER: {}", glGetString(GL_RENDERER));
+    printi("GL_VERSION: {}", glGetString(GL_VERSION));
+
+    int contextFlags = 0;
+    SDL_GL_GetAttribute(SDL_GL_CONTEXT_FLAGS, &contextFlags);
+    bool bDebugRequested = contextFlags & SDL_GL_CONTEXT_DEBUG_FLAG;
+
+    int glProfileMask = 0;
+    int glContextFlags = 0;
+    glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &glProfileMask);
+    glGetIntegerv(GL_CONTEXT_FLAGS, &glContextFlags);
+
+    if (glProfileMask & GL_CONTEXT_COMPATIBILITY_PROFILE_BIT) {
+        printw("OpenGL: Requested core profile, got compatibility instead");
+    }
+
+    if (glContextFlags & GL_CONTEXT_FLAG_DEBUG_BIT) {
+        if (GLAD_GL_ARB_debug_output) {
+            printd("OpenGL: Using debug context");
+        } else {
+            printw("OpenGL: Got debug context but ARB_debug_output is not supported");
+        }
+    } else if (bDebugRequested) {
+        if (GLAD_GL_ARB_debug_output) {
+            printw("OpenGL: Debug context NOT requested but ARB_debug_output is available");
+        } else {
+            printw("OpenGL: Debug context requested but not available");
+        }
+    }
+
+    if (GLAD_GL_ARB_debug_output) {
+        glDebugMessageCallbackARB(&debugMsgCallback, nullptr);
+    }
+
     bIsGladLoaded = true;
 }
 
 MainWindowAppComponent::~MainWindowAppComponent() {
+    // Remove debug callback
+    if (GLAD_GL_ARB_debug_output) {
+        glDebugMessageCallbackARB(nullptr, nullptr);
+    }
+
     // Remove GL context
     SDL_GL_DeleteContext(m_GLContext);
     m_GLContext = nullptr;
@@ -155,6 +203,106 @@ const char *MainWindowAppComponent::getGlErrorString(GLenum errorCode) {
     default:
         return "< unknown >";
     }
+}
+
+void MainWindowAppComponent::debugMsgCallback(GLenum source, GLenum type, GLuint id,
+                                              GLenum severity, GLsizei length,
+                                              const GLchar *message, const void *) {
+    std::string_view sourceStr;
+    std::string_view typeStr;
+    std::string_view severityStr;
+    ConMsgType conMsgType = ConMsgType::Warn;
+
+    //----------------------------------------
+    switch (source) {
+    case GL_DEBUG_SOURCE_API_ARB: {
+        sourceStr = "GL API";
+        break;
+    }
+    case GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB: {
+        sourceStr = "GL API";
+        break;
+    }
+    case GL_DEBUG_SOURCE_SHADER_COMPILER_ARB: {
+        sourceStr = "Shader Compiler";
+        break;
+    }
+    case GL_DEBUG_SOURCE_THIRD_PARTY_ARB: {
+        sourceStr = "Third-Party";
+        break;
+    }
+    case GL_DEBUG_SOURCE_APPLICATION_ARB: {
+        sourceStr = "Application";
+        break;
+    }
+    case GL_DEBUG_SOURCE_OTHER_ARB: {
+        sourceStr = "Other";
+        break;
+    }
+    default: {
+        sourceStr = "Unknown";
+        break;
+    }
+    }
+
+    //----------------------------------------
+    switch (type) {
+    case GL_DEBUG_TYPE_ERROR_ARB: {
+        typeStr = "Error";
+        break;
+    }
+    case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB: {
+        typeStr = "Deprecated Behavior";
+        break;
+    }
+    case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB: {
+        typeStr = "Undefined Behavior";
+        break;
+    }
+    case GL_DEBUG_TYPE_PORTABILITY_ARB: {
+        typeStr = "Portability";
+        break;
+    }
+    case GL_DEBUG_TYPE_PERFORMANCE_ARB: {
+        typeStr = "Performance";
+        break;
+    }
+    case GL_DEBUG_TYPE_OTHER_ARB: {
+        typeStr = "Other";
+        break;
+    }
+    default: {
+        typeStr = "Unknown";
+        break;
+    }
+    }
+
+    //----------------------------------------
+    switch (severity) {
+    case GL_DEBUG_SEVERITY_HIGH_ARB: {
+        severityStr = "Error";
+        conMsgType = ConMsgType::Error;
+        break;
+    }
+    case GL_DEBUG_SEVERITY_MEDIUM_ARB: {
+        severityStr = "Deprecated Behavior";
+        break;
+    }
+    case GL_DEBUG_SEVERITY_LOW_ARB: {
+        severityStr = "Undefined Behavior";
+        break;
+    }
+    default: {
+        severityStr = "Unknown";
+        break;
+    }
+    }
+
+    //----------------------------------------
+    printtype(conMsgType, "OpenGL: {}: {}", id, std::string_view(message, length));
+    printtype(conMsgType, "OpenGL: Source: {}", sourceStr);
+    printtype(conMsgType, "OpenGL: Type: {}", typeStr);
+    printtype(conMsgType, "OpenGL: Severity: {}", severityStr);
 }
 
 ImGuiAppComponent::ImGuiAppComponent(MainWindowAppComponent &window) {
