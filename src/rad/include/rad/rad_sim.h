@@ -158,9 +158,6 @@ private:
     //! Loads lights from entities.
     void loadLevelEntities();
 
-    //! Writes lightmap data into the lightmap texture
-    void sampleLightmap(size_t faceIdx);
-
     //! Calls the progress callback with specified progress.
     void updateProgress(double progress);
 

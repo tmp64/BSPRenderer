@@ -20,6 +20,9 @@ rad:
     
     # Divisor of default light_environment brightness
     light_env_brightness_divisor: 110
+    
+    # Brightness multiplier relative to sun brightness
+    sky_light_brightness_multiplier: 0.5
 
 commands:
     - app_sync_rates 1

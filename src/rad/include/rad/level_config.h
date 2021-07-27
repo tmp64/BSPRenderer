@@ -17,6 +17,11 @@ struct SunLight {
     bool bIsSet = false;
 };
 
+struct SkyLight {
+    glm::vec3 vColor = glm::vec3(-1, -1, -1); //!< Color in gamma space
+    float flBrightnessMul = 0; //!< Brightness multiplier relative to sun brightness
+};
+
 struct LevelConfig {
     //! YAML document of the config
     YAML::Node yaml;
@@ -29,6 +34,9 @@ struct LevelConfig {
 
     //! Direct sunlight.
     SunLight sunLight;
+
+    //! Diffuse skylight
+    SkyLight skyLight;
 
     //! Loads the default config.
     void loadDefaults(const RadConfig &cfg);

@@ -97,6 +97,11 @@ public:
     inline explicit PatchRef(PatchList &list, PatchIndex idx) : m_List(list), m_iIndex(idx) {}
 
     /**
+     * Index of the patch
+     */
+    inline PatchIndex index() { return m_iIndex; }
+
+    /**
      * Length of a side of the square.
      */
     inline float &getSize() { return m_List.m_flSize[m_iIndex]; }

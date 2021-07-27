@@ -6,4 +6,5 @@ void rad::RadConfig::loadFromAppConfig(AppConfig &cfg) {
     flRefl = rad.get<float>("reflectivity");
     flBaseRefl = rad.get<float>("base_reflectivity");
     flEnvLightDiv = rad.get<float>("light_env_brightness_divisor");
+    flSkyLightBrightness = rad.get<float>("sky_light_brightness_multiplier");
 }

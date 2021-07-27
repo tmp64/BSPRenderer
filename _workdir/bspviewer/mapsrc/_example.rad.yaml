@@ -35,3 +35,8 @@ sunlight:
     yaw: -45                # Yaw of the light
     color: [128, 64, 128]   # Light color in gamma space
     brightness: 250         # Brightness multiplier
+
+# Diffuse sky lighting
+skylight:
+    color: [128, 64, 128]   # Light color in gamma space
+    brightness: 0.7         # Brightness (times sunlight brightness)

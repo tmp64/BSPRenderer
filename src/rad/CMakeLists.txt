@@ -14,6 +14,7 @@ set(PUBLIC_HEADERS
 )
 
 set(PRIVATE_HEADERS
+	${CMAKE_CURRENT_SOURCE_DIR}/src/anorms.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/plat.h
 )
 

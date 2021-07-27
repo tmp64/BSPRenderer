@@ -1,5 +1,6 @@
 #include <rad/bouncer.h>
 #include <rad/rad_sim.h>
+#include "anorms.h"
 
 /**
  * Returns vector that points in the direction given in degrees (or -1/-2 for yaw).
@@ -97,34 +98,37 @@ void rad::Bouncer::bounceLight() {
 
 void rad::Bouncer::addEnvLighting() {
     const SunLight &sun = m_pRadSim->m_LevelConfig.sunLight;
+    const SkyLight &sky = m_pRadSim->m_LevelConfig.skyLight;
     
-    if (!sun.bIsSet) {
-        return;
-    }
+    bool bIsSunSet = sun.bIsSet;
 
     glm::vec3 vSunDir = -getVecFromAngles(sun.flPitch, sun.flYaw);
     glm::vec3 vSunColor = m_pRadSim->gammaToLinear(sun.vColor) * sun.flBrightness;
+    glm::vec3 vSkyColor;
+
+    if (sky.vColor.r != -1) {
+        vSkyColor = m_pRadSim->gammaToLinear(sky.vColor) * sun.flBrightness;
+    } else {
+        vSkyColor = vSunColor;
+    }
+
+    vSkyColor *= sky.flBrightnessMul;
+
+    if (!bIsSunSet && vSkyColor == glm::vec3(0, 0, 0)) {
+        // No env lighting
+        return;
+    }
 
     PatchIndex patchCount = m_pRadSim->m_Patches.size();
 
     for (PatchIndex patchIdx = 0; patchIdx < patchCount; patchIdx++) {
         PatchRef patch(m_pRadSim->m_Patches, patchIdx);
 
-        // Check if patch can be hit by the sky
-        float cosangle = glm::dot(patch.getNormal(), vSunDir);
-
-        if (cosangle < 0.001f) {
-            continue;
+        if (bIsSunSet) {
+            addDirectSunlight(patch, vSunDir, vSunColor);
         }
 
-        // Cast a ray to the sky and check if it hits
-        glm::vec3 from = patch.getOrigin();
-        glm::vec3 to = from + (vSunDir * SKY_RAY_LENGTH);
-
-        if (m_pRadSim->m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
-            // Hit the sky, add the sun color
-            addPatchLight(patchIdx, vSunColor * cosangle);
-        }
+        addDiffuseSkylight(patch, vSkyColor);
     }
 }
 
@@ -139,6 +143,58 @@ void rad::Bouncer::addTexLights() {
                 addPatchLight(p, glm::vec3(1, 1, 1) * 50.f);
             }
         }
+    }
+}
+
+void rad::Bouncer::addDirectSunlight(PatchRef &patch, const glm::vec3 vSunDir,
+                                     const glm::vec3 &vSunColor) {
+    // Check if patch can be hit by the sky
+    float cosangle = glm::dot(patch.getNormal(), vSunDir);
+
+    if (cosangle < 0.001f) {
+        return;
+    }
+
+    // Cast a ray to the sky and check if it hits
+    glm::vec3 from = patch.getOrigin();
+    glm::vec3 to = from + (vSunDir * SKY_RAY_LENGTH);
+
+    if (m_pRadSim->m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
+        // Hit the sky, add the sun color
+        addPatchLight(patch.index(), vSunColor * cosangle);
+    }
+}
+
+void rad::Bouncer::addDiffuseSkylight(PatchRef &patch, const glm::vec3 &vSkyColor) {
+    float intensity = 0;
+    const glm::vec3 normal = patch.getNormal();
+
+    float sum = 0;
+
+    for (size_t i = 0; i < std::size(AVER_TEX_NORMALS); i++) {
+        const glm::vec3 &anorm = AVER_TEX_NORMALS[i];
+
+        float cosangle = -glm::dot(normal, anorm);
+
+        if (cosangle < 0.001f) {
+            continue;
+        }
+
+        sum += cosangle;
+
+        // Cast a ray to the sky and check if it hits
+        glm::vec3 from = patch.getOrigin();
+        glm::vec3 to = from + (anorm * SKY_RAY_LENGTH);
+
+        if (m_pRadSim->m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
+            // Hit the sky
+            intensity += cosangle;
+        }
+    }
+
+    if (sum != 0) {
+        intensity /= sum;
+        addPatchLight(patch.index(), vSkyColor * intensity);
     }
 }
 

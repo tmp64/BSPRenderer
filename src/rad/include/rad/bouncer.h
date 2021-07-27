@@ -43,6 +43,9 @@ private:
     void addEnvLighting();
     void addTexLights();
 
+    void addDirectSunlight(PatchRef &patch, const glm::vec3 vSunDir, const glm::vec3 &vSunColor);
+    void addDiffuseSkylight(PatchRef &patch, const glm::vec3 &vSunColor);
+
     void receiveLightFromThis(int bounce, PatchIndex i);
     void receiveLightFromOther(int bounce, PatchIndex i);
 };
