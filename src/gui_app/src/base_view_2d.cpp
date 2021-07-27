@@ -6,13 +6,13 @@
 //-----------------------------------------------------------
 class BaseView2D::TextureShader : public BaseShader {
 public:
-    TextureShader()
-        : BaseShader()
-        , m_ViewMat(this, "uViewMatrix")
-        , m_ProjMat(this, "uProjMatrix") {
+    TextureShader() {
         setTitle("BaseView2D_TextureShader");
         setVert("assets:shaders/base_view_2d/texture.vert");
         setFrag("assets:shaders/base_view_2d/texture.frag");
+
+        addUniform(m_ViewMat, "uViewMatrix");
+        addUniform(m_ProjMat, "uProjMatrix");
     }
 
     void loadMatrices(const BaseView2D &view) {

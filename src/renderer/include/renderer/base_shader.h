@@ -14,15 +14,11 @@ class UniformCommon;
 class BaseShader : appfw::NoCopy {
 public:
     class UniformBase : appfw::NoCopy {
-    public:
-        void loadLocation();
-
     protected:
-        UniformBase(BaseShader *pShader, const char *name);
-
-        BaseShader *m_pShader = nullptr;
+        const char *m_pszUniformName;
         GLuint m_nLocation = 0;
-        std::string m_UniformName;
+
+        friend class BaseShader;
     };
 
     BaseShader();
@@ -58,6 +54,10 @@ protected:
     //! Sets the virtual path to the fragment shader.
     inline void setFrag(std::string_view fragmentPath) { m_FragmentFilePath = fragmentPath; }
 
+    //! Adds a uniform to the list.
+    //! @param  name    Name of the uniform, must be a constant string
+    void addUniform(UniformBase &uniform, const char *name);
+
 private:
     static constexpr GLsizei COMPILE_LOG_SIZE = 4096;
 
@@ -83,51 +83,49 @@ private:
     //! Links the shader program and destroys individual shaders.
     bool linkProgram();
 
+    //! Saves the location of the uniform from the shader program.
+    void loadUniformLocation(UniformBase &uniform);
+
     static std::forward_list<BaseShader *> &getUnregItems();
 
     friend class ShaderManager;
 };
 
 template <typename T>
-class ShaderUniform : BaseShader::UniformBase {
+class ShaderUniform : public BaseShader::UniformBase {
 public:
-    inline ShaderUniform(BaseShader *pShader, const char *name) : BaseShader::UniformBase(pShader, name) {
+    inline ShaderUniform() {
         static_assert(appfw::utils::FalseT<T>::value, "Unknown uniform type");
     }
 };
 
 template <>
-class ShaderUniform<int> : BaseShader::UniformBase {
+class ShaderUniform<int> : public BaseShader::UniformBase {
 public:
-    inline ShaderUniform(BaseShader *pShader, const char *name) : BaseShader::UniformBase(pShader, name) {}
     inline void set(int val) { glUniform1i(m_nLocation, val); }
 };
 
 template <>
-class ShaderUniform<float> : BaseShader::UniformBase {
+class ShaderUniform<float> : public BaseShader::UniformBase {
 public:
-    inline ShaderUniform(BaseShader *pShader, const char *name) : BaseShader::UniformBase(pShader, name) {}
     inline void set(float val) { glUniform1f(m_nLocation, val); }
 };
 
 template <>
-class ShaderUniform<glm::vec3> : BaseShader::UniformBase {
+class ShaderUniform<glm::vec3> : public BaseShader::UniformBase {
 public:
-    inline ShaderUniform(BaseShader *pShader, const char *name) : BaseShader::UniformBase(pShader, name) {}
     inline void set(const glm::vec3 &v) { glUniform3f(m_nLocation, v.x, v.y, v.z); }
 };
 
 template <>
-class ShaderUniform<glm::vec4> : BaseShader::UniformBase {
+class ShaderUniform<glm::vec4> : public BaseShader::UniformBase {
 public:
-    inline ShaderUniform(BaseShader *pShader, const char *name) : BaseShader::UniformBase(pShader, name) {}
     inline void set(const glm::vec4 &v) { glUniform4f(m_nLocation, v.x, v.y, v.z, v.w); }
 };
 
 template <>
-class ShaderUniform<glm::mat4> : BaseShader::UniformBase {
+class ShaderUniform<glm::mat4> : public BaseShader::UniformBase {
 public:
-    inline ShaderUniform(BaseShader *pShader, const char *name) : BaseShader::UniformBase(pShader, name) {}
     inline void set(const glm::mat4 &v) { glUniformMatrix4fv(m_nLocation, 1, false, glm::value_ptr(v)); }
 };
 

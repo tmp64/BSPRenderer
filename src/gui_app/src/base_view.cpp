@@ -36,14 +36,14 @@ static ConVar<int> v_msaa_level("v_msaa_level", 0, "Level of MSAA (1-4)",
 //-----------------------------------------------------------
 class BaseView::GridShader : public BaseShader {
 public:
-    GridShader()
-        : BaseShader()
-        , m_ViewMat(this, "uViewMatrix")
-        , m_ProjMat(this, "uProjMatrix")
-        , m_Color(this, "uColor") {
+    GridShader() {
         setTitle("ViewGridShader");
         setVert("assets:shaders/base_view/grid.vert");
         setFrag("assets:shaders/base_view/grid.frag");
+
+        addUniform(m_ViewMat, "uViewMatrix");
+        addUniform(m_ProjMat, "uProjMatrix");
+        addUniform(m_Color, "uColor");
     }
 
     void loadMatrices(const BaseView &view) {

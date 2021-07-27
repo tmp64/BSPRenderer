@@ -2,8 +2,6 @@
 #include <fstream>
 #include <renderer/base_shader.h>
 
-
-
 //---------------------------------------------------------------
 // Shader loading
 //---------------------------------------------------------------
@@ -31,10 +29,6 @@ static void loadFileToString(const fs::path &path, std::string &string) {
     }
     input.close();
 }
-
-
-
-
 
 BaseShader::BaseShader() {
     getUnregItems().push_front(this);
@@ -101,6 +95,11 @@ void BaseShader::enable() {
 
 void BaseShader::disable() {
     glUseProgram(0);
+}
+
+void BaseShader::addUniform(UniformBase &uniform, const char *name) {
+    uniform.m_pszUniformName = name;
+    m_UniformList.push_back(&uniform);
 }
 
 void BaseShader::createProgram() {
@@ -197,32 +196,23 @@ bool BaseShader::linkProgram() {
     m_nFragShaderId = 0;
 
     // Load uniforms
-    for (auto i : m_UniformList)
-        i->loadLocation();
+    for (UniformBase *i : m_UniformList) {
+        loadUniformLocation(*i);
+    }
 
     return true;
+}
+
+void BaseShader::loadUniformLocation(UniformBase &uniform) {
+    uniform.m_nLocation = glGetUniformLocation(m_nProgId, uniform.m_pszUniformName);
+
+    if (uniform.m_nLocation == -1) {
+        printw("{}: uniform {} not found (may have been optimized out)", getTitle(),
+               uniform.m_pszUniformName);
+    }
 }
 
 std::forward_list<BaseShader *> &BaseShader::getUnregItems() {
     static std::forward_list<BaseShader *> list;
     return list;
-}
-
-//---------------------------------------------------------------
-// CUniformCommon
-//---------------------------------------------------------------
-BaseShader::UniformBase::UniformBase(BaseShader *pShader, const char *name) {
-    m_pShader = pShader;
-    m_pShader->m_UniformList.push_back(this);
-    m_UniformName = name;
-}
-
-// CUniformCommon::~CUniformCommon() {}
-
-void BaseShader::UniformBase::loadLocation() {
-    m_nLocation = glGetUniformLocation(m_pShader->m_nProgId, m_UniformName.c_str());
-    if (m_nLocation == -1) {
-        printw("{}: uniform {} not found (may have been optimized out)", m_pShader->getTitle(),
-               m_UniformName);
-    }
 }

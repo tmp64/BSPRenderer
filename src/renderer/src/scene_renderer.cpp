@@ -49,19 +49,19 @@ static inline bool isVectorNull(const glm::vec3 &v) { return v.x == 0.f && v.y =
 //----------------------------------------------------------------
 // WorldShader
 //----------------------------------------------------------------
-SceneRenderer::WorldShader::WorldShader()
-    : BaseShader()
-    , m_ViewMat(this, "uViewMatrix")
-    , m_ProjMat(this, "uProjMatrix")
-    , m_Color(this, "uColor")
-    , m_LightingType(this, "uLightingType")
-    , m_TextureType(this, "uTextureType")
-    , m_Texture(this, "uTexture")
-    , m_LMTexture(this, "uLMTexture")
-    , m_TexGamma(this, "uTexGamma") {
+SceneRenderer::WorldShader::WorldShader() {
     setTitle("SceneRenderer_WorldShader");
     setVert("assets:shaders/scene/world.vert");
     setFrag("assets:shaders/scene/world.frag");
+
+    addUniform(m_ViewMat, "uViewMatrix");
+    addUniform(m_ProjMat, "uProjMatrix");
+    addUniform(m_Color, "uColor");
+    addUniform(m_LightingType, "uLightingType");
+    addUniform(m_TextureType, "uTextureType");
+    addUniform(m_Texture, "uTexture");
+    addUniform(m_LMTexture, "uLMTexture");
+    addUniform(m_TexGamma, "uTexGamma");
 }
 
 void SceneRenderer::WorldShader::setupUniforms(SceneRenderer &scene) {
@@ -79,17 +79,17 @@ void SceneRenderer::WorldShader::setColor(const glm::vec3 &c) { m_Color.set(c); 
 //----------------------------------------------------------------
 // SkyBoxShader
 //----------------------------------------------------------------
-SceneRenderer::SkyBoxShader::SkyBoxShader()
-    : BaseShader()
-    , m_ViewMat(this, "uViewMatrix")
-    , m_ProjMat(this, "uProjMatrix")
-    , m_Texture(this, "uTexture")
-    , m_TexGamma(this, "uTexGamma")
-    , m_Brightness(this, "uBrightness")
-    , m_ViewOrigin(this, "uViewOrigin") {
+SceneRenderer::SkyBoxShader::SkyBoxShader() {
     setTitle("SceneRenderer_WorldShader");
     setVert("assets:shaders/scene/skybox.vert");
     setFrag("assets:shaders/scene/skybox.frag");
+
+    addUniform(m_ViewMat, "uViewMatrix");
+    addUniform(m_ProjMat, "uProjMatrix");
+    addUniform(m_Texture, "uTexture");
+    addUniform(m_TexGamma, "uTexGamma");
+    addUniform(m_Brightness, "uBrightness");
+    addUniform(m_ViewOrigin, "uViewOrigin");
 }
 
 void SceneRenderer::SkyBoxShader::setupUniforms(SceneRenderer &scene) {
@@ -109,23 +109,23 @@ void SceneRenderer::SkyBoxShader::setupUniforms(SceneRenderer &scene) {
 //----------------------------------------------------------------
 // BrushEntityShader
 //----------------------------------------------------------------
-SceneRenderer::BrushEntityShader::BrushEntityShader()
-    : BaseShader()
-    , m_ModelMat(this, "uModelMatrix")
-    , m_ViewMat(this, "uViewMatrix")
-    , m_ProjMat(this, "uProjMatrix")
-    , m_Color(this, "uColor")
-    , m_LightingType(this, "uLightingType")
-    , m_TextureType(this, "uTextureType")
-    , m_Texture(this, "uTexture")
-    , m_LMTexture(this, "uLMTexture")
-    , m_TexGamma(this, "uTexGamma")
-    , m_RenderMode(this, "uRenderMode")
-    , m_FxAmount(this, "uFxAmount")
-    , m_FxColor(this, "uFxColor") {
+SceneRenderer::BrushEntityShader::BrushEntityShader() {
     setTitle("SceneRenderer_BrushEntityShader");
     setVert("assets:shaders/scene/brush_entity.vert");
     setFrag("assets:shaders/scene/brush_entity.frag");
+
+    addUniform(m_ModelMat, "uModelMatrix");
+    addUniform(m_ViewMat, "uViewMatrix");
+    addUniform(m_ProjMat, "uProjMatrix");
+    addUniform(m_Color, "uColor");
+    addUniform(m_LightingType, "uLightingType");
+    addUniform(m_TextureType, "uTextureType");
+    addUniform(m_Texture, "uTexture");
+    addUniform(m_LMTexture, "uLMTexture");
+    addUniform(m_TexGamma, "uTexGamma");
+    addUniform(m_RenderMode, "uRenderMode");
+    addUniform(m_FxAmount, "uFxAmount");
+    addUniform(m_FxColor, "uFxColor");
 }
 
 void SceneRenderer::BrushEntityShader::setupSceneUniforms(SceneRenderer &scene) {
@@ -143,13 +143,13 @@ void SceneRenderer::BrushEntityShader::setColor(const glm::vec3 &c) { m_Color.se
 //----------------------------------------------------------------
 // PatchesShader
 //----------------------------------------------------------------
-SceneRenderer::PatchesShader::PatchesShader()
-    : BaseShader()
-    , m_ViewMat(this, "uViewMatrix")
-    , m_ProjMat(this, "uProjMatrix") {
+SceneRenderer::PatchesShader::PatchesShader() {
     setTitle("SceneRenderer_PatchesShader");
     setVert("assets:shaders/scene/patches.vert");
     setFrag("assets:shaders/scene/patches.frag");
+
+    addUniform(m_ViewMat, "uViewMatrix");
+    addUniform(m_ProjMat, "uProjMatrix");
 }
 
 void SceneRenderer::PatchesShader::setupSceneUniforms(SceneRenderer &scene) {
@@ -160,14 +160,14 @@ void SceneRenderer::PatchesShader::setupSceneUniforms(SceneRenderer &scene) {
 //----------------------------------------------------------------
 // PostProcessShader
 //----------------------------------------------------------------
-SceneRenderer::PostProcessShader::PostProcessShader()
-    : BaseShader()
-    , m_Tonemap(this, "uTonemap")
-    , m_Exposure(this, "uExposure")
-    , m_Gamma(this, "uGamma") {
+SceneRenderer::PostProcessShader::PostProcessShader() {
     setTitle("SceneRenderer_PostProcessShader");
     setVert("assets:shaders/scene/post_processing.vert");
     setFrag("assets:shaders/scene/post_processing.frag");
+
+    addUniform(m_Tonemap, "uTonemap");
+    addUniform(m_Exposure, "uExposure");
+    addUniform(m_Gamma, "uGamma");
 }
 
 void SceneRenderer::PostProcessShader::setupUniforms() {
