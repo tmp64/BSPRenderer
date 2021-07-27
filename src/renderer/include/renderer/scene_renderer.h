@@ -127,7 +127,6 @@ private:
     class WorldShader : public BaseShader {
     public:
         WorldShader();
-        virtual void create() override;
         void setupUniforms(SceneRenderer &scene);
         void setColor(const glm::vec3 &c);
 
@@ -143,7 +142,6 @@ private:
     class SkyBoxShader : public BaseShader {
     public:
         SkyBoxShader();
-        virtual void create() override;
         void setupUniforms(SceneRenderer &scene);
 
     private:
@@ -157,7 +155,6 @@ private:
     class BrushEntityShader : public BaseShader {
     public:
         BrushEntityShader();
-        virtual void create() override;
         void setupSceneUniforms(SceneRenderer &scene);
         void setColor(const glm::vec3 &c);
 
@@ -176,7 +173,6 @@ private:
     class PatchesShader : public BaseShader {
     public:
         PatchesShader();
-        virtual void create() override;
         void setupSceneUniforms(SceneRenderer &scene);
         void setColor(const glm::vec3 &c);
 
@@ -186,7 +182,6 @@ private:
     class PostProcessShader : public BaseShader {
     public:
         PostProcessShader();
-        virtual void create() override;
         void setupUniforms();
 
     private:

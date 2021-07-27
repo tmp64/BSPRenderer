@@ -7,15 +7,12 @@
 class BaseView2D::TextureShader : public BaseShader {
 public:
     TextureShader()
-        : BaseShader("BaseView2D_TextureShader")
+        : BaseShader()
         , m_ViewMat(this, "uViewMatrix")
-        , m_ProjMat(this, "uProjMatrix") {}
-
-    virtual void create() override {
-        createProgram();
-        createVertexShader("assets:shaders/base_view_2d/texture.vert");
-        createFragmentShader("assets:shaders/base_view_2d/texture.frag");
-        linkProgram();
+        , m_ProjMat(this, "uProjMatrix") {
+        setTitle("BaseView2D_TextureShader");
+        setVert("assets:shaders/base_view_2d/texture.vert");
+        setFrag("assets:shaders/base_view_2d/texture.frag");
     }
 
     void loadMatrices(const BaseView2D &view) {

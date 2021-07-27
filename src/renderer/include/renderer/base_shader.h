@@ -14,61 +14,78 @@ class UniformCommon;
 class BaseShader : appfw::NoCopy {
 public:
     class UniformBase : appfw::NoCopy {
+    public:
+        void loadLocation();
+
     protected:
         UniformBase(BaseShader *pShader, const char *name);
-        // virtual ~CUniformCommon();
 
         BaseShader *m_pShader = nullptr;
         GLuint m_nLocation = 0;
         std::string m_UniformName;
-
-        void loadLocation();
-
-        friend class BaseShader;
     };
 
-    /**
-     * Creates a shader.
-     */
-    BaseShader(const char *title);
+    BaseShader();
     virtual ~BaseShader();
 
-    /**
-     * Loads shader from files, compiles and links it.
-     * On error throws std::runtime_error
-     */
-    virtual void create() = 0;
+    //! Returns whether the shader can be used or not.
+    inline bool isReady() { return m_bIsReady; }
 
-    /**
-     * Deletes compiled shader from OpenGL context.
-     */
-    virtual void destroy();
+    //! Reloads and recompiles the shader program.
+    //! Errors and warnings will be printed to the console.
+    //! @returns true on success (no errors occured)
+    bool reload();
 
-    const char *getShaderTitle();
+    //! Destroys the shader program and individual shaders.
+    void destroy();
+
+    //! @returns the name of the shader.
+    inline std::string_view getTitle() { return m_Title; }
+
+    //! Enables this shader program. This will disable any other shaders.
     void enable();
+
+    //! Disables this shader program.
     void disable();
 
 protected:
-    const char *m_pShaderTitle = nullptr;
+    //! Sets the shader title.
+    inline void setTitle(std::string_view title) { m_Title = title; }
 
-    GLuint m_nVertexShaderId = 0, m_nFragShaderId = 0;
-    GLuint m_nProgId = 0;
+    //! Sets the virtual path to the vertex shader.
+    inline void setVert(std::string_view vertexPath) { m_VertexFilePath = vertexPath; }
 
-    void createProgram();
-    void createVertexShaderFromPath(const fs::path &filename);
-    void createFragmentShaderFromPath(const fs::path &filename);
-    void linkProgram();
-
-    void createVertexShader(std::string_view filepath);
-    void createFragmentShader(std::string_view filepath);
+    //! Sets the virtual path to the fragment shader.
+    inline void setFrag(std::string_view fragmentPath) { m_FragmentFilePath = fragmentPath; }
 
 private:
+    static constexpr GLsizei COMPILE_LOG_SIZE = 4096;
+
+    std::string_view m_Title;
+    std::string_view m_VertexFilePath;
+    std::string_view m_FragmentFilePath;
+
+    GLuint m_nVertShaderId = 0, m_nFragShaderId = 0;
+    GLuint m_nProgId = 0;
+
+    bool m_bIsReady = false;
+
     std::vector<BaseShader::UniformBase *> m_UniformList;
+
+    //! Creates an empty shader program.
+    void createProgram();
+
+    //! Loads the file from path and compiled it as a shader.
+    //! Any warnings/errors will be printed in the console.
+    //! @returns shader id or 0 on error
+    GLuint compileShader(GLenum shaderType, std::string_view path);
+
+    //! Links the shader program and destroys individual shaders.
+    bool linkProgram();
 
     static std::forward_list<BaseShader *> &getUnregItems();
 
     friend class ShaderManager;
-    friend class BaseShader::UniformBase;
 };
 
 template <typename T>

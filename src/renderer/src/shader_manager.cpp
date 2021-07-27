@@ -43,16 +43,8 @@ bool ShaderManager::reloadShaders() {
     bool result = true;
 
     for (BaseShader *pShader : m_ShaderList) {
-        try {
-            pShader->create();
+        if (pShader->reload()) {
             success++;
-        } catch (const std::exception &e) {
-            printe("When creating shader '{}':", pShader->getShaderTitle());
-            printe("    Error: {}", e.what());
-            printe("");
-
-            result = false;
-            failed++;
         }
     }
 
