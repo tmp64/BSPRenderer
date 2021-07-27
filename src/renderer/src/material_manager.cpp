@@ -1,13 +1,9 @@
 #include <appfw/appfw.h>
 #include <appfw/prof.h>
-
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_ASSERT(x) AFW_ASSERT(x)
-
 #include <appfw/timer.h>
 #include <bsp/wad_file.h>
 #include <gui_app/imgui_controls.h>
-#include <renderer/stb_image.h>
+#include <stb_image.h>
 #include <renderer/material_manager.h>
 
 ConVar<bool> mat_ui("mat_ui", false, "Enable material manager dev UI");

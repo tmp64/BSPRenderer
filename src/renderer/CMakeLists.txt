@@ -7,7 +7,6 @@ set(RNDR_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/raii.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/shader_manager.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/stb_image.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/surface_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/utils.h
 )
@@ -41,6 +40,7 @@ target_link_libraries(renderer
 	glm::glm
 	gui_app
 	imgui
+	stb
 )
 
 appfw_get_std_pch(PCH_STD_HEADERS)

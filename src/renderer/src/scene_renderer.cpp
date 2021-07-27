@@ -2,7 +2,7 @@
 #include <appfw/timer.h>
 #include <appfw/prof.h>
 #include <app_base/lightmap.h>
-#include <renderer/stb_image.h>
+#include <stb_image.h>
 #include <renderer/scene_renderer.h>
 #include <imgui.h>
 #include <gui_app/imgui_controls.h>

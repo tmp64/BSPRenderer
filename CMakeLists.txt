@@ -45,6 +45,7 @@ add_subdirectory(external/taskflow)
 message(STATUS ">>>>>> Dependencies end")
 
 # Libraries
+add_subdirectory(src/stb)
 add_subdirectory(src/app_base)
 add_subdirectory(src/gui_app)
 add_subdirectory(src/bsp)

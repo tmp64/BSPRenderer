@@ -9,7 +9,7 @@
 #include <appfw/command_line.h>
 #include <appfw/timer.h>
 #include <app_base/texture_block.h>
-#include <renderer/stb_image.h>
+#include <stb_image.h>
 #include "bmplib.hpp"
 
 static bool s_IsRunning = false;
