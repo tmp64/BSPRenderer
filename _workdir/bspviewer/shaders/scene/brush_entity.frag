@@ -1,17 +1,4 @@
-// World-space fragment position
-in vec3 gFragPos;
-
-// World-space normal vector
-in vec3 gNormal;
-
-// Texture coordinates
-in vec2 gTexCoord;
-
-// BSP lightmap texture coordinates
-in vec2 gBSPLMTexCoord;
-
-// Custom lightmap texture coordinates
-in vec2 gCustomLMTexCoord;
+#include "scene/world_iface.glsl"
 
 // Output color
 out vec4 outColor;
@@ -35,7 +22,7 @@ uniform vec3 uFxColor;
 #define kRenderTransAdd		5
 
 void main(void) {
-	vec4 textureColor = texture(uTexture, gTexCoord).rgba;
+	vec4 textureColor = texture(uTexture, vsOut.vTexCoord).rgba;
 	vec4 objectColor = vec4(1, 0, 1, 1);
 	vec3 ligtmapColor = vec3(1, 1, 1);
 
@@ -73,7 +60,7 @@ void main(void) {
 		vec3 ambient = vec3(1, 1, 1) * 0.75;
 		
 		// Direct diffuse ligthing
-		vec3 normal = normalize(gNormal);
+		vec3 normal = normalize(vsOut.vNormal);
 		vec3 lightDir = normalize(vec3(1.0, 1.5, 1.5));
 		
 		float diff = max(dot(normal, lightDir), 0.0);
@@ -84,12 +71,12 @@ void main(void) {
 		ligtmapColor = ambient + diffuse;
 	} else if (uLightingType == 2) {
 		// BSP lightmaps
-		ligtmapColor = texture(uLMTexture, gBSPLMTexCoord).rgb;
+		ligtmapColor = texture(uLMTexture, vsOut.vBSPLMTexCoord).rgb;
 		// Gamma correction
 		ligtmapColor.rgb = pow(ligtmapColor.rgb, vec3(1.5));
 	} else if (uLightingType == 3) {
 		// Custom lightmaps
-		ligtmapColor = texture(uLMTexture, gCustomLMTexCoord).rgb;
+		ligtmapColor = texture(uLMTexture, vsOut.vCustomLMTexCoord).rgb;
 	}
 
 	//--------------------------------------------------

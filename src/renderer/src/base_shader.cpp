@@ -215,6 +215,8 @@ bool BaseShader::linkProgram() {
         return false;
     }
 
+    glDetachShader(m_nProgId, m_nVertShaderId);
+    glDetachShader(m_nProgId, m_nFragShaderId);
     glDeleteShader(m_nVertShaderId);
     glDeleteShader(m_nFragShaderId);
     m_nVertShaderId = 0;
