@@ -280,16 +280,16 @@ void MainWindowAppComponent::debugMsgCallback(GLenum source, GLenum type, GLuint
     //----------------------------------------
     switch (severity) {
     case GL_DEBUG_SEVERITY_HIGH_ARB: {
-        severityStr = "Error";
+        severityStr = "High";
         conMsgType = ConMsgType::Error;
         break;
     }
     case GL_DEBUG_SEVERITY_MEDIUM_ARB: {
-        severityStr = "Deprecated Behavior";
+        severityStr = "Medium";
         break;
     }
     case GL_DEBUG_SEVERITY_LOW_ARB: {
-        severityStr = "Undefined Behavior";
+        severityStr = "Low";
         break;
     }
     default: {
