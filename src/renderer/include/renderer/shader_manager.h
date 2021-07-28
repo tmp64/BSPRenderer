@@ -1,6 +1,7 @@
 #ifndef RENDERER_SHADER_MANAGER_H
 #define RENDERER_SHADER_MANAGER_H
 #include <vector>
+#include <renderer/shader_definitions.h>
 
 class BaseShader;
 
@@ -34,8 +35,20 @@ public:
      */
     bool reloadShaders();
 
+    //! Returns the list of shader definitions applied to all shaders
+    inline ShaderDefinitions &getGlobalDefinitions() { return m_GlobalDefs; }
+
+    //! Returns the list of shader definitions applied to all vertex shaders
+    inline ShaderDefinitions &getVertDefinitions() { return m_VertDefs; }
+
+    //! Returns the list of shader definitions applied to all fragment shaders
+    inline ShaderDefinitions &getFragDefinitions() { return m_FragDefs; }
+
 private:
     std::vector<BaseShader *> m_ShaderList;
+    ShaderDefinitions m_GlobalDefs;
+    ShaderDefinitions m_VertDefs;
+    ShaderDefinitions m_FragDefs;
 
     void destroyAllShaders();
 };

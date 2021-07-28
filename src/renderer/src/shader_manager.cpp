@@ -10,6 +10,10 @@ ShaderManager &ShaderManager::get() {
 }
 
 void ShaderManager::init() {
+    // Add default definitions
+    getVertDefinitions().addDef("IFACE_VF", "out");
+    getFragDefinitions().addDef("IFACE_VF", "in");
+
     registerAllAvailableItems();
     reloadShaders();
 }
@@ -45,10 +49,18 @@ bool ShaderManager::reloadShaders() {
     for (BaseShader *pShader : m_ShaderList) {
         if (pShader->reload()) {
             success++;
+        } else {
+            failed++;
+            result = false;
         }
     }
 
     printi("Reloaded {} shader(s), {} failed (total {})", success, failed, m_ShaderList.size());
+
+    if (!result) {
+        AFW_DEBUG_BREAK();
+    }
+
     return result;
 }
 

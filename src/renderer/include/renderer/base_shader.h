@@ -1,13 +1,14 @@
 #ifndef RENDERER_BASESHADER_H
 #define RENDERER_BASESHADER_H
+#include <string>
+#include <vector>
+#include <forward_list>
 #include <appfw/utils.h>
 #include <appfw/appfw.h>
-#include <forward_list>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <string>
-#include <vector>
+#include <renderer/shader_definitions.h>
 
 class UniformCommon;
 
@@ -58,6 +59,15 @@ protected:
     //! @param  name    Name of the uniform, must be a constant string
     void addUniform(UniformBase &uniform, const char *name);
 
+    //! Returns the list of shader definitions applied to all shaders
+    inline ShaderDefinitions &getDefinitions() { return m_Defs; }
+
+    //! Returns the list of shader definitions applied to the vertex shader
+    inline ShaderDefinitions &getVertDefinitions() { return m_VertDefs; }
+
+    //! Returns the list of shader definitions applied to the fragment shader
+    inline ShaderDefinitions &getFragDefinitions() { return m_FragDefs; }
+
 private:
     static constexpr GLsizei COMPILE_LOG_SIZE = 4096;
 
@@ -71,6 +81,9 @@ private:
     bool m_bIsReady = false;
 
     std::vector<BaseShader::UniformBase *> m_UniformList;
+    ShaderDefinitions m_Defs;
+    ShaderDefinitions m_VertDefs;
+    ShaderDefinitions m_FragDefs;
 
     //! Creates an empty shader program.
     void createProgram();
@@ -79,6 +92,10 @@ private:
     //! Any warnings/errors will be printed in the console.
     //! @returns shader id or 0 on error
     GLuint compileShader(GLenum shaderType, std::string_view path);
+
+    //! Loads the file into a string and processes all #include directives.
+    //! @returns final shader code or an empty string on error
+    std::string loadShaderFile(GLenum shaderType, std::string_view path);
 
     //! Links the shader program and destroys individual shaders.
     bool linkProgram();

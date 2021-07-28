@@ -1,34 +1,8 @@
-#include <appfw/dbg.h>
 #include <fstream>
+#include <stb_include.h>
+#include <appfw/dbg.h>
 #include <renderer/base_shader.h>
-
-//---------------------------------------------------------------
-// Shader loading
-//---------------------------------------------------------------
-static void loadFileToString(const fs::path &path, std::string &string) {
-    string.clear();
-
-    std::ifstream input(path);
-    if (!input.is_open())
-        throw std::runtime_error(std::string("open ") + path.u8string() +
-                                 " failed: " + strerror(errno));
-
-        // Add version
-#ifdef GLAD_OPENGL
-    string += "#version 330 core\n";
-#elif defined(GLAD_OPENGL_ES)
-    string += "#version 300 es\n";
-#else
-#error
-#endif
-    string += "#line 1\n";
-
-    std::string line;
-    while (std::getline(input, line)) {
-        string += line + '\n';
-    }
-    input.close();
-}
+#include <renderer/shader_manager.h>
 
 BaseShader::BaseShader() {
     getUnregItems().push_front(this);
@@ -108,17 +82,11 @@ void BaseShader::createProgram() {
 }
 
 GLuint BaseShader::compileShader(GLenum shaderType, std::string_view path) {
-    fs::path fullPath;
+    std::string shaderCode = loadShaderFile(shaderType, path);
 
-    try {
-        fullPath = getFileSystem().findExistingFile(path);
-    } catch (...) {
-        printe("Shader file {} not found", path);
+    if (shaderCode.empty()) {
         return 0;
     }
-
-    std::string shaderCode;
-    loadFileToString(fullPath, shaderCode);
 
     GLuint shaderId = glCreateShader(shaderType);
     const char *cstr = shaderCode.c_str();
@@ -153,6 +121,63 @@ GLuint BaseShader::compileShader(GLenum shaderType, std::string_view path) {
     }
     
     return shaderId;
+}
+
+std::string BaseShader::loadShaderFile(GLenum shaderType, std::string_view path) {
+    // Resolve path
+    fs::path fullPath = getFileSystem().findExistingFile(path, std::nothrow);
+
+    if (fullPath.empty()) {
+        printe("{}: file {} not found", m_Title, path);
+        return "";
+    }
+
+    // Read source file
+    std::vector<char> rawData;
+    std::ifstream file(fullPath, std::ifstream::binary);
+    appfw::readFileContents(file, rawData);
+    rawData.push_back('\0');
+
+    // Handle #include
+    char includeError[256];
+    std::unique_ptr<char, decltype(&std::free)> processedFile(
+        stb_include_string(rawData.data(), nullptr, "assets:shaders", nullptr, includeError),
+        &free);
+
+    if (!processedFile) {
+        printe("{}: {}: include processing failed", m_Title, path);
+        printe("{}", includeError);
+        return "";
+    }
+
+    // Assemble source header
+    std::string srcHeader;
+#ifdef GLAD_OPENGL
+    srcHeader += "#version 330 core\n";
+#elif defined(GLAD_OPENGL_ES)
+    srcHeader += "#version 300 es\n";
+#else
+#error
+#endif
+    srcHeader += ShaderManager::get().getGlobalDefinitions().toString();
+
+    if (shaderType == GL_VERTEX_SHADER) {
+        srcHeader += ShaderManager::get().getVertDefinitions().toString();
+    } else if (shaderType == GL_FRAGMENT_SHADER) {
+        srcHeader += ShaderManager::get().getFragDefinitions().toString();
+    }
+
+    srcHeader += getDefinitions().toString();
+
+    if (shaderType == GL_VERTEX_SHADER) {
+        srcHeader += getVertDefinitions().toString();
+    } else if (shaderType == GL_FRAGMENT_SHADER) {
+        srcHeader += getFragDefinitions().toString();
+    }
+
+    srcHeader += "#line 1\n";
+
+    return srcHeader + processedFile.get();
 }
 
 bool BaseShader::linkProgram() {
