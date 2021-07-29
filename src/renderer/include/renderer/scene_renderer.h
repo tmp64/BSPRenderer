@@ -33,6 +33,9 @@ public:
 
         //! Time of the last frame
         double flFrameTime = 0;
+
+        //! Average luminance of the image
+        float flAvgLum = 0;
     };
 
     /**
@@ -179,15 +182,21 @@ private:
         ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
     };
 
+    class LuminanceShader : public BaseShader {
+    public:
+        LuminanceShader();
+    };
+
     class PostProcessShader : public BaseShader {
     public:
         PostProcessShader();
-        void setupUniforms();
+        void setupUniforms(SceneRenderer &scene);
 
     private:
         ShaderUniform<int> m_Tonemap;
-        ShaderUniform<float> m_Exposure;
         ShaderUniform<float> m_Gamma;
+        ShaderUniform<float> m_AvgLum;
+        ShaderUniform<float> m_WhitePoint;
     };
 
     struct SurfaceVertex {
@@ -291,18 +300,23 @@ private:
     std::vector<ClientEntity *> m_TransEntityList;
     std::vector<size_t> m_SortBuffer;
     unsigned m_uVisibleEntCount = 0;
+    float m_flAvgLum = 0;
 
     // Screen-wide quad
     GLVao m_nQuadVao;
     GLBuffer m_nQuadVbo;
     void createScreenQuad();
 
-    // Framebuffer
+    // Framebuffers
     bool m_bNeedRefreshFB = true;
     glm::ivec2 m_vViewportSize = glm::ivec2(1, 1);
-    GLuint m_nHdrFramebuffer = 0;
-    GLuint m_nColorBuffer = 0;
-    GLuint m_nRenderBuffer = 0;
+    GLFramebuffer m_nHdrFramebuffer;
+    GLTexture m_nColorBuffer;
+    GLRenderbuffer m_nRenderBuffer;
+
+    GLTexture m_nLumColorBuffer;
+    GLFramebuffer m_nLumFramebuffer;
+
     void recreateFramebuffer();
     void destroyFramebuffer();
 
@@ -403,6 +417,11 @@ private:
     void drawBrushEntitySurface(Surface &surf);
 
     /**
+     * Calculates average luminance from mipmap of the HDR framebuffer.
+     */
+    void calculateAvgLum();
+
+    /**
      * Post-processes HDB framebuffer (tonemapping, gamma correction) and draws it into active framebuffer.
      */
     void doPostProcessing();
@@ -416,6 +435,7 @@ private:
     static inline SkyBoxShader m_sSkyShader;
     static inline BrushEntityShader m_sBrushEntityShader;
     static inline PatchesShader m_sPatchesShader;
+    static inline LuminanceShader m_sLuminanceShader;
     static inline PostProcessShader m_sPostProcessShader;
 };
 

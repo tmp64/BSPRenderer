@@ -122,42 +122,14 @@ using GLVao = GLRaiiWrapper<&glGenVertexArrays, &glDeleteVertexArrays>;
  */
 using GLBuffer = GLRaiiWrapper<&glGenBuffers, &glDeleteBuffers>;
 
-/*class GLTexture : appfw::NoCopy {
-public:
-    GLTexture() noexcept = default;
-    GLTexture(GLTexture &&other) noexcept;
-    ~GLTexture();
-
-    GLTexture &operator=(GLTexture &&other) noexcept;
-
-    inline GLuint id() { return m_nId; }
-
-    void create() noexcept;
-    void destroy() noexcept;
-
-public:
-    GLuint m_nId = 0;
-};*/
+/**
+ * RAII wrapper for a framebuffer.
+ */
+using GLFramebuffer = GLRaiiWrapper<&glGenFramebuffers, &glDeleteFramebuffers>;
 
 /**
- * RAII wrapper for a number of OpenGL textures.
+ * RAII wrapper for a renderbuffer.
  */
-/*class GLTextureVector : appfw::NoCopy {
-public:
-    GLTextureVector() noexcept = default;
-    GLTextureVector(GLTextureVector &&other) noexcept;
-    ~GLTextureVector();
-
-    GLTextureVector &operator=(GLTextureVector &&other) noexcept;
-
-    void create(GLsizei count);
-    void destroy() noexcept;
-
-    inline GLuint id(size_t idx) { return m_nIds[idx]; }
-    inline GLsizei size() { return (GLsizei)m_nIds.size(); }
-
-public:
-    std::vector<GLuint> m_nIds;
-};*/
+using GLRenderbuffer = GLRaiiWrapper<&glGenRenderbuffers, &glDeleteRenderbuffers>;
 
 #endif

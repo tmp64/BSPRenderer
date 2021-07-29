@@ -25,11 +25,11 @@ ConVar<float> r_gamma("r_gamma", 2.2f, "Gamma");
 ConVar<float> r_texgamma("r_texgamma", 2.2f, "Texture gamma");
 ConVar<int> r_texture("r_texture", 2,
                       "Which texture should be used:\n  0 - white color, 1 - random color, 2 - texture");
-ConVar<int> r_lighting("r_lighting", 2,
+ConVar<int> r_lighting("r_lighting", 3,
                        "Lighting method:\n  0 - fullbright, 1 - shaded, 2 - BSP lightmaps, 3 - custom lightmaps");
-ConVar<int> r_tonemap("r_tonemap", 2, "HDR tonemapping method:\n  0 - none (clamp to 1), 1 - Reinhard, 2 - exposure");
-ConVar<float> r_exposure("r_exposure", 0.5f, "Picture exposure");
-ConVar<float> r_skybright("r_skybright", 3.f, "Sky brightness");
+ConVar<int> r_tonemap("r_tonemap", 2, "HDR tonemapping method:\n  0 - none (clamp to 1), 1 - Reinhard white point, 2 - ACES");
+ConVar<float> r_skybright("r_skybright", 1.1f, "Sky brightness");
+ConVar<float> r_whitepoint("r_whitepoint", 1.5f, "White point for Reinhard curve");
 ConVar<float> r_skybright_ldr("r_skybright", 1.f, "Sky brightness for LDR (BSP lightmpas)");
 ConVar<bool> r_ebo("r_ebo", true, "Use indexed rendering");
 ConVar<bool> r_wireframe("r_wireframe", false, "Draw wireframes");
@@ -158,6 +158,15 @@ void SceneRenderer::PatchesShader::setupSceneUniforms(SceneRenderer &scene) {
 }
 
 //----------------------------------------------------------------
+// LuminanceShader
+//----------------------------------------------------------------
+SceneRenderer::LuminanceShader::LuminanceShader() {
+    setTitle("SceneRenderer_LuminanceShader");
+    setVert("assets:shaders/scene/luminance.vert");
+    setFrag("assets:shaders/scene/luminance.frag");
+}
+
+//----------------------------------------------------------------
 // PostProcessShader
 //----------------------------------------------------------------
 SceneRenderer::PostProcessShader::PostProcessShader() {
@@ -166,18 +175,21 @@ SceneRenderer::PostProcessShader::PostProcessShader() {
     setFrag("assets:shaders/scene/post_processing.frag");
 
     addUniform(m_Tonemap, "uTonemap");
-    addUniform(m_Exposure, "uExposure");
     addUniform(m_Gamma, "uGamma");
+    addUniform(m_AvgLum, "uAvgLum");
+    addUniform(m_WhitePoint, "uWhitePoint");
 }
 
-void SceneRenderer::PostProcessShader::setupUniforms() {
+void SceneRenderer::PostProcessShader::setupUniforms(SceneRenderer &scene) {
     if (r_lighting.getValue() == 2) {
         // No tonemapping for BSP lightmaps
         m_Tonemap.set(0);
     } else {
         m_Tonemap.set(r_tonemap.getValue());
+        m_AvgLum.set(scene.m_flAvgLum);
+        m_WhitePoint.set(r_whitepoint.getValue());
     }
-    m_Exposure.set(r_exposure.getValue());
+
     m_Gamma.set(r_gamma.getValue());
 }
 
@@ -401,6 +413,8 @@ void SceneRenderer::renderScene(GLint targetFb) {
 
     frameEnd();
 
+    calculateAvgLum();
+
     glBindFramebuffer(GL_FRAMEBUFFER, targetFb);
     doPostProcessing();
 
@@ -432,6 +446,8 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         ImGui::Text("    Trans: %lu", m_TransEntityList.size());
         ImGui::Separator();
 
+        ImGui::Text("Luminance: %.3f", m_Stats.flAvgLum);
+
         CvarCheckbox("World", r_drawworld);
         ImGui::SameLine();
         CvarCheckbox("Sky", r_drawsky);
@@ -453,6 +469,8 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
             }
             ImGui::EndCombo();
         }
+
+        CvarSlider("White point", r_whitepoint, 1, 10);
 
         ImGui::End();
     }
@@ -500,44 +518,53 @@ void SceneRenderer::createScreenQuad() {
 void SceneRenderer::recreateFramebuffer() {
     destroyFramebuffer();
 
-    glGenFramebuffers(1, &m_nHdrFramebuffer);
-
     // Create FP color buffer
-    glGenTextures(1, &m_nColorBuffer);
+    m_nColorBuffer.create();
     glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_vViewportSize.x, m_vViewportSize.y, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // Create depth buffer (renderbuffer)
-    glGenRenderbuffers(1, &m_nRenderBuffer);
+    m_nRenderBuffer.create();
     glBindRenderbuffer(GL_RENDERBUFFER, m_nRenderBuffer);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, m_vViewportSize.x, m_vViewportSize.y);
 
     // Attach buffers
+    m_nHdrFramebuffer.create();
     glBindFramebuffer(GL_FRAMEBUFFER, m_nHdrFramebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_nColorBuffer, 0);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_nRenderBuffer);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        throw std::runtime_error("SceneRenderer::recreateFramebuffer(): framebuffer not complete");
+        throw std::runtime_error("SceneRenderer::recreateFramebuffer(): HDR framebuffer not complete");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Create FP color buffer
+    m_nLumColorBuffer.create();
+    glBindTexture(GL_TEXTURE_2D, m_nLumColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, m_vViewportSize.x, m_vViewportSize.y, 0, GL_RED,
+                 GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // Attach buffers
+    m_nLumFramebuffer.create();
+    glBindFramebuffer(GL_FRAMEBUFFER, m_nLumFramebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_nLumColorBuffer,
+                           0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        throw std::runtime_error(
+            "SceneRenderer::recreateFramebuffer(): Luminance framebuffer not complete");
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void SceneRenderer::destroyFramebuffer() {
-    if (m_nHdrFramebuffer) {
-        glDeleteFramebuffers(1, &m_nHdrFramebuffer);
-        m_nHdrFramebuffer = 0;
-    }
+    m_nHdrFramebuffer.destroy();
+    m_nColorBuffer.destroy();
+    m_nRenderBuffer.destroy();
 
-    if (m_nColorBuffer) {
-        glDeleteTextures(1, &m_nColorBuffer);
-        m_nColorBuffer = 0;
-    }
-
-    if (m_nRenderBuffer) {
-        glDeleteRenderbuffers(1, &m_nRenderBuffer);
-        m_nRenderBuffer = 0;
-    }
+    m_nLumFramebuffer.destroy();
+    m_nLumColorBuffer.destroy();
 }
 
 void SceneRenderer::asyncCreateSurfaces() {
@@ -1667,13 +1694,56 @@ void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
     m_Stats.uRenderedBrushEntPolys++;
 }
 
+void SceneRenderer::calculateAvgLum() {
+    appfw::Prof mainprof("Average luminance");
+
+    {
+        appfw::Prof prof("Render pass");
+        m_sLuminanceShader.enable();
+        glBindFramebuffer(GL_FRAMEBUFFER, m_nLumFramebuffer);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
+        glBindVertexArray(m_nQuadVao);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glBindVertexArray(0);
+        m_sLuminanceShader.disable();
+    }
+
+    glBindTexture(GL_TEXTURE_2D, m_nLumColorBuffer);
+
+    {
+        appfw::Prof prof("Mip-maps");
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+
+    {
+        appfw::Prof prof("Texture read");
+        int numLevels =
+            1 + (int)floor(log2((double)std::max(m_vViewportSize.x, m_vViewportSize.y)));
+        int lastLevel = numLevels - 1;
+
+        int wide = 0, tall = 0;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, lastLevel, GL_TEXTURE_WIDTH, &wide);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, lastLevel, GL_TEXTURE_HEIGHT, &tall);
+
+        AFW_ASSERT_REL(wide == 1);
+        AFW_ASSERT_REL(tall == 1);
+
+        float l = 0;
+        glGetTexImage(GL_TEXTURE_2D, lastLevel, GL_RED, GL_FLOAT, &l);
+        l = std::exp(l);
+        m_Stats.flAvgLum = l;
+        m_flAvgLum = l;
+    }
+}
+
 void SceneRenderer::doPostProcessing() {
     appfw::Prof prof("Post-Processing");
 
     m_sPostProcessShader.enable();
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
-    m_sPostProcessShader.setupUniforms();
+    m_sPostProcessShader.setupUniforms(*this);
 
     glBindVertexArray(m_nQuadVao);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);

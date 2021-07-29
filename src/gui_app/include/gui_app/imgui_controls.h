@@ -41,4 +41,12 @@ inline void CvarCheckbox(const char *text, ConVar<bool> &cvar) {
 	}
 }
 
+inline void CvarSlider(const char *label, ConVar<float> &cvar, float v_min, float v_max) {
+    float val = cvar.getValue();
+
+    if (ImGui::SliderFloat(label, &val, v_min, v_max)) {
+        cvar.setValue(val);
+	}
+}
+
 #endif

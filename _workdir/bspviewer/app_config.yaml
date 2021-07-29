@@ -19,7 +19,8 @@ rad:
     base_reflectivity: 0.4
     
     # Divisor of default light_environment brightness
-    light_env_brightness_divisor: 110
+    #light_env_brightness_divisor: 100 # for rendering without tonemapping
+    light_env_brightness_divisor: 38 # for ACES tonemapping
     
     # Brightness multiplier relative to sun brightness
     sky_light_brightness_multiplier: 0.5
