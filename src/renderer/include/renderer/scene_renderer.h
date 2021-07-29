@@ -33,9 +33,6 @@ public:
 
         //! Time of the last frame
         double flFrameTime = 0;
-
-        //! Average luminance of the image
-        float flAvgLum = 0;
     };
 
     /**
@@ -190,12 +187,13 @@ private:
     class PostProcessShader : public BaseShader {
     public:
         PostProcessShader();
-        void setupUniforms(SceneRenderer &scene);
+        void setupUniforms();
 
     private:
+        ShaderUniform<int> m_HdrBuffer;
+        ShaderUniform<int> m_LumBuffer;
         ShaderUniform<int> m_Tonemap;
         ShaderUniform<float> m_Gamma;
-        ShaderUniform<float> m_AvgLum;
         ShaderUniform<float> m_WhitePoint;
     };
 
@@ -300,7 +298,6 @@ private:
     std::vector<ClientEntity *> m_TransEntityList;
     std::vector<size_t> m_SortBuffer;
     unsigned m_uVisibleEntCount = 0;
-    float m_flAvgLum = 0;
 
     // Screen-wide quad
     GLVao m_nQuadVao;

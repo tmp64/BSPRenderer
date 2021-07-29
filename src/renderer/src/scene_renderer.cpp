@@ -174,22 +174,24 @@ SceneRenderer::PostProcessShader::PostProcessShader() {
     setVert("assets:shaders/scene/post_processing.vert");
     setFrag("assets:shaders/scene/post_processing.frag");
 
+    addUniform(m_HdrBuffer, "uHdrBuffer");
+    addUniform(m_LumBuffer, "uLumBuffer");
     addUniform(m_Tonemap, "uTonemap");
     addUniform(m_Gamma, "uGamma");
-    addUniform(m_AvgLum, "uAvgLum");
     addUniform(m_WhitePoint, "uWhitePoint");
 }
 
-void SceneRenderer::PostProcessShader::setupUniforms(SceneRenderer &scene) {
+void SceneRenderer::PostProcessShader::setupUniforms() {
     if (r_lighting.getValue() == 2) {
         // No tonemapping for BSP lightmaps
         m_Tonemap.set(0);
     } else {
         m_Tonemap.set(r_tonemap.getValue());
-        m_AvgLum.set(scene.m_flAvgLum);
         m_WhitePoint.set(r_whitepoint.getValue());
     }
 
+    m_HdrBuffer.set(0);
+    m_LumBuffer.set(1);
     m_Gamma.set(r_gamma.getValue());
 }
 
@@ -446,8 +448,6 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         ImGui::Text("    Trans: %lu", m_TransEntityList.size());
         ImGui::Separator();
 
-        ImGui::Text("Luminance: %.3f", m_Stats.flAvgLum);
-
         CvarCheckbox("World", r_drawworld);
         ImGui::SameLine();
         CvarCheckbox("Sky", r_drawsky);
@@ -544,7 +544,7 @@ void SceneRenderer::recreateFramebuffer() {
     glBindTexture(GL_TEXTURE_2D, m_nLumColorBuffer);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, m_vViewportSize.x, m_vViewportSize.y, 0, GL_RED,
                  GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // Attach buffers
@@ -1715,26 +1715,6 @@ void SceneRenderer::calculateAvgLum() {
         appfw::Prof prof("Mip-maps");
         glGenerateMipmap(GL_TEXTURE_2D);
     }
-
-    {
-        appfw::Prof prof("Texture read");
-        int numLevels =
-            1 + (int)floor(log2((double)std::max(m_vViewportSize.x, m_vViewportSize.y)));
-        int lastLevel = numLevels - 1;
-
-        int wide = 0, tall = 0;
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, lastLevel, GL_TEXTURE_WIDTH, &wide);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, lastLevel, GL_TEXTURE_HEIGHT, &tall);
-
-        AFW_ASSERT_REL(wide == 1);
-        AFW_ASSERT_REL(tall == 1);
-
-        float l = 0;
-        glGetTexImage(GL_TEXTURE_2D, lastLevel, GL_RED, GL_FLOAT, &l);
-        l = std::exp(l);
-        m_Stats.flAvgLum = l;
-        m_flAvgLum = l;
-    }
 }
 
 void SceneRenderer::doPostProcessing() {
@@ -1743,7 +1723,10 @@ void SceneRenderer::doPostProcessing() {
     m_sPostProcessShader.enable();
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
-    m_sPostProcessShader.setupUniforms(*this);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_nLumColorBuffer);
+    m_sPostProcessShader.setupUniforms();
 
     glBindVertexArray(m_nQuadVao);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
