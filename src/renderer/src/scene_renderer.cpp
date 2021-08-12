@@ -6,6 +6,7 @@
 #include <renderer/scene_renderer.h>
 #include <imgui.h>
 #include <gui_app/imgui_controls.h>
+#include "scene_shaders.h"
 
 ConVar<int> r_cull("r_cull", 1,
                    "Backface culling:\n"
@@ -41,127 +42,6 @@ static const char *r_lighting_values[] = {
 };
 
 static inline bool isVectorNull(const glm::vec3 &v) { return v.x == 0.f && v.y == 0.f && v.z == 0.f; }
-
-//----------------------------------------------------------------
-// WorldShader
-//----------------------------------------------------------------
-SceneRenderer::WorldShader::WorldShader() {
-    setTitle("SceneRenderer_WorldShader");
-    setVert("assets:shaders/scene/world.vert");
-    setFrag("assets:shaders/scene/world.frag");
-
-    addUniform(m_ViewMat, "uViewMatrix");
-    addUniform(m_ProjMat, "uProjMatrix");
-    addUniform(m_Color, "uColor");
-    addUniform(m_LightingType, "uLightingType");
-    addUniform(m_TextureType, "uTextureType");
-    addUniform(m_Texture, "uTexture");
-    addUniform(m_LMTexture, "uLMTexture");
-    addUniform(m_TexGamma, "uTexGamma");
-}
-
-void SceneRenderer::WorldShader::setupUniforms(SceneRenderer &scene) {
-    m_ProjMat.set(scene.m_Data.viewContext.getProjectionMatrix());
-    m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
-    m_LightingType.set(r_lighting.getValue());
-    m_TextureType.set(r_texture.getValue());
-    m_Texture.set(0);
-    m_LMTexture.set(1);
-    m_TexGamma.set(r_texgamma.getValue());
-}
-
-void SceneRenderer::WorldShader::setColor(const glm::vec3 &c) { m_Color.set(c); }
-
-//----------------------------------------------------------------
-// SkyBoxShader
-//----------------------------------------------------------------
-SceneRenderer::SkyBoxShader::SkyBoxShader() {
-    setTitle("SceneRenderer_WorldShader");
-    setVert("assets:shaders/scene/skybox.vert");
-    setFrag("assets:shaders/scene/skybox.frag");
-
-    addUniform(m_ViewMat, "uViewMatrix");
-    addUniform(m_ProjMat, "uProjMatrix");
-    addUniform(m_Texture, "uTexture");
-    addUniform(m_TexGamma, "uTexGamma");
-    addUniform(m_ViewOrigin, "uViewOrigin");
-}
-
-void SceneRenderer::SkyBoxShader::setupUniforms(SceneRenderer &scene) {
-    m_ProjMat.set(scene.m_Data.viewContext.getProjectionMatrix());
-    m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
-    m_Texture.set(0);
-    m_TexGamma.set(r_texgamma.getValue());
-    m_ViewOrigin.set(scene.m_Data.viewContext.getViewOrigin());
-}
-
-//----------------------------------------------------------------
-// BrushEntityShader
-//----------------------------------------------------------------
-SceneRenderer::BrushEntityShader::BrushEntityShader() {
-    setTitle("SceneRenderer_BrushEntityShader");
-    setVert("assets:shaders/scene/brush_entity.vert");
-    setFrag("assets:shaders/scene/brush_entity.frag");
-
-    addUniform(m_ModelMat, "uModelMatrix");
-    addUniform(m_ViewMat, "uViewMatrix");
-    addUniform(m_ProjMat, "uProjMatrix");
-    addUniform(m_Color, "uColor");
-    addUniform(m_LightingType, "uLightingType");
-    addUniform(m_TextureType, "uTextureType");
-    addUniform(m_Texture, "uTexture");
-    addUniform(m_LMTexture, "uLMTexture");
-    addUniform(m_TexGamma, "uTexGamma");
-    addUniform(m_RenderMode, "uRenderMode");
-    addUniform(m_FxAmount, "uFxAmount");
-    addUniform(m_FxColor, "uFxColor");
-}
-
-void SceneRenderer::BrushEntityShader::setupSceneUniforms(SceneRenderer &scene) {
-    m_ProjMat.set(scene.m_Data.viewContext.getProjectionMatrix());
-    m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
-    m_LightingType.set(r_lighting.getValue());
-    m_TextureType.set(r_texture.getValue());
-    m_Texture.set(0);
-    m_LMTexture.set(1);
-    m_TexGamma.set(r_texgamma.getValue());
-}
-
-void SceneRenderer::BrushEntityShader::setColor(const glm::vec3 &c) { m_Color.set(c); }
-
-//----------------------------------------------------------------
-// PatchesShader
-//----------------------------------------------------------------
-SceneRenderer::PatchesShader::PatchesShader() {
-    setTitle("SceneRenderer_PatchesShader");
-    setVert("assets:shaders/scene/patches.vert");
-    setFrag("assets:shaders/scene/patches.frag");
-
-    addUniform(m_ViewMat, "uViewMatrix");
-    addUniform(m_ProjMat, "uProjMatrix");
-}
-
-void SceneRenderer::PatchesShader::setupSceneUniforms(SceneRenderer &scene) {
-    m_ProjMat.set(scene.m_Data.viewContext.getProjectionMatrix());
-    m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
-}
-
-//----------------------------------------------------------------
-// PostProcessShader
-//----------------------------------------------------------------
-SceneRenderer::PostProcessShader::PostProcessShader() {
-    setTitle("SceneRenderer_PostProcessShader");
-    setVert("assets:shaders/scene/post_processing.vert");
-    setFrag("assets:shaders/scene/post_processing.frag");
-
-    addUniform(m_HdrBuffer, "uHdrBuffer");
-    addUniform(m_Gamma, "uGamma");
-}
-
-void SceneRenderer::PostProcessShader::setupUniforms() {
-    m_HdrBuffer.set(0);
-    m_Gamma.set(r_gamma.getValue());
-}
 
 //----------------------------------------------------------------
 // SceneRenderer
@@ -372,13 +252,13 @@ void SceneRenderer::renderScene(GLint targetFb) {
     // Draw patches
     if (m_Data.patchesVao.id() != 0) {
         appfw::Prof prof("Patches");
-        m_sPatchesShader.enable();
-        m_sPatchesShader.setupSceneUniforms(*this);
+        Shaders::patches.enable();
+        Shaders::patches.setupSceneUniforms(*this);
         glBindVertexArray(m_Data.patchesVao);
         glPointSize(5);
         glDrawArrays(GL_LINES, 0, m_Data.patchesVerts);
         glBindVertexArray(0);
-        m_sPatchesShader.disable();
+        Shaders::patches.disable();
     }
 
     frameEnd();
@@ -1152,8 +1032,8 @@ void SceneRenderer::drawWorldSurfaces() {
 }
 
 void SceneRenderer::drawWorldSurfacesVao() {
-    m_sWorldShader.enable();
-    m_sWorldShader.setupUniforms(*this);
+    Shaders::world.enable();
+    Shaders::world.setupUniforms(*this);
 
     auto &textureChain = m_Data.viewContext.getWorldTextureChain();
     auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
@@ -1175,7 +1055,7 @@ void SceneRenderer::drawWorldSurfacesVao() {
             Surface &surf = m_Data.surfaces[j];
 
             if (r_texture.getValue() == 1) {
-                m_sWorldShader.setColor(surf.m_Color);
+                Shaders::world.setColor(surf.m_Color);
             }
 
             glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
@@ -1185,7 +1065,7 @@ void SceneRenderer::drawWorldSurfacesVao() {
     }
 
     glBindVertexArray(0);
-    m_sWorldShader.disable();
+    Shaders::world.disable();
 
     m_Stats.uRenderedWorldPolys = drawnSurfs;
     m_Stats.uDrawCallCount += drawnSurfs;
@@ -1194,8 +1074,8 @@ void SceneRenderer::drawWorldSurfacesVao() {
 void SceneRenderer::drawWorldSurfacesIndexed() {
     AFW_ASSERT(!m_Data.surfEboData.empty());
 
-    m_sWorldShader.enable();
-    m_sWorldShader.setupUniforms(*this);
+    Shaders::world.enable();
+    Shaders::world.setupUniforms(*this);
 
     auto &textureChain = m_Data.viewContext.getWorldTextureChain();
     auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
@@ -1274,9 +1154,9 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
             eboIdx--;
 
             // Set rendering mode to color
-            m_sWorldShader.m_TextureType.set(1);
-            m_sWorldShader.m_LightingType.set(0);
-            m_sWorldShader.setColor({1.0, 1.0, 1.0});
+            Shaders::world.m_TextureType.set(1);
+            Shaders::world.m_LightingType.set(0);
+            Shaders::world.setColor({1.0, 1.0, 1.0});
 
             // Update EBO
             glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
@@ -1295,7 +1175,7 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
     glDisable(GL_PRIMITIVE_RESTART);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    m_sWorldShader.disable();
+    Shaders::world.disable();
     m_Stats.uRenderedWorldPolys = drawnSurfs;
 }
 
@@ -1305,8 +1185,8 @@ void SceneRenderer::drawSkySurfaces() {
     if (!m_Data.viewContext.getSkySurfaces().empty()) {
         glDepthFunc(GL_LEQUAL);
 
-        m_sSkyShader.enable();
-        m_sSkyShader.setupUniforms(*this);
+        Shaders::skybox.enable();
+        Shaders::skybox.setupUniforms(*this);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, m_Data.skyboxCubemap);
@@ -1317,7 +1197,7 @@ void SceneRenderer::drawSkySurfaces() {
             drawSkySurfacesVao();
         }
 
-        m_sSkyShader.disable();
+        Shaders::skybox.disable();
 
         glDepthFunc(GL_LESS);
     }
@@ -1381,9 +1261,9 @@ void SceneRenderer::drawSkySurfacesIndexed() {
 void SceneRenderer::drawSolidEntities() {
     appfw::Prof prof("Solid");
 
-    m_sBrushEntityShader.enable();
-    m_sBrushEntityShader.setupSceneUniforms(*this);
-    m_sBrushEntityShader.m_FxAmount.set(1);
+    Shaders::brushent.enable();
+    Shaders::brushent.setupSceneUniforms(*this);
+    Shaders::brushent.m_FxAmount.set(1);
 
     // Sort opaque entities
     auto sortFn = [this](ClientEntity *const &lhs, ClientEntity *const &rhs) {
@@ -1418,8 +1298,8 @@ void SceneRenderer::drawSolidEntities() {
 void SceneRenderer::drawTransEntities() {
     appfw::Prof prof("Trans");
 
-    m_sBrushEntityShader.enable();
-    m_sBrushEntityShader.setupSceneUniforms(*this);
+    Shaders::brushent.enable();
+    Shaders::brushent.setupSceneUniforms(*this);
 
     if (!r_nosort.getValue()) {
         // Sort entities based on render mode and distance
@@ -1469,7 +1349,7 @@ void SceneRenderer::drawTransEntities() {
 }
 
 void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
-    m_sBrushEntityShader.enable();
+    Shaders::brushent.enable();
 
     Model *model = clent->getModel();
 
@@ -1495,12 +1375,12 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
     modelMat = glm::translate(modelMat, clent->getOrigin());
-    m_sBrushEntityShader.m_ModelMat.set(modelMat);
+    Shaders::brushent.m_ModelMat.set(modelMat);
 
     // Render mode
     AFW_ASSERT(clent->getRenderMode() == kRenderNormal || clent->getRenderMode() == kRenderTransAlpha);
     setRenderMode(clent->getRenderMode());
-    m_sBrushEntityShader.m_RenderMode.set(clent->getRenderMode());
+    Shaders::brushent.m_RenderMode.set(clent->getRenderMode());
 
     // Draw surfaces
     auto &surfs = m_Data.optBrushModels[model->getOptModelIdx()].surfs;
@@ -1515,7 +1395,7 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
 
         if (r_texture.getValue() == 1) {
             // Set color
-            m_sWorldShader.setColor(surf.m_Color);
+            Shaders::brushent.setColor(surf.m_Color);
         } else if (r_texture.getValue() == 2) {
             // Bind material
             if (lastMat != surf.m_nMatIdx) {
@@ -1533,7 +1413,7 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
 }
 
 void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
-    m_sBrushEntityShader.enable();
+    Shaders::brushent.enable();
 
     Model *model = clent->getModel();
 
@@ -1559,17 +1439,17 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
     modelMat = glm::translate(modelMat, clent->getOrigin());
-    m_sBrushEntityShader.m_ModelMat.set(modelMat);
+    Shaders::brushent.m_ModelMat.set(modelMat);
 
     // Render mode
     if (!r_notrans.getValue()) {
         setRenderMode(clent->getRenderMode());
-        m_sBrushEntityShader.m_RenderMode.set(clent->getRenderMode());
-        m_sBrushEntityShader.m_FxAmount.set(clent->getFxAmount() / 255.f);
-        m_sBrushEntityShader.m_FxColor.set(glm::vec3(clent->getFxColor()) / 255.f);
+        Shaders::brushent.m_RenderMode.set(clent->getRenderMode());
+        Shaders::brushent.m_FxAmount.set(clent->getFxAmount() / 255.f);
+        Shaders::brushent.m_FxColor.set(glm::vec3(clent->getFxColor()) / 255.f);
     } else {
         setRenderMode(kRenderNormal);
-        m_sBrushEntityShader.m_RenderMode.set(kRenderNormal);
+        Shaders::brushent.m_RenderMode.set(kRenderNormal);
     }
 
     bool needSort = false;
@@ -1628,7 +1508,7 @@ void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
     mat.bindTextures();
 
     if (r_texture.getValue() == 1) {
-        m_sWorldShader.setColor(surf.m_Color);
+        Shaders::brushent.setColor(surf.m_Color);
     }
 
     glBindVertexArray(m_Data.surfVao);
@@ -1640,17 +1520,17 @@ void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
 void SceneRenderer::doPostProcessing() {
     appfw::Prof prof("Post-Processing");
 
-    m_sPostProcessShader.enable();
+    Shaders::postprocess.enable();
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
 
-    m_sPostProcessShader.setupUniforms();
+    Shaders::postprocess.setupUniforms();
 
     glBindVertexArray(m_nQuadVao);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
 
-    m_sPostProcessShader.disable();
+    Shaders::postprocess.disable();
 }
 
 void SceneRenderer::setRenderMode(RenderMode mode) {

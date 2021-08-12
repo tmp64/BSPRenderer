@@ -124,69 +124,12 @@ private:
     static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
     static constexpr int MAX_TRANS_SURFS_PER_MODEL = 512; //!< Maximum number of surfaces per transparent model
 
-    class WorldShader : public BaseShader {
-    public:
-        WorldShader();
-        void setupUniforms(SceneRenderer &scene);
-        void setColor(const glm::vec3 &c);
-
-        ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
-        ShaderUniform<glm::vec3> m_Color;
-        ShaderUniform<int> m_LightingType;
-        ShaderUniform<int> m_TextureType;
-        ShaderUniform<int> m_Texture;
-        ShaderUniform<int> m_LMTexture;
-        ShaderUniform<float> m_TexGamma;
-    };
-
-    class SkyBoxShader : public BaseShader {
-    public:
-        SkyBoxShader();
-        void setupUniforms(SceneRenderer &scene);
-
-    private:
-        ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
-        ShaderUniform<int> m_Texture;
-        ShaderUniform<float> m_TexGamma;
-        ShaderUniform<glm::vec3> m_ViewOrigin;
-    };
-
-    class BrushEntityShader : public BaseShader {
-    public:
-        BrushEntityShader();
-        void setupSceneUniforms(SceneRenderer &scene);
-        void setColor(const glm::vec3 &c);
-
-        ShaderUniform<glm::mat4> m_ModelMat, m_ViewMat, m_ProjMat;
-        ShaderUniform<glm::vec3> m_Color;
-        ShaderUniform<int> m_LightingType;
-        ShaderUniform<int> m_TextureType;
-        ShaderUniform<int> m_Texture;
-        ShaderUniform<int> m_LMTexture;
-        ShaderUniform<float> m_TexGamma;
-        ShaderUniform<int> m_RenderMode;
-        ShaderUniform<float> m_FxAmount;
-        ShaderUniform<glm::vec3> m_FxColor;
-    };
-
-    class PatchesShader : public BaseShader {
-    public:
-        PatchesShader();
-        void setupSceneUniforms(SceneRenderer &scene);
-        void setColor(const glm::vec3 &c);
-
-        ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
-    };
-
-    class PostProcessShader : public BaseShader {
-    public:
-        PostProcessShader();
-        void setupUniforms();
-
-    private:
-        ShaderUniform<int> m_HdrBuffer;
-        ShaderUniform<float> m_Gamma;
-    };
+    class WorldShader;
+    class SkyBoxShader;
+    class BrushEntityShader;
+    class PatchesShader;
+    class PostProcessShader;
+    struct Shaders;
 
     struct SurfaceVertex {
         glm::vec3 position;
@@ -410,12 +353,6 @@ private:
      * Sets up render mode.
      */
     void setRenderMode(RenderMode mode);
-
-    static inline WorldShader m_sWorldShader;
-    static inline SkyBoxShader m_sSkyShader;
-    static inline BrushEntityShader m_sBrushEntityShader;
-    static inline PatchesShader m_sPatchesShader;
-    static inline PostProcessShader m_sPostProcessShader;
 };
 
 #endif

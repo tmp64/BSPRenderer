@@ -16,6 +16,7 @@ set(RNDR_PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_shader.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/material_manager.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_renderer.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_shaders.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/shader_definitions.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/shader_manager.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/surface_renderer.cpp
