@@ -10,9 +10,7 @@
 
 class SceneRenderer : appfw::NoCopy {
 public:
-    /**
-     * Called during rendering to update the entity list.
-     */
+    //! Called during rendering to update the entity list.
     using EntListCallback = std::function<void()>;
 
     SceneRenderer();
@@ -35,86 +33,58 @@ public:
         double flFrameTime = 0;
     };
 
-    /**
-     * Returns level set to the renderer.
-     */
+    //! Returns level set to the renderer.
     inline const bsp::Level *getLevel() { return m_pLevel; }
 
-    /**
-     * Begins async level loading.
-     * @param   level   Loaded bsp::Level
-     * @param   path    Path to the .bsp file to load lightmap from (can be empty)
-     * @param   tag     Tag of .bsp
-     */
+    //! Begins async level loading.
+    //! @param   level   Loaded bsp::Level
+    //! @param   path    Path to the .bsp file to load lightmap from (can be empty)
+    //! @param   tag     Tag of .bsp
     void beginLoading(const bsp::Level *level, std::string_view path);
 
-    /**
-     * Creates an optimized model for a brush model for more effficient solid rendering.
-     */
+    //! Creates an optimized model for a brush model for more effficient solid rendering.
     void optimizeBrushModel(Model *model);
 
-    /**
-     * Unloads the level.
-     */
+    //! Unloads the level.
     void unloadLevel();
 
-    /**
-     * Returns whether the level is loading.
-     */
+    //! Returns whether the level is loading.
     bool isLoading() { return m_pLoadingState != nullptr; }
 
-    /**
-     * Should be called during loading from main thread.
-     * @return  Whether loading has finished or not
-     */
+    //! Should be called during loading from main thread.
+    //! @return  Whether loading has finished or not
     bool loadingTick();
 
-    /**
-     * Sets perspective projection.
-     * @param   fov     Horizontal field of view
-     * @param   aspect  Aspect ration of the screen (wide / tall)
-     * @param   near    Near clipping plane
-     * @param   far     Far clipping plane
-     */
+    //! Sets perspective projection.
+    //! @param   fov     Horizontal field of view
+    //! @param   aspect  Aspect ration of the screen (wide / tall)
+    //! @param   near    Near clipping plane
+    //! @param   far     Far clipping plane
     void setPerspective(float fov, float aspect, float near, float far);
 
-    /**
-     * Sets position and angles of the perspective view.
-     * @param   origin  Origin of view
-     * @param   angles  Pitch, yaw and roll in degrees
-     */
+    //! Sets position and angles of the perspective view.
+    //! @param   origin  Origin of view
+    //! @param   angles  Pitch, yaw and roll in degrees
     void setPerspViewOrigin(const glm::vec3 &origin, const glm::vec3 &angles);
 
-    /**
-     * Sets size of the viewport.
-     */
+    //! Sets size of the viewport.
     void setViewportSize(const glm::ivec2 &size);
 
-    /**
-     * Sets the entitiy list callback.
-     */
+    //! Sets the entitiy list callback.
     inline void setEntListCallback(const EntListCallback &fn) { m_pfnEntListCb = fn; }
 
-    /**
-     * Renders the image to the screen.
-     */
+    //! Renders the image to the screen.
     void renderScene(GLint targetFb);
 
-    /**
-     * Returns performance stats for last renderScene call.
-     */
+    //! Returns performance stats for last renderScene call.
     inline const RenderingStats &getStats() const { return m_Stats; }
 
-    /**
-     * Shows ImGui dialog with debug info.
-     */
+    //! Shows ImGui dialog with debug info.
     void showDebugDialog(const char *title, bool *isVisible = nullptr);
 
-    /**
-     * During EntListCallback:
-     * Adds an entity into rendering list.
-     * @returns true if entity was added, false if limit reached
-     */
+    //! During EntListCallback:
+    //! Adds an entity into rendering list.
+    //! @returns true if entity was added, false if limit reached
     bool addEntity(ClientEntity *pClent);
 
 private:
@@ -263,95 +233,59 @@ private:
     std::vector<uint8_t> rotateImage90CW(uint8_t *data, int wide, int tall);
     std::vector<uint8_t> rotateImage90CCW(uint8_t *data, int wide, int tall);
 
-    /**
-     * Pre-rendering stuff
-     */
+    //! Pre-rendering stuff
     void frameSetup();
 
-    /**
-     * Post-rendering stuff.
-     * Disables stuff enabled in frameSetup.
-     */
+    //! Post-rendering stuff.
+    //! Disables stuff enabled in frameSetup.
     void frameEnd();
 
-    /**
-     * Binds and clears HDB framebuffer
-     */
+    //! Binds and clears HDB framebuffer
     void prepareHdrFramebuffer();
 
-    /**
-     * Sets view constext settings.
-     */
+    //! Sets view constext settings.
     void setupViewContext();
 
-    /**
-     * Binds lightmap block texture
-     */
+    //! Binds lightmap block texture
     void bindLightmapBlock();
 
-    /**
-     * Draws solid BSP faces.
-     */
+    //! Draws solid BSP faces.
     void drawWorldSurfaces();
 
-    /**
-     * Draws solid BSP faces.
-     */
+    //! Draws solid BSP faces.
     void drawWorldSurfacesVao();
 
-    /**
-     * Draws solid BSP faces using indexed rendering.
-     */
+    //! Draws solid BSP faces using indexed rendering.
     void drawWorldSurfacesIndexed();
 
-    /**
-     * Draws BSP faces with SKY texture.
-     */
+    //! Draws BSP faces with SKY texture.
     void drawSkySurfaces();
 
-    /**
-     * Draws BSP faces with SKY texture using VAOs.
-     */
+    //! Draws BSP faces with SKY texture using VAOs.
     void drawSkySurfacesVao();
 
-    /**
-     * Draws BSP faces with SKY texture using EBO.
-     */
+    //! Draws BSP faces with SKY texture using EBO.
     void drawSkySurfacesIndexed();
 
-    /**
-     * Draws solid entities
-     */
+    //! Draws solid entities
     void drawSolidEntities();
 
-    /**
-     * Draws transparent entities
-     */
+    //! Draws transparent entities
     void drawTransEntities();
 
-    /**
-     * Draws a solid brush entity
-     */
+    //! Draws a solid brush entity
     void drawSolidBrushEntity(ClientEntity *pClent);
 
-    /**
-     * Draws a (maybe transparent) brush entity
-     */
+    //! Draws a (maybe transparent) brush entity
     void drawBrushEntity(ClientEntity *pClent);
 
-    /**
-     * Draws a brush entity surface.
-     */
+    //! Draws a brush entity surface.
     void drawBrushEntitySurface(Surface &surf);
 
-    /**
-     * Post-processes HDB framebuffer (tonemapping, gamma correction) and draws it into active framebuffer.
-     */
+    //! Post-processes HDB framebuffer (tonemapping, gamma correction) and draws it into active framebuffer.
     void doPostProcessing();
 
-    /**
-     * Sets up render mode.
-     */
+    //! Sets up render mode.
     void setRenderMode(RenderMode mode);
 };
 
