@@ -76,6 +76,12 @@ void BaseShader::addUniform(UniformBase &uniform, const char *name) {
     m_UniformList.push_back(&uniform);
 }
 
+void BaseShader::addUniform(UniformBlock &uniform, const char *name, GLuint bindingPoint) {
+    uniform.m_pszUniformName = name;
+    uniform.m_nBindingPoint = bindingPoint;
+    m_UniformBlockList.push_back(&uniform);
+}
+
 void BaseShader::createProgram() {
     AFW_ASSERT(!m_nProgId);
     m_nProgId = glCreateProgram();
@@ -223,11 +229,17 @@ bool BaseShader::linkProgram() {
     m_nFragShaderId = 0;
 
     // Load uniforms
+    bool success = true;
+
     for (UniformBase *i : m_UniformList) {
         loadUniformLocation(*i);
     }
 
-    return true;
+    for (UniformBlock *i : m_UniformBlockList) {
+        success = success && loadUniformBlockIndex(*i);
+    }
+
+    return success;
 }
 
 void BaseShader::loadUniformLocation(UniformBase &uniform) {
@@ -237,6 +249,18 @@ void BaseShader::loadUniformLocation(UniformBase &uniform) {
         printw("{}: uniform {} not found (may have been optimized out)", getTitle(),
                uniform.m_pszUniformName);
     }
+}
+
+bool BaseShader::loadUniformBlockIndex(UniformBlock &uniform) {
+    uniform.m_nIndex = glGetUniformBlockIndex(m_nProgId, uniform.m_pszUniformName);
+
+    if (uniform.m_nIndex == GL_INVALID_INDEX) {
+        printe("{}: uniform block {} not found", getTitle(), uniform.m_pszUniformName);
+        return false;
+    }
+
+    glUniformBlockBinding(m_nProgId, uniform.m_nIndex, uniform.m_nBindingPoint);
+    return true;
 }
 
 std::forward_list<BaseShader *> &BaseShader::getUnregItems() {

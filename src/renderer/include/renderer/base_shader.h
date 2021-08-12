@@ -17,7 +17,18 @@ public:
     class UniformBase : appfw::NoCopy {
     protected:
         const char *m_pszUniformName;
-        GLuint m_nLocation = 0;
+        GLint m_nLocation = 0;
+
+        friend class BaseShader;
+    };
+
+    class UniformBlock : appfw::NoCopy {
+    public:
+
+    private:
+        const char *m_pszUniformName;
+        GLuint m_nIndex = 0;
+        GLuint m_nBindingPoint = 0;
 
         friend class BaseShader;
     };
@@ -59,6 +70,10 @@ protected:
     //! @param  name    Name of the uniform, must be a constant string
     void addUniform(UniformBase &uniform, const char *name);
 
+    //! Adds a uniform block to the list.
+    //! @param  name    Name of the uniform, must be a constant string
+    void addUniform(UniformBlock &uniform, const char *name, GLuint bindingPoint);
+
     //! Returns the list of shader definitions applied to all shaders
     inline ShaderDefinitions &getDefinitions() { return m_Defs; }
 
@@ -81,6 +96,7 @@ private:
     bool m_bIsReady = false;
 
     std::vector<BaseShader::UniformBase *> m_UniformList;
+    std::vector<BaseShader::UniformBlock *> m_UniformBlockList;
     ShaderDefinitions m_Defs;
     ShaderDefinitions m_VertDefs;
     ShaderDefinitions m_FragDefs;
@@ -102,6 +118,9 @@ private:
 
     //! Saves the location of the uniform from the shader program.
     void loadUniformLocation(UniformBase &uniform);
+
+    //! Saves the index of the block from the shader program.
+    bool loadUniformBlockIndex(UniformBlock &uniform);
 
     static std::forward_list<BaseShader *> &getUnregItems();
 
