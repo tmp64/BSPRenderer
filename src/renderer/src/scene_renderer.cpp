@@ -1098,9 +1098,6 @@ void SceneRenderer::drawWorldSurfacesVao() {
 void SceneRenderer::drawWorldSurfacesIndexed() {
     AFW_ASSERT(!m_Data.surfEboData.empty());
 
-    Shaders::world.enable();
-    Shaders::world.setupUniforms();
-
     auto &textureChain = m_Data.viewContext.getWorldTextureChain();
     auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
     unsigned frame = m_Data.viewContext.getWorldTextureChainFrame();
@@ -1111,6 +1108,9 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.surfEbo);
     glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
     glEnable(GL_PRIMITIVE_RESTART);
+
+    Shaders::world.enable();
+    Shaders::world.setupUniforms();
 
     for (size_t i = 0; i < textureChain.size(); i++) {
         if (textureChainFrames[i] != frame) {
@@ -1150,6 +1150,8 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
         m_Stats.uDrawCallCount++;
     }
 
+    Shaders::world.disable();
+
     if (r_wireframe.getValue()) {
         unsigned eboIdx = 0;
 
@@ -1177,11 +1179,10 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
             // Decrement EBO size to remove last PRIMITIVE_RESTART_IDX
             eboIdx--;
 
-            // Set rendering mode to color
-            // TODO
-            //Shaders::world.m_TextureType.set(1);
-            //Shaders::world.m_LightingType.set(0);
-            Shaders::world.setColor({1.0, 1.0, 1.0});
+            Shaders::brushent.enable();
+            Shaders::brushent.m_uRenderMode.set(kRenderTransColor);
+            Shaders::brushent.m_uFxAmount.set(1.0);
+            Shaders::brushent.m_uFxColor.set({1.0, 1.0, 1.0});
 
             // Update EBO
             glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
@@ -1194,13 +1195,14 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             glDisable(GL_POLYGON_OFFSET_LINE);
             m_Stats.uDrawCallCount++;
+
+            Shaders::brushent.disable();
         }
     }
 
     glDisable(GL_PRIMITIVE_RESTART);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    Shaders::world.disable();
     m_Stats.uRenderedWorldPolys = drawnSurfs;
 }
 
