@@ -148,7 +148,6 @@ private:
         ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
         ShaderUniform<int> m_Texture;
         ShaderUniform<float> m_TexGamma;
-        ShaderUniform<float> m_Brightness;
         ShaderUniform<glm::vec3> m_ViewOrigin;
     };
 
@@ -179,11 +178,6 @@ private:
         ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
     };
 
-    class LuminanceShader : public BaseShader {
-    public:
-        LuminanceShader();
-    };
-
     class PostProcessShader : public BaseShader {
     public:
         PostProcessShader();
@@ -191,10 +185,7 @@ private:
 
     private:
         ShaderUniform<int> m_HdrBuffer;
-        ShaderUniform<int> m_LumBuffer;
-        ShaderUniform<int> m_Tonemap;
         ShaderUniform<float> m_Gamma;
-        ShaderUniform<float> m_WhitePoint;
     };
 
     struct SurfaceVertex {
@@ -311,9 +302,6 @@ private:
     GLTexture m_nColorBuffer;
     GLRenderbuffer m_nRenderBuffer;
 
-    GLTexture m_nLumColorBuffer;
-    GLFramebuffer m_nLumFramebuffer;
-
     void recreateFramebuffer();
     void destroyFramebuffer();
 
@@ -414,11 +402,6 @@ private:
     void drawBrushEntitySurface(Surface &surf);
 
     /**
-     * Calculates average luminance from mipmap of the HDR framebuffer.
-     */
-    void calculateAvgLum();
-
-    /**
      * Post-processes HDB framebuffer (tonemapping, gamma correction) and draws it into active framebuffer.
      */
     void doPostProcessing();
@@ -432,7 +415,6 @@ private:
     static inline SkyBoxShader m_sSkyShader;
     static inline BrushEntityShader m_sBrushEntityShader;
     static inline PatchesShader m_sPatchesShader;
-    static inline LuminanceShader m_sLuminanceShader;
     static inline PostProcessShader m_sPostProcessShader;
 };
 

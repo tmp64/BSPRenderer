@@ -13,7 +13,6 @@ out vec4 outColor;
 // Uniforms
 uniform samplerCube uTexture;
 uniform float uTexGamma;
-uniform float uBrightness;
 
 void main(void) {
 	// Sample the cubemap
@@ -23,5 +22,5 @@ void main(void) {
 	skyColor.rgb = pow(skyColor.rgb, vec3(uTexGamma));
 
 	// Final color
-	outColor = vec4(skyColor * uBrightness, 1.0);
+	outColor = vec4(skyColor, 1.0);
 }

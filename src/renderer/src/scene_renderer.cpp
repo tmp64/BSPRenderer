@@ -27,10 +27,6 @@ ConVar<int> r_texture("r_texture", 2,
                       "Which texture should be used:\n  0 - white color, 1 - random color, 2 - texture");
 ConVar<int> r_lighting("r_lighting", 3,
                        "Lighting method:\n  0 - fullbright, 1 - shaded, 2 - BSP lightmaps, 3 - custom lightmaps");
-ConVar<int> r_tonemap("r_tonemap", 2, "HDR tonemapping method:\n  0 - none (clamp to 1), 1 - Reinhard white point, 2 - ACES");
-ConVar<float> r_skybright("r_skybright", 1.1f, "Sky brightness");
-ConVar<float> r_whitepoint("r_whitepoint", 1.5f, "White point for Reinhard curve");
-ConVar<float> r_skybright_ldr("r_skybright", 1.f, "Sky brightness for LDR (BSP lightmpas)");
 ConVar<bool> r_ebo("r_ebo", true, "Use indexed rendering");
 ConVar<bool> r_wireframe("r_wireframe", false, "Draw wireframes");
 ConVar<bool> r_nosort("r_nosort", false, "Disable transparent entity sorting");
@@ -88,7 +84,6 @@ SceneRenderer::SkyBoxShader::SkyBoxShader() {
     addUniform(m_ProjMat, "uProjMatrix");
     addUniform(m_Texture, "uTexture");
     addUniform(m_TexGamma, "uTexGamma");
-    addUniform(m_Brightness, "uBrightness");
     addUniform(m_ViewOrigin, "uViewOrigin");
 }
 
@@ -98,12 +93,6 @@ void SceneRenderer::SkyBoxShader::setupUniforms(SceneRenderer &scene) {
     m_Texture.set(0);
     m_TexGamma.set(r_texgamma.getValue());
     m_ViewOrigin.set(scene.m_Data.viewContext.getViewOrigin());
-
-    if (r_lighting.getValue() == 2) {
-        m_Brightness.set(r_skybright_ldr.getValue());
-    } else {
-        m_Brightness.set(r_skybright.getValue());
-    }
 }
 
 //----------------------------------------------------------------
@@ -158,15 +147,6 @@ void SceneRenderer::PatchesShader::setupSceneUniforms(SceneRenderer &scene) {
 }
 
 //----------------------------------------------------------------
-// LuminanceShader
-//----------------------------------------------------------------
-SceneRenderer::LuminanceShader::LuminanceShader() {
-    setTitle("SceneRenderer_LuminanceShader");
-    setVert("assets:shaders/scene/luminance.vert");
-    setFrag("assets:shaders/scene/luminance.frag");
-}
-
-//----------------------------------------------------------------
 // PostProcessShader
 //----------------------------------------------------------------
 SceneRenderer::PostProcessShader::PostProcessShader() {
@@ -175,23 +155,11 @@ SceneRenderer::PostProcessShader::PostProcessShader() {
     setFrag("assets:shaders/scene/post_processing.frag");
 
     addUniform(m_HdrBuffer, "uHdrBuffer");
-    addUniform(m_LumBuffer, "uLumBuffer");
-    addUniform(m_Tonemap, "uTonemap");
     addUniform(m_Gamma, "uGamma");
-    addUniform(m_WhitePoint, "uWhitePoint");
 }
 
 void SceneRenderer::PostProcessShader::setupUniforms() {
-    if (r_lighting.getValue() == 2) {
-        // No tonemapping for BSP lightmaps
-        m_Tonemap.set(0);
-    } else {
-        m_Tonemap.set(r_tonemap.getValue());
-        m_WhitePoint.set(r_whitepoint.getValue());
-    }
-
     m_HdrBuffer.set(0);
-    m_LumBuffer.set(1);
     m_Gamma.set(r_gamma.getValue());
 }
 
@@ -415,8 +383,6 @@ void SceneRenderer::renderScene(GLint targetFb) {
 
     frameEnd();
 
-    calculateAvgLum();
-
     glBindFramebuffer(GL_FRAMEBUFFER, targetFb);
     doPostProcessing();
 
@@ -469,8 +435,6 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
             }
             ImGui::EndCombo();
         }
-
-        CvarSlider("White point", r_whitepoint, 1, 10);
 
         ImGui::End();
     }
@@ -538,33 +502,12 @@ void SceneRenderer::recreateFramebuffer() {
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         throw std::runtime_error("SceneRenderer::recreateFramebuffer(): HDR framebuffer not complete");
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // Create FP color buffer
-    m_nLumColorBuffer.create();
-    glBindTexture(GL_TEXTURE_2D, m_nLumColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, m_vViewportSize.x, m_vViewportSize.y, 0, GL_RED,
-                 GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // Attach buffers
-    m_nLumFramebuffer.create();
-    glBindFramebuffer(GL_FRAMEBUFFER, m_nLumFramebuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_nLumColorBuffer,
-                           0);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        throw std::runtime_error(
-            "SceneRenderer::recreateFramebuffer(): Luminance framebuffer not complete");
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void SceneRenderer::destroyFramebuffer() {
     m_nHdrFramebuffer.destroy();
     m_nColorBuffer.destroy();
     m_nRenderBuffer.destroy();
-
-    m_nLumFramebuffer.destroy();
-    m_nLumColorBuffer.destroy();
 }
 
 void SceneRenderer::asyncCreateSurfaces() {
@@ -1694,29 +1637,6 @@ void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
     m_Stats.uRenderedBrushEntPolys++;
 }
 
-void SceneRenderer::calculateAvgLum() {
-    appfw::Prof mainprof("Average luminance");
-
-    {
-        appfw::Prof prof("Render pass");
-        m_sLuminanceShader.enable();
-        glBindFramebuffer(GL_FRAMEBUFFER, m_nLumFramebuffer);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
-        glBindVertexArray(m_nQuadVao);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glBindVertexArray(0);
-        m_sLuminanceShader.disable();
-    }
-
-    glBindTexture(GL_TEXTURE_2D, m_nLumColorBuffer);
-
-    {
-        appfw::Prof prof("Mip-maps");
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-}
-
 void SceneRenderer::doPostProcessing() {
     appfw::Prof prof("Post-Processing");
 
@@ -1724,8 +1644,6 @@ void SceneRenderer::doPostProcessing() {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
 
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_nLumColorBuffer);
     m_sPostProcessShader.setupUniforms();
 
     glBindVertexArray(m_nQuadVao);
