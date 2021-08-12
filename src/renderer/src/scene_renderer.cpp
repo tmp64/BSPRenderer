@@ -48,6 +48,7 @@ static inline bool isVectorNull(const glm::vec3 &v) { return v.x == 0.f && v.y =
 //----------------------------------------------------------------
 SceneRenderer::SceneRenderer() {
     createScreenQuad();
+    createGlobalUniform();
 
     m_SolidEntityList.reserve(MAX_VISIBLE_ENTS);
     m_SortBuffer.reserve(MAX_TRANS_SURFS_PER_MODEL);
@@ -211,7 +212,7 @@ void SceneRenderer::setViewportSize(const glm::ivec2 &size) {
     m_bNeedRefreshFB = true;
 }
 
-void SceneRenderer::renderScene(GLint targetFb) {
+void SceneRenderer::renderScene(GLint targetFb, float flSimTime, float flTimeDelta) {
     appfw::Timer frameTimer;
     frameTimer.start();
 
@@ -228,7 +229,7 @@ void SceneRenderer::renderScene(GLint targetFb) {
         printw("Lighting type set to shaded since custom lightmaps are not loaded");
     }
 
-    frameSetup();
+    frameSetup(flSimTime, flTimeDelta);
 
     if (r_drawents.getValue()) {
         appfw::Prof prof("Entity list");
@@ -357,6 +358,14 @@ void SceneRenderer::createScreenQuad() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
+    glBindVertexArray(0);
+}
+
+void SceneRenderer::createGlobalUniform() {
+    m_nGlobalUniform.create();
+    glBindBuffer(GL_UNIFORM_BUFFER, m_nGlobalUniform);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(GlobalUniform), nullptr, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
 void SceneRenderer::recreateFramebuffer() {
@@ -943,7 +952,7 @@ std::vector<uint8_t> SceneRenderer::rotateImage90CCW(uint8_t *data, int wide, in
     return newData;
 }
 
-void SceneRenderer::frameSetup() {
+void SceneRenderer::frameSetup(float flSimTime, float flTimeDelta) {
     appfw::Prof prof("Frame Setup");
 
     prepareHdrFramebuffer();
@@ -967,6 +976,21 @@ void SceneRenderer::frameSetup() {
 
     // Seamless cubemap filtering
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+    // Fill global uniform object
+    m_GlobalUniform.mMainProj = m_Data.viewContext.getProjectionMatrix();
+    m_GlobalUniform.mMainView = m_Data.viewContext.getViewMatrix();
+    m_GlobalUniform.vMainViewOrigin = glm::vec4(m_Data.viewContext.getViewOrigin(), 0);
+    m_GlobalUniform.vflParams1.x = r_texgamma.getValue();
+    m_GlobalUniform.vflParams1.y = r_gamma.getValue();
+    m_GlobalUniform.vflParams1.z = flSimTime;
+    m_GlobalUniform.vflParams1.w = flTimeDelta;
+    m_GlobalUniform.viParams1.x = r_texture.getValue();
+    m_GlobalUniform.viParams1.y = r_lighting.getValue();
+    
+    glBindBuffer(GL_UNIFORM_BUFFER, m_nGlobalUniform);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(m_GlobalUniform), &m_GlobalUniform);
+    glBindBufferBase(GL_UNIFORM_BUFFER, GLOBAL_UNIFORM_BIND, m_nGlobalUniform);
 
     // Bind lightmap - will be used for world and brush ents
     bindLightmapBlock();
@@ -1033,7 +1057,7 @@ void SceneRenderer::drawWorldSurfaces() {
 
 void SceneRenderer::drawWorldSurfacesVao() {
     Shaders::world.enable();
-    Shaders::world.setupUniforms(*this);
+    Shaders::world.setupUniforms();
 
     auto &textureChain = m_Data.viewContext.getWorldTextureChain();
     auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
@@ -1075,7 +1099,7 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
     AFW_ASSERT(!m_Data.surfEboData.empty());
 
     Shaders::world.enable();
-    Shaders::world.setupUniforms(*this);
+    Shaders::world.setupUniforms();
 
     auto &textureChain = m_Data.viewContext.getWorldTextureChain();
     auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
@@ -1154,8 +1178,9 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
             eboIdx--;
 
             // Set rendering mode to color
-            Shaders::world.m_TextureType.set(1);
-            Shaders::world.m_LightingType.set(0);
+            // TODO
+            //Shaders::world.m_TextureType.set(1);
+            //Shaders::world.m_LightingType.set(0);
             Shaders::world.setColor({1.0, 1.0, 1.0});
 
             // Update EBO
@@ -1186,7 +1211,7 @@ void SceneRenderer::drawSkySurfaces() {
         glDepthFunc(GL_LEQUAL);
 
         Shaders::skybox.enable();
-        Shaders::skybox.setupUniforms(*this);
+        Shaders::skybox.setupUniforms();
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, m_Data.skyboxCubemap);
@@ -1262,8 +1287,8 @@ void SceneRenderer::drawSolidEntities() {
     appfw::Prof prof("Solid");
 
     Shaders::brushent.enable();
-    Shaders::brushent.setupSceneUniforms(*this);
-    Shaders::brushent.m_FxAmount.set(1);
+    Shaders::brushent.setupUniforms();
+    Shaders::brushent.m_uFxAmount.set(1);
 
     // Sort opaque entities
     auto sortFn = [this](ClientEntity *const &lhs, ClientEntity *const &rhs) {
@@ -1299,7 +1324,7 @@ void SceneRenderer::drawTransEntities() {
     appfw::Prof prof("Trans");
 
     Shaders::brushent.enable();
-    Shaders::brushent.setupSceneUniforms(*this);
+    Shaders::brushent.setupUniforms();
 
     if (!r_nosort.getValue()) {
         // Sort entities based on render mode and distance
@@ -1375,12 +1400,12 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
     modelMat = glm::translate(modelMat, clent->getOrigin());
-    Shaders::brushent.m_ModelMat.set(modelMat);
+    Shaders::brushent.m_uModelMat.set(modelMat);
 
     // Render mode
     AFW_ASSERT(clent->getRenderMode() == kRenderNormal || clent->getRenderMode() == kRenderTransAlpha);
     setRenderMode(clent->getRenderMode());
-    Shaders::brushent.m_RenderMode.set(clent->getRenderMode());
+    Shaders::brushent.m_uRenderMode.set(clent->getRenderMode());
 
     // Draw surfaces
     auto &surfs = m_Data.optBrushModels[model->getOptModelIdx()].surfs;
@@ -1439,17 +1464,17 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
     modelMat = glm::translate(modelMat, clent->getOrigin());
-    Shaders::brushent.m_ModelMat.set(modelMat);
+    Shaders::brushent.m_uModelMat.set(modelMat);
 
     // Render mode
     if (!r_notrans.getValue()) {
         setRenderMode(clent->getRenderMode());
-        Shaders::brushent.m_RenderMode.set(clent->getRenderMode());
-        Shaders::brushent.m_FxAmount.set(clent->getFxAmount() / 255.f);
-        Shaders::brushent.m_FxColor.set(glm::vec3(clent->getFxColor()) / 255.f);
+        Shaders::brushent.m_uRenderMode.set(clent->getRenderMode());
+        Shaders::brushent.m_uFxAmount.set(clent->getFxAmount() / 255.f);
+        Shaders::brushent.m_uFxColor.set(glm::vec3(clent->getFxColor()) / 255.f);
     } else {
         setRenderMode(kRenderNormal);
-        Shaders::brushent.m_RenderMode.set(kRenderNormal);
+        Shaders::brushent.m_uRenderMode.set(kRenderNormal);
     }
 
     bool needSort = false;

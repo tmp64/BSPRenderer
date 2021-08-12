@@ -46,7 +46,7 @@ bool Renderer::loadingTick() {
 void Renderer::draw() {
     m_SceneRenderer.setPerspective(fov.getValue(), BSPViewer::get().getAspectRatio(), 4, 8192);
     m_SceneRenderer.setPerspViewOrigin(BSPViewer::get().getCameraPos(), BSPViewer::get().getCameraRot());
-    m_SceneRenderer.renderScene(0); // 0 is the main framebuffer
+    m_SceneRenderer.renderScene(0, 0, 0); // 0 is the main framebuffer
 }
 
 void Renderer::optimizeBrushModel(Model *model) { m_SceneRenderer.optimizeBrushModel(model); }

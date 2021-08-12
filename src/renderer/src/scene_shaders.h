@@ -14,41 +14,27 @@ class SceneRenderer::WorldShader : public BaseShader {
 public:
     WorldShader() {
         setTitle("SceneRenderer::WorldShader");
-        setVert("assets:shaders/scene/world.vert");
-        setFrag("assets:shaders/scene/world.frag");
+        setVert("assets:shaders/scene/brush.vert");
+        setFrag("assets:shaders/scene/brush.frag");
 
-        addUniform(m_ViewMat, "uViewMatrix");
-        addUniform(m_ProjMat, "uProjMatrix");
-        addUniform(m_Color, "uColor");
-        addUniform(m_LightingType, "uLightingType");
-        addUniform(m_TextureType, "uTextureType");
-        addUniform(m_Texture, "uTexture");
-        addUniform(m_LMTexture, "uLMTexture");
-        addUniform(m_TexGamma, "uTexGamma");
+        addUniform(m_uGlobalUniform, "GlobalUniform", GLOBAL_UNIFORM_BIND);
+        addUniform(m_uColor, "u_Color");
+        addUniform(m_uTexture, "u_Texture");
+        addUniform(m_uLMTexture, "u_LMTexture");
     }
 
-    void setupUniforms(SceneRenderer &scene) {
-        m_ProjMat.set(scene.m_Data.viewContext.getProjectionMatrix());
-        m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
-        m_LightingType.set(r_lighting.getValue());
-        m_TextureType.set(r_texture.getValue());
-        m_Texture.set(0);
-        m_LMTexture.set(1);
-        m_TexGamma.set(r_texgamma.getValue());
+    void setupUniforms() {
+        m_uTexture.set(0);
+        m_uLMTexture.set(1);
     }
 
-    void setColor(const glm::vec3 &c) { m_Color.set(c); }
-
-    ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
-    ShaderUniform<glm::vec3> m_Color;
-    ShaderUniform<int> m_LightingType;
-    ShaderUniform<int> m_TextureType;
-    ShaderUniform<int> m_Texture;
-    ShaderUniform<int> m_LMTexture;
-    ShaderUniform<float> m_TexGamma;
+    void setColor(const glm::vec3 &c) { m_uColor.set(c); }
 
 private:
-    
+    UniformBlock m_uGlobalUniform;
+    ShaderUniform<glm::vec3> m_uColor;
+    ShaderUniform<int> m_uTexture;
+    ShaderUniform<int> m_uLMTexture;
 };
 
 //----------------------------------------------------------------
@@ -61,26 +47,17 @@ public:
         setVert("assets:shaders/scene/skybox.vert");
         setFrag("assets:shaders/scene/skybox.frag");
 
-        addUniform(m_ViewMat, "uViewMatrix");
-        addUniform(m_ProjMat, "uProjMatrix");
-        addUniform(m_Texture, "uTexture");
-        addUniform(m_TexGamma, "uTexGamma");
-        addUniform(m_ViewOrigin, "uViewOrigin");
+        addUniform(m_uGlobalUniform, "GlobalUniform", GLOBAL_UNIFORM_BIND);
+        addUniform(m_Texture, "u_Texture");
     }
 
-    void setupUniforms(SceneRenderer &scene) {
-        m_ProjMat.set(scene.m_Data.viewContext.getProjectionMatrix());
-        m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
+    void setupUniforms() {
         m_Texture.set(0);
-        m_TexGamma.set(r_texgamma.getValue());
-        m_ViewOrigin.set(scene.m_Data.viewContext.getViewOrigin());
     }
 
 private:
-    ShaderUniform<glm::mat4> m_ViewMat, m_ProjMat;
+    UniformBlock m_uGlobalUniform;
     ShaderUniform<int> m_Texture;
-    ShaderUniform<float> m_TexGamma;
-    ShaderUniform<glm::vec3> m_ViewOrigin;
 };
 
 //----------------------------------------------------------------
@@ -90,45 +67,36 @@ class SceneRenderer::BrushEntityShader : public BaseShader {
 public:
     BrushEntityShader() {
         setTitle("SceneRenderer::BrushEntityShader");
-        setVert("assets:shaders/scene/brush_entity.vert");
-        setFrag("assets:shaders/scene/brush_entity.frag");
+        setVert("assets:shaders/scene/brush.vert");
+        setFrag("assets:shaders/scene/brush.frag");
 
-        addUniform(m_ModelMat, "uModelMatrix");
-        addUniform(m_ViewMat, "uViewMatrix");
-        addUniform(m_ProjMat, "uProjMatrix");
-        addUniform(m_Color, "uColor");
-        addUniform(m_LightingType, "uLightingType");
-        addUniform(m_TextureType, "uTextureType");
-        addUniform(m_Texture, "uTexture");
-        addUniform(m_LMTexture, "uLMTexture");
-        addUniform(m_TexGamma, "uTexGamma");
-        addUniform(m_RenderMode, "uRenderMode");
-        addUniform(m_FxAmount, "uFxAmount");
-        addUniform(m_FxColor, "uFxColor");
+        getDefinitions().addDef("ENTITY_SHADER", 1);
+
+        addUniform(m_uGlobalUniform, "GlobalUniform", GLOBAL_UNIFORM_BIND);
+        addUniform(m_uModelMat, "u_ModelMatrix");
+        addUniform(m_uColor, "u_Color");
+        addUniform(m_uTexture, "u_Texture");
+        addUniform(m_uLMTexture, "u_LMTexture");
+        addUniform(m_uRenderMode, "u_iRenderMode");
+        addUniform(m_uFxAmount, "u_flFxAmount");
+        addUniform(m_uFxColor, "u_vFxColor");
     }
 
-    void setupSceneUniforms(SceneRenderer &scene) {
-        m_ProjMat.set(scene.m_Data.viewContext.getProjectionMatrix());
-        m_ViewMat.set(scene.m_Data.viewContext.getViewMatrix());
-        m_LightingType.set(r_lighting.getValue());
-        m_TextureType.set(r_texture.getValue());
-        m_Texture.set(0);
-        m_LMTexture.set(1);
-        m_TexGamma.set(r_texgamma.getValue());
+    void setupUniforms() {
+        m_uTexture.set(0);
+        m_uLMTexture.set(1);
     }
 
-    void setColor(const glm::vec3 &c) { m_Color.set(c); }
+    void setColor(const glm::vec3 &c) { m_uColor.set(c); }
 
-    ShaderUniform<glm::mat4> m_ModelMat, m_ViewMat, m_ProjMat;
-    ShaderUniform<glm::vec3> m_Color;
-    ShaderUniform<int> m_LightingType;
-    ShaderUniform<int> m_TextureType;
-    ShaderUniform<int> m_Texture;
-    ShaderUniform<int> m_LMTexture;
-    ShaderUniform<float> m_TexGamma;
-    ShaderUniform<int> m_RenderMode;
-    ShaderUniform<float> m_FxAmount;
-    ShaderUniform<glm::vec3> m_FxColor;
+    UniformBlock m_uGlobalUniform;
+    ShaderUniform<glm::mat4> m_uModelMat;
+    ShaderUniform<glm::vec3> m_uColor;
+    ShaderUniform<int> m_uTexture;
+    ShaderUniform<int> m_uLMTexture;
+    ShaderUniform<int> m_uRenderMode;
+    ShaderUniform<float> m_uFxAmount;
+    ShaderUniform<glm::vec3> m_uFxColor;
 };
 
 //----------------------------------------------------------------
@@ -163,18 +131,17 @@ public:
         setVert("assets:shaders/scene/post_processing.vert");
         setFrag("assets:shaders/scene/post_processing.frag");
 
-        addUniform(m_HdrBuffer, "uHdrBuffer");
-        addUniform(m_Gamma, "uGamma");
+        addUniform(m_uGlobalUniform, "GlobalUniform", GLOBAL_UNIFORM_BIND);
+        addUniform(m_HdrBuffer, "u_HdrBuffer");
     }
 
     void setupUniforms() {
         m_HdrBuffer.set(0);
-        m_Gamma.set(r_gamma.getValue());
     }
 
 private:
+    UniformBlock m_uGlobalUniform;
     ShaderUniform<int> m_HdrBuffer;
-    ShaderUniform<float> m_Gamma;
 };
 
 struct SceneRenderer::Shaders {

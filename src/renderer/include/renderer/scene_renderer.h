@@ -74,7 +74,7 @@ public:
     inline void setEntListCallback(const EntListCallback &fn) { m_pfnEntListCb = fn; }
 
     //! Renders the image to the screen.
-    void renderScene(GLint targetFb);
+    void renderScene(GLint targetFb, float flSimTime, float flTimeDelta);
 
     //! Returns performance stats for last renderScene call.
     inline const RenderingStats &getStats() const { return m_Stats; }
@@ -94,6 +94,8 @@ private:
     static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
     static constexpr int MAX_TRANS_SURFS_PER_MODEL = 512; //!< Maximum number of surfaces per transparent model
 
+    static constexpr int GLOBAL_UNIFORM_BIND = 0;
+
     class WorldShader;
     class SkyBoxShader;
     class BrushEntityShader;
@@ -107,11 +109,6 @@ private:
         glm::vec2 texture;
         glm::vec2 bspLMTexture;
         glm::vec2 customLMTexture;
-
-        inline bool operator==(const SurfaceVertex &rhs) {
-            return position == rhs.position && normal == rhs.normal && texture == rhs.texture &&
-                   bspLMTexture == rhs.bspLMTexture && customLMTexture == rhs.customLMTexture;
-        }
     };
 
     static_assert(sizeof(SurfaceVertex) == sizeof(float) * 12, "Size of Vertex is invalid");
@@ -134,6 +131,14 @@ private:
 
     struct OptBrushModel {
         std::vector<unsigned> surfs; //!< Contains surface indeces sorted by material
+    };
+
+    struct GlobalUniform {
+        glm::mat4 mMainProj;
+        glm::mat4 mMainView;
+        glm::vec4 vMainViewOrigin; // xyz
+        glm::vec4 vflParams1;      // x tex gamma, y screen gamma, z sim time, w sim time delta
+        glm::ivec4 viParams1;      // x is texture type, y is lighting type
     };
 
     struct LevelData {
@@ -215,6 +220,11 @@ private:
     GLTexture m_nColorBuffer;
     GLRenderbuffer m_nRenderBuffer;
 
+    // Global uniform buffer
+    GLBuffer m_nGlobalUniform;
+    GlobalUniform m_GlobalUniform;
+    void createGlobalUniform();
+
     void recreateFramebuffer();
     void destroyFramebuffer();
 
@@ -234,7 +244,7 @@ private:
     std::vector<uint8_t> rotateImage90CCW(uint8_t *data, int wide, int tall);
 
     //! Pre-rendering stuff
-    void frameSetup();
+    void frameSetup(float flSimTime, float flTimeDelta);
 
     //! Post-rendering stuff.
     //! Disables stuff enabled in frameSetup.

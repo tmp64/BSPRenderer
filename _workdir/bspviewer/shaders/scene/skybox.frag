@@ -1,8 +1,4 @@
-// World-space fragment position
-in vec3 gFragPos;
-
-// World-space normal vector
-in vec3 gNormal;
+#include "scene/global_uniform.glsl"
 
 // Texture coordinates
 in vec3 gTexCoord;
@@ -11,15 +7,14 @@ in vec3 gTexCoord;
 out vec4 outColor;
 
 // Uniforms
-uniform samplerCube uTexture;
-uniform float uTexGamma;
+uniform samplerCube u_Texture;
 
 void main(void) {
 	// Sample the cubemap
-	vec3 skyColor = texture(uTexture, gTexCoord).rgb;
+	vec3 skyColor = texture(u_Texture, gTexCoord).rgb;
 
 	// Gamma correction
-	skyColor.rgb = pow(skyColor.rgb, vec3(uTexGamma));
+	skyColor.rgb = pow(skyColor.rgb, vec3(u_Global.uflTexGamma));
 
 	// Final color
 	outColor = vec4(skyColor, 1.0);

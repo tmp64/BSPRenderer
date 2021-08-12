@@ -1,5 +1,5 @@
-#ifndef WORLD_IFACE_H
-#define WORLD_IFACE_H
+#ifndef BRUSH_IFACE_H
+#define BRUSH_IFACE_H
 
 IFACE_VF ShaderIface {
 	vec3 vFragPos;			// World-space fragment position
