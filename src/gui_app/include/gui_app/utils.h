@@ -1,6 +1,7 @@
 #ifndef GUI_APP_UTILS_H
 #define GUI_APP_UTILS_H
 #include <SDL.h>
+#include <imgui.h>
 #include <glad/glad.h>
 #include <appfw/utils.h>
 #include <appfw/filesystem.h>
@@ -92,6 +93,8 @@ public:
      * Draws the UI.
      */
     void draw();
+
+    ImFont *loadFont(std::string_view file, float size);
 
 private:
     MainWindowAppComponent *m_pWindow = nullptr;

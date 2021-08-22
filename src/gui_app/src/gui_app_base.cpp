@@ -27,30 +27,39 @@ GuiAppBase::GuiAppBase()
     // TODO: Enable extcon
     //appfw::init::setExtconPort(getConfig().getItem("appfw").get<int>("extcon_port"));
 
-    // ImGUI font scale
-    float fontScale = getConfig().getItem("gui").get<float>("imgui_font_scale", 0.0f);
+    // ImGUI scale
+    float guiScale = getConfig().getItem("gui").get<float>("imgui_scale", 0.0f);
 
-    if (fontScale == 0) {
+    if (guiScale == 0) {
+        guiScale = 1.0f;
         float dpi = 0;
 
         if (SDL_GetDisplayDPI(0, &dpi, nullptr, nullptr) == 0) {
             if (dpi > NORMAL_DPI) {
-                ImGui::GetIO().FontGlobalScale = dpi / NORMAL_DPI;
+                guiScale = dpi / NORMAL_DPI;
 
                 if (appfw::isAndroid()) {
-                    ImGui::GetIO().FontGlobalScale *= 3.f / 5.f;
+                    guiScale *= 3.f / 5.f;
                 }
 
-                printd("Display DPI: {}, font scale: {}", dpi, ImGui::GetIO().FontGlobalScale);
+                printd("Display DPI: {}, UI scale: {}", dpi, guiScale);
             } else if (dpi < NORMAL_DPI) {
-                printw("DPI is lower than normal DPI ({} < {})", dpi, NORMAL_DPI);
+                printw("DPI is lower than normal DPI ({} < {}), UI not scaled", dpi, NORMAL_DPI);
             }
         } else {
             printw("Failed to get display DPI: {}", SDL_GetError());
         }
-    } else {
-        ImGui::GetIO().FontGlobalScale = fontScale;
     }
+
+    std::string fontPath = getConfig().getItem("gui").get<std::string>("imgui_font_path", "");
+    float fontSize = getConfig().getItem("gui").get<float>("imgui_font_size", 13.0f);
+
+    if (fontPath.empty() || !m_ImGui.loadFont(fontPath, fontSize * guiScale)) {
+        printe("ImGui: Using default font");
+        ImGui::GetIO().Fonts->AddFontDefault();
+    }
+
+    ImGui::GetStyle().ScaleAllSizes(guiScale);
 
     // Dev console
     appfw::getConsole().addConsoleReceiver(&m_DevConsole);

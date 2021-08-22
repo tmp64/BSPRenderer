@@ -363,6 +363,27 @@ void ImGuiAppComponent::draw() {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
+ImFont *ImGuiAppComponent::loadFont(std::string_view filepath, float size_pixels) {
+    char *data = nullptr;
+    int size = 0;
+
+    try {
+        std::ifstream file;
+        file.exceptions(std::ios::failbit | std::ios::badbit);
+        file.open(getFileSystem().findExistingFile(filepath), std::ifstream::binary);
+
+        size = (int)appfw::getFileSize(file);
+        data = (char *)IM_ALLOC(size);
+        file.read(data, size);
+    } catch (const std::exception &e) {
+        printe("ImGui: Failed to open font {}: {}", filepath, e.what());
+        IM_FREE(data);
+        return nullptr;
+    }
+
+    return ImGui::GetIO().Fonts->AddFontFromMemoryTTF(data, size, size_pixels);
+}
+
 RendererSystemAppComponent::RendererSystemAppComponent() {
     ShaderManager::get().init();
     MaterialManager::get().init();
