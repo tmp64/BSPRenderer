@@ -187,6 +187,7 @@ private:
         // Lightmaps
         TextureBlock<glm::u8vec3> bspLightmapBlock;
         std::vector<glm::vec3> customLightmapTex;
+        std::vector<glm::vec3> patchBuffer;
         glm::ivec2 customLightmapTexSize;
 
         // Surface objects
@@ -238,7 +239,6 @@ private:
     void enableSurfaceAttribs();
     void loadTextures();
     void loadSkyBox();
-    void loadPatches();
     void finishLoading();
     std::vector<uint8_t> rotateImage90CW(uint8_t *data, int wide, int tall);
     std::vector<uint8_t> rotateImage90CCW(uint8_t *data, int wide, int tall);
@@ -291,6 +291,9 @@ private:
 
     //! Draws a brush entity surface.
     void drawBrushEntitySurface(Surface &surf);
+
+    //! Draws custom lightmap patches
+    void drawPatches();
 
     //! Post-processes HDB framebuffer (tonemapping, gamma correction) and draws it into active framebuffer.
     void doPostProcessing();

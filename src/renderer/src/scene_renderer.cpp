@@ -33,9 +33,7 @@ ConVar<bool> r_wireframe("r_wireframe", false, "Draw wireframes");
 ConVar<bool> r_nosort("r_nosort", false, "Disable transparent entity sorting");
 ConVar<bool> r_notrans("r_notrans", false, "Disable entity transparency");
 ConVar<bool> r_filter_lm("r_filter_lm", true, "Filter lightmaps (requires map reload)");
-
-ConCommand cmd_r_loadpatches("r_loadpatches", "Load and display patches.dat");
-ConCommand cmd_r_unloadpatches("r_unloadpatches", "Unload patches.dat");
+ConVar<bool> r_patches("r_patches", false, "Draw custom lightmap patches");
 
 static const char *r_lighting_values[] = {
     "Fullbright", "Shaded", "BSP lightmaps", "Custom lightmaps"
@@ -52,20 +50,6 @@ SceneRenderer::SceneRenderer() {
 
     m_SolidEntityList.reserve(MAX_VISIBLE_ENTS);
     m_SortBuffer.reserve(MAX_TRANS_SURFS_PER_MODEL);
-
-    cmd_r_loadpatches.setCallback([&] {
-        try {
-            loadPatches();
-        } catch (const std::exception &e) {
-            printe("Failed: {}", e.what());
-        }
-    });
-
-    cmd_r_unloadpatches.setCallback([&] {
-        m_Data.patchesVao.destroy();
-        m_Data.patchesVbo.destroy();
-        m_Data.patchesVerts = 0;
-    });
 }
 
 SceneRenderer::~SceneRenderer() {}
@@ -251,15 +235,8 @@ void SceneRenderer::renderScene(GLint targetFb, float flSimTime, float flTimeDel
     }
 
     // Draw patches
-    if (m_Data.patchesVao.id() != 0) {
-        appfw::Prof prof("Patches");
-        Shaders::patches.enable();
-        Shaders::patches.setupSceneUniforms(*this);
-        glBindVertexArray(m_Data.patchesVao);
-        glPointSize(5);
-        glDrawArrays(GL_LINES, 0, m_Data.patchesVerts);
-        glBindVertexArray(0);
-        Shaders::patches.disable();
+    if (m_Data.patchesVao.id() != 0 && r_patches.getValue()) {
+        drawPatches();
     }
 
     frameEnd();
@@ -302,6 +279,8 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         CvarCheckbox("EBO", r_ebo);
 
         CvarCheckbox("Entities", r_drawents);
+        ImGui::SameLine();
+        CvarCheckbox("Patches", r_patches);
 
         int lighting = std::clamp(r_lighting.getValue(), 0, 3);
 
@@ -588,6 +567,10 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
         file.readBytes(reinterpret_cast<uint8_t *>(m_pLoadingState->customLightmapTex.data()),
                        m_pLoadingState->customLightmapTex.size() * sizeof(glm::vec3));
 
+        auto &patchBuf = m_pLoadingState->patchBuffer;
+        patchBuf.clear();
+        patchBuf.reserve(80000);
+
         // Face info
         for (uint32_t i = 0; i < faceCount; i++) {
             Surface &surf = m_Data.surfaces[i];
@@ -600,9 +583,9 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
                                 surf.m_iVertexCount, vertCount));
             }
 
-            file.readVec<glm::vec3>(); // vI
-            file.readVec<glm::vec3>(); // vJ
-            file.readVec<glm::vec3>(); // World position of (0, 0) plane coord.
+            glm::vec3 vI = file.readVec<glm::vec3>(); // vI
+            glm::vec3 vJ = file.readVec<glm::vec3>(); // vJ
+            glm::vec3 vPlaneOrigin = file.readVec<glm::vec3>(); // World position of (0, 0) plane coord.
             file.readVec<glm::vec2>(); // Offset of (0, 0) to get to plane coords
             file.readVec<glm::vec2>(); // Face size
 
@@ -620,9 +603,38 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
 
                 // Patches
                 uint32_t patchCount = file.readUInt32(); // Patch count
-                file.seekRelative(patchCount * sizeof(float) * 3);
+
+                for (uint32_t j = 0; j < patchCount; j++) {
+                    glm::vec2 coord = file.readVec<glm::vec2>();
+                    float size = file.readFloat();
+                    float k = size / 2.0f;
+
+                    glm::vec3 org = vPlaneOrigin + coord.x * vI + coord.y * vJ;
+                    glm::vec3 corners[4];
+
+                    corners[0] = org - vI * k - vJ * k;
+                    corners[1] = org + vI * k - vJ * k;
+                    corners[2] = org + vI * k + vJ * k;
+                    corners[3] = org - vI * k + vJ * k;
+
+                    patchBuf.push_back(corners[0]);
+                    patchBuf.push_back(corners[1]);
+
+                    patchBuf.push_back(corners[1]);
+                    patchBuf.push_back(corners[2]);
+
+                    patchBuf.push_back(corners[2]);
+                    patchBuf.push_back(corners[3]);
+
+                    patchBuf.push_back(corners[3]);
+                    patchBuf.push_back(corners[0]);
+                }
             }
         }
+
+        patchBuf.shrink_to_fit();
+        printi("Custom lightmaps: Patches use {:.1f} MiB of VRAM",
+               patchBuf.size() * sizeof(patchBuf[0]) / 1024.0 / 1024.0);
     } catch (const std::exception &e) {
         printw("Custom lightmaps: failed to load: {}", e.what());
         m_pLoadingState->customLightmapTex.clear();
@@ -650,6 +662,22 @@ void SceneRenderer::finishLoadCustomLightmaps() {
     glGenerateMipmap(GL_TEXTURE_2D);
 
     blockData.clear();
+
+    // Load patches into the GPU
+    auto &patchBuf = m_pLoadingState->patchBuffer;
+    if (!patchBuf.empty()) {
+        m_Data.patchesVerts = (uint32_t)patchBuf.size();
+        m_Data.patchesVao.create();
+        m_Data.patchesVbo.create();
+
+        glBindVertexArray(m_Data.patchesVao);
+        glBindBuffer(GL_ARRAY_BUFFER, m_Data.patchesVbo);
+        glBufferData(GL_ARRAY_BUFFER, m_Data.patchesVerts * sizeof(glm::vec3), patchBuf.data(),
+                     GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
+    }
+
     m_Data.bCustomLMLoaded = true;
     printi("Custom lightmaps: loaded");
 }
@@ -892,23 +920,6 @@ void SceneRenderer::loadSkyBox() {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-}
-
-void SceneRenderer::loadPatches() {
-    appfw::BinaryInputFile file(getFileSystem().findExistingFile("assets:patches.dat"));
-    uint32_t count = file.readUInt32();
-    std::vector<glm::vec3> verts(count);
-    file.readBytes((uint8_t *)verts.data(), count * sizeof(glm::vec3));
-
-    m_Data.patchesVerts = count;
-    m_Data.patchesVao.create();
-    m_Data.patchesVbo.create();
-
-    glBindVertexArray(m_Data.patchesVao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_Data.patchesVbo);
-    glBufferData(GL_ARRAY_BUFFER, count * sizeof(glm::vec3), verts.data(), GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
 }
 
 void SceneRenderer::finishLoading() {
@@ -1542,6 +1553,18 @@ void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
     glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
     m_Stats.uDrawCallCount++;
     m_Stats.uRenderedBrushEntPolys++;
+}
+
+void SceneRenderer::drawPatches() {
+    appfw::Prof prof("Patches");
+    Shaders::patches.enable();
+    Shaders::patches.setupSceneUniforms(*this);
+    glBindVertexArray(m_Data.patchesVao);
+    glPointSize(5);
+    glDrawArrays(GL_LINES, 0, m_Data.patchesVerts);
+    m_Stats.uDrawCallCount++;
+    glBindVertexArray(0);
+    Shaders::patches.disable();
 }
 
 void SceneRenderer::doPostProcessing() {
