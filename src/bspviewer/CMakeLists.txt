@@ -10,6 +10,7 @@ add_executable(bspviewer
 	src/renderer.h
 	src/world_state.cpp
 	src/world_state.h
+	../gui_app/src/gui_app.manifest
 )
 
 appfw_module(bspviewer)
