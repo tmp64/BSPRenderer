@@ -6,6 +6,9 @@
 ConVar<double> app_tps_max("app_tps_max", 100, "Application tickrate");
 ConVar<double> app_fps_max("app_fps_max", 60, "Application framerate");
 ConVar<bool> app_sync_rates("app_sync_rates", false, "Syncs TPS and FPS, uses value from app_fps_max for the rate.");
+ConVar<bool> app_vsync("app_vsync", true, "Enable vertical synchronization");
+ConVar<bool> app_vsync_finish("app_vsync_finish", true,
+                              "Wait for image to be fully displayed after backbuffer swap");
 
 static ConCommand cmd_toggleconsole("toggleconsole", "Toggles console dialog", [](const CmdString &) {
     GuiAppBase::getBaseInstance().setConsoleVisible(!GuiAppBase::getBaseInstance().isConsoleVisible());
@@ -26,6 +29,34 @@ GuiAppBase::GuiAppBase()
 
     // TODO: Enable extcon
     //appfw::init::setExtconPort(getConfig().getItem("appfw").get<int>("extcon_port"));
+
+    // Set VSync cvar callback
+    app_vsync.setCallback([](const bool &, const bool &newVal) {
+        if (newVal) {
+            // Try adaptive sync
+            if (SDL_GL_SetSwapInterval(-1) == 0) {
+                printi("Enabled Adaptive VSync");
+            } else {
+                // Try VSync
+                if (SDL_GL_SetSwapInterval(1) == 0) {
+                    printi("Enabled VSync");
+                } else {
+                    printe("Failed to enable VSync");
+                }
+            }
+        } else {
+            // Try to disable VSync
+            if (SDL_GL_SetSwapInterval(0) == 0) {
+                printi("Disabled VSync");
+            } else {
+                printe("Failed to disable VSync");
+            }
+        }
+
+        return true;
+    });
+
+    app_vsync.setValue(app_vsync.getValue());
 
     // ImGUI scale
     float guiScale = getConfig().getItem("gui").get<float>("imgui_scale", 0.0f);
@@ -274,6 +305,13 @@ void GuiAppBase::internalDraw() {
         {
             appfw::Prof prof("Swap Buffers");
             SDL_GL_SwapWindow(m_Window.getWindow());
+
+            if (app_vsync.getValue() && app_vsync_finish.getValue()) {
+                // https://www.khronos.org/opengl/wiki/Swap_Interval
+                // GPU vs CPU synchronization
+                // This should remove lag caused by VSync
+                glFinish();
+            }
         }
 
         m_DrawProfData.end();
