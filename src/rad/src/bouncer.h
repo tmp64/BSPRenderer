@@ -1,19 +1,22 @@
 #ifndef RAD_BOUNCER_H
 #define RAD_BOUNCER_H
 #include <vector>
-#include <rad/types.h>
+#include "types.h"
 
 namespace rad {
 
-class RadSim;
+class RadSimImpl;
 
 class Bouncer {
 public:
     //! Maximum distance from any point in world to a point on a sky face.
     static constexpr float SKY_RAY_LENGTH = 8192.f;
 
+    inline Bouncer(RadSimImpl &radSim)
+        : m_RadSim(radSim) {}
+
     //! Initializes the bouncer
-    void setup(RadSim *pRadSim, int bounceCount);
+    void setup(int bounceCount);
 
     //! Adds all lighting
     void addLighting();
@@ -25,7 +28,7 @@ public:
     void bounceLight();
 
 private:
-    RadSim *m_pRadSim = nullptr;
+    RadSimImpl &m_RadSim;
     int m_iBounceCount = 0;
     PatchIndex m_uPatchCount = 0;
     std::vector<glm::vec3> m_PatchBounce;

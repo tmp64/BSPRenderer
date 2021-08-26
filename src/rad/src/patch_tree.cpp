@@ -1,6 +1,4 @@
-#include <rad/patch_tree.h>
-#include <rad/rad_sim.h>
-#include <rad/patch_list.h>
+#include "rad_sim_impl.h"
 
 #define DISABLE_TREE
 
@@ -104,7 +102,7 @@ float lightmapFilter(float x) {
 
 }
 
-void rad::PatchTree::createPatches(RadSim *pRadSim, Face &face,
+void rad::PatchTree::createPatches(RadSimImpl *pRadSim, Face &face,
                                    std::atomic<PatchIndex> &globalPatchCount,
                                    float flMinPatchSize) {
     m_pRadSim = pRadSim;

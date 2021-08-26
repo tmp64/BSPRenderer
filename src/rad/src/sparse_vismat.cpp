@@ -3,15 +3,14 @@
 #include <appfw/timer.h>
 #include <appfw/platform.h>
 #include <appfw/binary_file.h>
-#include <rad/sparse_vismat.h>
-#include <rad/rad_sim.h>
+#include "rad_sim_impl.h"
 
-rad::SparseVisMat::SparseVisMat(RadSim *pRadSim) {
-	m_pRadSim = pRadSim; }
+rad::SparseVisMat::SparseVisMat(RadSimImpl &radSim)
+    : m_RadSim(radSim) {}
 
 bool rad::SparseVisMat::isLoaded() { return m_bIsLoaded; }
 
-bool rad::SparseVisMat::isValid() { return m_bIsLoaded && m_PatchHash == m_pRadSim->getPatchHash(); }
+bool rad::SparseVisMat::isValid() { return m_bIsLoaded && m_PatchHash == m_RadSim.getPatchHash(); }
 
 void rad::SparseVisMat::loadFromFile(const fs::path &path) {
     unloadMatrix();
@@ -38,7 +37,7 @@ void rad::SparseVisMat::loadFromFile(const fs::path &path) {
     appfw::SHA256::Digest patchHash;
     file.readByteSpan(appfw::span(patchHash));
 
-    if (patchHash != m_pRadSim->m_PatchHash) {
+    if (patchHash != m_RadSim.m_PatchHash) {
         printi("SVisMat discarded: different patch hash.");
         return;
     }
@@ -47,8 +46,8 @@ void rad::SparseVisMat::loadFromFile(const fs::path &path) {
     size_t patchCount = 0;
     file.readObject(patchCount);
 
-    if (patchCount != m_pRadSim->m_Patches.size()) {
-        printi("SVisMat discarded: patch count mismatch ({} instead of {}).", patchCount, m_pRadSim->m_Patches.size());
+    if (patchCount != m_RadSim.m_Patches.size()) {
+        printi("SVisMat discarded: patch count mismatch ({} instead of {}).", patchCount, m_RadSim.m_Patches.size());
         return;
     }
 
@@ -95,7 +94,7 @@ void rad::SparseVisMat::saveToFile(const fs::path &path) {
 
 void rad::SparseVisMat::buildSparseMat() {
     unloadMatrix();
-    m_PatchHash = m_pRadSim->getPatchHash();
+    m_PatchHash = m_RadSim.getPatchHash();
 
     calcSize();
     compressMat();
@@ -120,13 +119,13 @@ void rad::SparseVisMat::calcSize() {
     appfw::Timer timer;
     timer.start();
 
-    PatchIndex patchCount = m_pRadSim->m_Patches.size();
-    auto &visdata = m_pRadSim->m_VisMat.getData();
+    PatchIndex patchCount = m_RadSim.m_Patches.size();
+    auto &visdata = m_RadSim.m_VisMat.getData();
     std::atomic_size_t totalListItemCount = 0;
 
     auto fnLoopBody = [&](PatchIndex i) {
         PatchIndex pos = i + 1;
-        size_t bitset = m_pRadSim->m_VisMat.getRowOffset(i);
+        size_t bitset = m_RadSim.m_VisMat.getRowOffset(i);
 
         for (;;) {
             ListItem item;
@@ -134,7 +133,7 @@ void rad::SparseVisMat::calcSize() {
             // Note:
             // (visdata[(bitset + pos) >> 3] & (1 << ((bitset + pos) & 7)))
             // <=>
-            // m_pRadSim->m_VisMat.checkVisBit(i, pos)
+            // m_RadSim.m_VisMat.checkVisBit(i, pos)
             // Based on m_Data[bitset >> 3] |= 1 << (bitset & 7)
 
             // Skip zeroes
@@ -165,7 +164,7 @@ void rad::SparseVisMat::calcSize() {
 
     tf::Taskflow taskflow;
     taskflow.for_each_index_dynamic((PatchIndex)0, patchCount - 1, (PatchIndex)1, fnLoopBody);
-    m_pRadSim->m_Executor.run(taskflow).wait();
+    m_RadSim.m_Executor.run(taskflow).wait();
 
     timer.stop();
     printi("Calculate sparse vismat: {:.3f} s", timer.dseconds());
@@ -184,14 +183,14 @@ void rad::SparseVisMat::compressMat() {
     appfw::Timer timer;
     timer.start();
 
-    PatchIndex patchCount = m_pRadSim->m_Patches.size();
-    auto &visdata = m_pRadSim->m_VisMat.getData();
+    PatchIndex patchCount = m_RadSim.m_Patches.size();
+    auto &visdata = m_RadSim.m_VisMat.getData();
     size_t listOffset = 0;
     size_t totalOnesCount = 0; //!< How many ones there is in the table
 
     for (PatchIndex i = 0; i < patchCount - 1; i++) {
         PatchIndex pos = i + 1;
-        size_t bitset = m_pRadSim->m_VisMat.getRowOffset(i);
+        size_t bitset = m_RadSim.m_VisMat.getRowOffset(i);
         m_OffsetTable[i] = listOffset;
         PatchIndex itemCount = 0;
         PatchIndex onesCount = 0;
@@ -202,7 +201,7 @@ void rad::SparseVisMat::compressMat() {
             // Note:
             // (visdata[(bitset + pos) >> 3] & (1 << ((bitset + pos) & 7)))
             // <=>
-            // m_pRadSim->m_VisMat.checkVisBit(i, pos)
+            // m_RadSim.m_VisMat.checkVisBit(i, pos)
             // Based on m_Data[bitset >> 3] |= 1 << (bitset & 7)
 
             // Skip zeroes
@@ -250,13 +249,13 @@ void rad::SparseVisMat::validateMat() {
     appfw::Timer timer;
     timer.start();
 
-    PatchIndex patchCount = m_pRadSim->m_Patches.size();
+    PatchIndex patchCount = m_RadSim.m_Patches.size();
 
     for (PatchIndex i = 0; i < patchCount; i++) {
         // Check that vis = 0 before first item
         if (m_CountTable[i] > 0) {
             for (PatchIndex j = i + 1; j < m_ListItems[m_OffsetTable[i]].offset; j++) {
-                if (m_pRadSim->m_VisMat.checkVisBit(i, j)) {
+                if (m_RadSim.m_VisMat.checkVisBit(i, j)) {
                     printfatal("sparse matrix validation failed 1: {} {}", i, j);
                     abort();
                 }
@@ -271,7 +270,7 @@ void rad::SparseVisMat::validateMat() {
 
             // Check that all bits are ones
             for (PatchIndex k = 0; k < item.size; k++) {
-                if (!m_pRadSim->m_VisMat.checkVisBit(i, p + k)) {
+                if (!m_RadSim.m_VisMat.checkVisBit(i, p + k)) {
                     printfatal("sparse matrix validation failed 2: {} {} {}", i, j, k);
                     abort();
                 }
@@ -282,7 +281,7 @@ void rad::SparseVisMat::validateMat() {
             // Check that all bits after that are zeroes
             if (j + 1 < m_CountTable[i]) {
                 for (PatchIndex k = 0; k < m_ListItems[m_OffsetTable[i] + j + 1].offset; k++) {
-                    if (m_pRadSim->m_VisMat.checkVisBit(i, p + k)) {
+                    if (m_RadSim.m_VisMat.checkVisBit(i, p + k)) {
                         printfatal("sparse matrix validation failed 3: {} {} {}", i, j, k);
                         abort();
                     }

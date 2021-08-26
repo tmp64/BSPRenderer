@@ -1,13 +1,13 @@
 #ifndef RAD_SPARSE_VISMAT_H
 #define RAD_SPARSE_VISMAT_H
+#include <vector>
 #include <appfw/appfw.h>
 #include <appfw/sha256.h>
-#include <rad/types.h>
-#include <vector>
+#include "types.h"
 
 namespace rad {
 
-class RadSim;
+class RadSimImpl;
 
 class SparseVisMat {
 public:
@@ -24,7 +24,7 @@ public:
         uint16_t size = 0;   //!< Size of block in bits (patches). Can be zero (e.g. if previous offset == MAX_OFFSET).
     };
 
-    SparseVisMat(RadSim *pRadSim);
+    SparseVisMat(RadSimImpl &radSim);
 
     /**
      * Returns true if a vismat is loaded.
@@ -63,7 +63,7 @@ public:
     inline size_t getTotalOnesCount() { return m_uTotalOnesCount; }
 
 private:
-    RadSim *m_pRadSim;
+    RadSimImpl &m_RadSim;
     bool m_bIsLoaded = false;
     appfw::SHA256::Digest m_PatchHash = {};
     std::vector<size_t> m_OffsetTable; //<! Offset into m_ListItems for each patch

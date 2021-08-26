@@ -1,7 +1,7 @@
 #ifndef RAD_PATCH_TREE_H
 #define RAD_PATCH_TREE_H
 #include <appfw/sha256.h>
-#include <rad/types.h>
+#include "types.h"
 
 namespace rad {
 
@@ -10,7 +10,8 @@ class PatchRef;
 
 class PatchTree {
 public:
-    void createPatches(RadSim *pRadSim, Face &face, std::atomic<PatchIndex> &globalPatchCount, float flMinPatchSize);
+    void createPatches(RadSimImpl *pRadSim, Face &face, std::atomic<PatchIndex> &globalPatchCount,
+                       float flMinPatchSize);
     PatchIndex copyPatchesToTheList(PatchIndex offset, appfw::SHA256 &hash);
     void buildTree();
 
@@ -59,7 +60,7 @@ private:
         glm::vec2 getChildOrigin(int idx);
     };
 
-    RadSim *m_pRadSim = nullptr;
+    RadSimImpl *m_pRadSim = nullptr;
     Face *m_pFace = nullptr;
     MiniPatch *m_pPatches = nullptr;
     Node m_RootNode;

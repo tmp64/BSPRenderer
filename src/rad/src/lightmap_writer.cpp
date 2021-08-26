@@ -1,18 +1,17 @@
 #include <appfw/timer.h>
 #include <app_base/lightmap.h>
-#include <rad/lightmap_writer.h>
+#include "lightmap_writer.h"
 
-void rad::LightmapWriter::saveLightmap(RadSim *pRadSim) {
+void rad::LightmapWriter::saveLightmap() {
     printn("Sampling lightmaps...");
     appfw::Timer timer;
 
-    m_pRadSim = pRadSim;
-    m_flLuxelSize = m_pRadSim->m_Profile.flLuxelSize;
-    m_iOversampleSize = m_pRadSim->m_Profile.iOversample;
-    m_iBlockSize = m_pRadSim->m_Profile.iBlockSize;
-    m_iBlockPadding = m_pRadSim->m_Profile.iBlockPadding;
+    m_flLuxelSize = m_RadSim.m_Profile.flLuxelSize;
+    m_iOversampleSize = m_RadSim.m_Profile.iOversample;
+    m_iBlockSize = m_RadSim.m_Profile.iBlockSize;
+    m_iBlockPadding = m_RadSim.m_Profile.iBlockPadding;
 
-    size_t faceCount = m_pRadSim->m_Faces.size();
+    size_t faceCount = m_RadSim.m_Faces.size();
     m_LightmapIdx.resize(faceCount);
     m_Lightmaps.reserve(faceCount);
 
@@ -27,7 +26,7 @@ void rad::LightmapWriter::saveLightmap(RadSim *pRadSim) {
 }
 
 void rad::LightmapWriter::processFace(size_t faceIdx) {
-    const Face &face = m_pRadSim->m_Faces[faceIdx];
+    const Face &face = m_RadSim.m_Faces[faceIdx];
 
     if (!face.hasLightmap()) {
         return;
@@ -64,9 +63,9 @@ void rad::LightmapWriter::processFace(size_t faceIdx) {
 
 void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
     glm::ivec2 lmSize = lm.vSize;
-    auto &patchTrees = m_pRadSim->m_PatchTrees;
-    bool bSampleNeighbours = m_pRadSim->m_Profile.bSampleNeighbours;
-    const Face &face = m_pRadSim->m_Faces[faceIdx];
+    auto &patchTrees = m_RadSim.m_PatchTrees;
+    bool bSampleNeighbours = m_RadSim.m_Profile.bSampleNeighbours;
+    const Face &face = m_RadSim.m_Faces[faceIdx];
 
     for (int lmy = 0; lmy < lmSize.y; lmy++) {
         glm::vec3 *lmrow = lm.lightmapData.data() + (size_t)lmy * lmSize.x;
@@ -90,11 +89,11 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
             if (bSampleNeighbours) {
                 // Sample from neighbours
                 int normalDir = !!face.nPlaneSide;
-                auto &neighbours = m_pRadSim->m_Planes[face.iPlane].faces;
+                auto &neighbours = m_RadSim.m_Planes[face.iPlane].faces;
                 glm::vec2 luxelPos2 = luxelPos + face.vPlaneOriginInPlaneCoords;
 
                 for (unsigned neighbourIdx : neighbours) {
-                    Face &neighbour = m_pRadSim->m_Faces[neighbourIdx];
+                    Face &neighbour = m_RadSim.m_Faces[neighbourIdx];
 
                     if (neighbourIdx != faceIdx && neighbour.hasLightmap() &&
                         normalDir == !!neighbour.nPlaneSide) {
@@ -157,9 +156,9 @@ void rad::LightmapWriter::writeLightmapFile() {
     printn("Writing lightmap...");
     appfw::Timer timer;
 
-    fs::path lmPath = getFileSystem().getFilePath(m_pRadSim->getLightmapPath());
+    fs::path lmPath = getFileSystem().getFilePath(m_RadSim.getLightmapPath());
     appfw::BinaryOutputFile file(lmPath);
-    size_t faceCount = m_pRadSim->m_Faces.size();
+    size_t faceCount = m_RadSim.m_Faces.size();
 
     // Header
     file.writeBytes(LightmapFileFormat::MAGIC, sizeof(LightmapFileFormat::MAGIC));
@@ -176,7 +175,7 @@ void rad::LightmapWriter::writeLightmapFile() {
 
     // Face info
     for (size_t i = 0; i < faceCount; i++) {
-        const Face &face = m_pRadSim->m_Faces[i];
+        const Face &face = m_RadSim.m_Faces[i];
         size_t vertCount = face.vertices.size();
         file.writeUInt32((uint32_t)vertCount);         // Vertex count
         file.writeVec(face.vI);                        // vI
@@ -200,7 +199,7 @@ void rad::LightmapWriter::writeLightmapFile() {
             file.writeUInt32(face.iNumPatches); // Patch count
 
             for (PatchIndex j = face.iFirstPatch; j < face.iFirstPatch + face.iNumPatches; j++) {
-                PatchRef patch(m_pRadSim->m_Patches, j);
+                PatchRef patch(m_RadSim.m_Patches, j);
                 file.writeVec(patch.getFaceOrigin());
                 file.writeFloat(patch.getSize());
             }

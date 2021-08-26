@@ -1,42 +1,34 @@
-set(PUBLIC_HEADERS
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/bouncer.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/level_config.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/lightmap_writer.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/patch_list.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/patch_tree.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/rad_config.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/rad_sim.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/sparse_vismat.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/types.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/vflist.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/rad/vismat.h
+set(SOURCE_FILES
+	CMakeLists.txt
+	include/rad/level_config.h
+	include/rad/rad_config.h
+	include/rad/rad_sim.h
 
-)
-
-set(PRIVATE_HEADERS
-	${CMAKE_CURRENT_SOURCE_DIR}/src/anorms.h
-	${CMAKE_CURRENT_SOURCE_DIR}/src/plat.h
-)
-
-set(PRIVATE_SOURCES
-	${CMAKE_CURRENT_SOURCE_DIR}/src/bouncer.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/level_config.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/lightmap_writer.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/patch_list.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/patch_tree.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/plat_win.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/rad_config.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/rad_sim.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/sparse_vismat.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/vflist.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/vismat.cpp
+	src/anorms.h
+	src/bouncer.cpp
+	src/bouncer.h
+	src/level_config.cpp
+	src/lightmap_writer.cpp
+	src/lightmap_writer.h
+	src/patch_list.cpp
+	src/patch_list.h
+	src/patch_tree.cpp
+	src/patch_tree.h
+	src/rad_config.cpp
+	src/rad_sim.cpp
+	src/rad_sim_impl.cpp
+	src/rad_sim_impl.h
+	src/sparse_vismat.cpp
+	src/sparse_vismat.h
+	src/types.h
+	src/vflist.cpp
+	src/vflist.h
+	src/vismat.cpp
+	src/vismat.h
 )
 
 add_library(rad STATIC
-	${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
-	${PUBLIC_HEADERS}
-	${PRIVATE_HEADERS}
-	${PRIVATE_SOURCES}
+	${SOURCE_FILES}
 )
 
 appfw_module(rad)
@@ -47,7 +39,6 @@ target_link_libraries(rad
 	appfw
 	app_base
 	bsp
-	nlohmann_json
 	taskflow
 	yaml-cpp
 )
@@ -57,9 +48,7 @@ appfw_get_pch(PCH_APPFW_HEADERS)
 target_precompile_headers(rad PRIVATE
     ${PCH_STD_HEADERS}
     ${PCH_APPFW_HEADERS}
-	<rad/rad_sim.h>
+	[["rad_sim_impl.h"]]
 )
 
-source_group("Public Headers" FILES ${PUBLIC_HEADERS})
-source_group("Private Headers" FILES ${PRIVATE_HEADERS})
-source_group("Private Sources" FILES ${PRIVATE_SOURCES})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})

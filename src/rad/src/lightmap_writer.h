@@ -3,15 +3,18 @@
 #include <appfw/appfw.h>
 #include <appfw/binary_file.h>
 #include <app_base/texture_block.h>
-#include <rad/types.h>
+#include "types.h"
 
 namespace rad {
 
-class RadSim;
+class RadSimImpl;
 
 class LightmapWriter {
 public:
-    void saveLightmap(RadSim *pRadSim);
+    inline LightmapWriter(RadSimImpl &radSim)
+        : m_RadSim(radSim) {}
+
+    void saveLightmap();
 
 private:
     static constexpr float FILTER_RADIUS = 2.0f;
@@ -24,7 +27,7 @@ private:
         glm::vec2 vPlaneOffset; //< Face plane pos of lightmap (0;0)
     };
 
-    RadSim *m_pRadSim = nullptr;
+    RadSimImpl &m_RadSim;
     TextureBlock<glm::vec3> m_TexBlock;
 
     float m_flLuxelSize = 0;

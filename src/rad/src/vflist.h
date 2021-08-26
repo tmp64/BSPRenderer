@@ -2,7 +2,7 @@
 #define RAD_VFLIST_H
 #include <appfw/appfw.h>
 #include <appfw/sha256.h>
-#include <rad/types.h>
+#include "types.h"
 
 namespace rad {
 
@@ -16,7 +16,7 @@ class VFList {
 public:
     static constexpr uint8_t VF_MAGIC[] = "VFLIST001";
 
-    VFList(RadSim *pRadSim);
+    VFList(RadSimImpl &radSim);
 
     /**
      * Returns whether vflist if loaded.
@@ -49,7 +49,7 @@ public:
     inline const std::vector<float> &getVFKoeff() { return m_Koeff; }
 
 private:
-    RadSim *m_pRadSim;
+    RadSimImpl &m_RadSim;
     bool m_bIsLoaded = false;
     std::atomic_size_t m_uFinishedPatches;
     appfw::SHA256::Digest m_PatchHash = {};

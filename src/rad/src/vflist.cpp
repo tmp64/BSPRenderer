@@ -1,13 +1,13 @@
 #include <appfw/timer.h>
 #include <appfw/binary_file.h>
-#include <rad/vflist.h>
-#include <rad/rad_sim.h>
+#include "rad_sim_impl.h"
 
-rad::VFList::VFList(RadSim *pRadSim) { m_pRadSim = pRadSim; }
+rad::VFList::VFList(RadSimImpl &radSim)
+    : m_RadSim(radSim) {}
 
 bool rad::VFList::isLoaded() { return m_bIsLoaded; }
 
-bool rad::VFList::isValid() { return m_bIsLoaded && m_PatchHash == m_pRadSim->getPatchHash(); }
+bool rad::VFList::isValid() { return m_bIsLoaded && m_PatchHash == m_RadSim.getPatchHash(); }
 
 void rad::VFList::loadFromFile(const fs::path &path) {
     appfw::BinaryInputFile file(path);
@@ -31,13 +31,13 @@ void rad::VFList::loadFromFile(const fs::path &path) {
     appfw::SHA256::Digest patchHash;
     file.readByteSpan(appfw::span(patchHash));
 
-    if (patchHash != m_pRadSim->m_PatchHash) {
+    if (patchHash != m_RadSim.m_PatchHash) {
         printi("VFList discarded: different patch hash.");
         return;
     }
 
     // Read count
-    size_t patchCount = m_pRadSim->m_Patches.size();
+    size_t patchCount = m_RadSim.m_Patches.size();
     size_t offsetSize;
     file.readObject(offsetSize);
 
@@ -92,7 +92,7 @@ void rad::VFList::saveToFile(const fs::path &path) {
 }
 
 void rad::VFList::calculateVFList() {
-    if (!m_pRadSim->isVisMatValid()) {
+    if (!m_RadSim.isVisMatValid()) {
         throw std::logic_error("calculateVFList: valid vismat required");
     }
 
@@ -102,11 +102,11 @@ void rad::VFList::calculateVFList() {
     m_PatchHash = {};
 
     // Allocate memory
-    PatchIndex patchCount = m_pRadSim->m_Patches.size();
-    size_t memoryUsage = (sizeof(size_t) + sizeof(float)) * patchCount + sizeof(float) * m_pRadSim->m_SVisMat.getTotalOnesCount();
+    PatchIndex patchCount = m_RadSim.m_Patches.size();
+    size_t memoryUsage = (sizeof(size_t) + sizeof(float)) * patchCount + sizeof(float) * m_RadSim.m_SVisMat.getTotalOnesCount();
     printi("Memory required for viewfactor list: {:.3f} MiB", memoryUsage / 1024.0 / 1024.0);
     m_Offsets.resize(patchCount);
-    m_Data.resize(m_pRadSim->m_SVisMat.getTotalOnesCount());
+    m_Data.resize(m_RadSim.m_SVisMat.getTotalOnesCount());
     m_Koeff.resize(patchCount);
 
     calcOffsets();
@@ -114,7 +114,7 @@ void rad::VFList::calculateVFList() {
     sumViewFactors();
 
     m_bIsLoaded = true;
-    m_PatchHash = m_pRadSim->getPatchHash();
+    m_PatchHash = m_RadSim.getPatchHash();
 }
 
 void rad::VFList::calcOffsets() {
@@ -122,11 +122,11 @@ void rad::VFList::calcOffsets() {
     appfw::Timer timer;
     timer.start();
 
-    PatchIndex patchCount = m_pRadSim->m_Patches.size();
+    PatchIndex patchCount = m_RadSim.m_Patches.size();
     size_t offset = 0;
     for (PatchIndex i = 0; i < patchCount; i++) {
         m_Offsets[i] = offset;
-        offset += m_pRadSim->m_SVisMat.getOnesCountTable()[i];
+        offset += m_RadSim.m_SVisMat.getOnesCountTable()[i];
     }
 
     timer.stop();
@@ -136,36 +136,36 @@ void rad::VFList::calcOffsets() {
 void rad::VFList::calcViewFactors() {
     printi("Calculating view factors...");
 
-    m_pRadSim->updateProgress(0);
+    m_RadSim.updateProgress(0);
 
     appfw::Timer timer;
     timer.start();
 
-    size_t patchCount = m_pRadSim->m_Patches.size();
+    size_t patchCount = m_RadSim.m_Patches.size();
     m_uFinishedPatches = 0;
     tf::Taskflow taskflow;
     taskflow.for_each_index_dynamic((size_t)0, patchCount, (size_t)1, [this](size_t i) { worker(i); });
-    auto result = m_pRadSim->m_Executor.run(taskflow);
+    auto result = m_RadSim.m_Executor.run(taskflow);
 
     while (!appfw::isFutureReady(result)) {
         size_t work = m_uFinishedPatches;
         double done = (double)work / patchCount;
-        m_pRadSim->updateProgress(done);
+        m_RadSim.updateProgress(done);
         std::this_thread::sleep_for(std::chrono::microseconds(1000 / 30));
     }
 
-    m_pRadSim->updateProgress(1);
+    m_RadSim.updateProgress(1);
 
     timer.stop();
     printi("View factors: {:.3f} s", timer.dseconds());
 }
 
 void rad::VFList::worker(size_t i) {
-    auto &countTable = m_pRadSim->m_SVisMat.getCountTable();
-    auto &offsetTable = m_pRadSim->m_SVisMat.getOffsetTable();
-    auto &listItems = m_pRadSim->m_SVisMat.getListItems();
+    auto &countTable = m_RadSim.m_SVisMat.getCountTable();
+    auto &offsetTable = m_RadSim.m_SVisMat.getOffsetTable();
+    auto &listItems = m_RadSim.m_SVisMat.getListItems();
 
-    PatchRef patch(m_pRadSim->m_Patches, (PatchIndex)i);
+    PatchRef patch(m_RadSim.m_Patches, (PatchIndex)i);
 
     PatchIndex p = (PatchIndex)i + 1;
     size_t dataOffset = m_Offsets[i];
@@ -176,7 +176,7 @@ void rad::VFList::worker(size_t i) {
         p += item.offset;
 
         for (PatchIndex k = 0; k < item.size; k++) {
-            PatchRef other(m_pRadSim->m_Patches, p + k);
+            PatchRef other(m_RadSim.m_Patches, p + k);
             float vf = calcPatchViewfactor(patch, other);
             m_Data[dataOffset] = vf;
             dataOffset++;
@@ -185,7 +185,7 @@ void rad::VFList::worker(size_t i) {
         p += item.size;
     }
 
-    AFW_ASSERT(dataOffset - m_Offsets[i] == m_pRadSim->m_SVisMat.getOnesCountTable()[i]);
+    AFW_ASSERT(dataOffset - m_Offsets[i] == m_RadSim.m_SVisMat.getOnesCountTable()[i]);
 
     // Normalize view factors
     /*float k = 1 / sum;
@@ -201,13 +201,13 @@ void rad::VFList::sumViewFactors() {
     appfw::Timer timer;
     timer.start();
 
-    auto &countTable = m_pRadSim->m_SVisMat.getCountTable();
-    auto &offsetTable = m_pRadSim->m_SVisMat.getOffsetTable();
-    auto &listItems = m_pRadSim->m_SVisMat.getListItems();
-    PatchIndex patchCount = m_pRadSim->m_Patches.size();
+    auto &countTable = m_RadSim.m_SVisMat.getCountTable();
+    auto &offsetTable = m_RadSim.m_SVisMat.getOffsetTable();
+    auto &listItems = m_RadSim.m_SVisMat.getListItems();
+    PatchIndex patchCount = m_RadSim.m_Patches.size();
 
     for (PatchIndex i = 0; i < patchCount; i++) {
-        PatchRef patchi(m_pRadSim->m_Patches, i);
+        PatchRef patchi(m_RadSim.m_Patches, i);
         PatchIndex p = i + 1;
         size_t dataOffset = m_Offsets[i];
 
@@ -216,7 +216,7 @@ void rad::VFList::sumViewFactors() {
             p += item.offset;
 
             for (PatchIndex k = 0; k < item.size; k++) {
-                PatchRef patchpk(m_pRadSim->m_Patches, p + k);
+                PatchRef patchpk(m_RadSim.m_Patches, p + k);
                 float vf = m_Data[dataOffset];
                 m_Koeff[i] += vf * patchpk.getSize() * patchpk.getSize();
                 m_Koeff[p + k] += vf * patchi.getSize() * patchi.getSize();

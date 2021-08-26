@@ -3,7 +3,7 @@
 #include <vector>
 #include <appfw/appfw.h>
 #include <appfw/sha256.h>
-#include <rad/types.h>
+#include "types.h"
 
 namespace rad {
 
@@ -13,7 +13,7 @@ class VisMat {
 public:
     static constexpr char VISMAT_MAGIC[] = "VISMAT001";
 
-    VisMat(RadSim *pRadSim);
+    VisMat(RadSimImpl &radSim);
 
     /**
      * Returns true if a vismat is loaded.
@@ -68,7 +68,7 @@ private:
     static constexpr size_t ROW_ALIGNMENT = sizeof(uint8_t);
     static constexpr size_t ROW_ALIGNMENT_BITS = ROW_ALIGNMENT * 8;
 
-    RadSim *m_pRadSim;
+    RadSimImpl &m_RadSim;
     std::atomic_size_t m_uFinishedLeaves;
     bool m_bIsLoaded = false;
     appfw::SHA256::Digest m_PatchHash = {};

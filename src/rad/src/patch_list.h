@@ -4,7 +4,7 @@
 #include <map>
 #include <limits>
 #include <appfw/utils.h>
-#include <rad/types.h>
+#include "types.h"
 
 namespace rad {
 
