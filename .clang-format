@@ -13,6 +13,7 @@ AllowShortLambdasOnASingleLine: All
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 AlwaysBreakTemplateDeclarations: Yes
+BreakConstructorInitializers: BeforeComma
 ColumnLimit: 100
 DerivePointerAlignment: false
 PointerAlignment: Right
