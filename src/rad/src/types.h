@@ -4,6 +4,8 @@
 
 namespace rad {
 
+class RadSimImpl;
+
 using PatchIndex = uint32_t;
 static_assert(std::atomic<PatchIndex>::is_always_lock_free, "PatchIndex atomic is not lock free");
 
@@ -36,6 +38,8 @@ struct Plane : public bsp::BSPPlane {
 
     //! List of faces that are in this plane
     std::vector<unsigned> faces;
+
+    void load(RadSimImpl &radSim, const bsp::BSPPlane &bspPlane);
 };
 
 struct Face : public bsp::BSPFace {
@@ -87,6 +91,8 @@ struct Face : public bsp::BSPFace {
 
     //! Number of patches of this face
     PatchIndex iNumPatches = 0;
+
+    void load(RadSimImpl &radSim, const bsp::BSPFace &bspFace);
 
     //! @returns whether the face has lightmaps and should be split into patches
     inline bool hasLightmap() const {

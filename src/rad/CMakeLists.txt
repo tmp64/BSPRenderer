@@ -20,6 +20,7 @@ set(SOURCE_FILES
 	src/rad_sim_impl.h
 	src/sparse_vismat.cpp
 	src/sparse_vismat.h
+	src/surface.cpp
 	src/types.h
 	src/vflist.cpp
 	src/vflist.h
