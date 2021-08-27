@@ -335,11 +335,12 @@ void DevConsoleDialog::print(const appfw::ConMsgInfo &info, std::string_view msg
 
     int colorInt = (int)color;
 
-    int intensity = (colorInt & 0b1000) ? 255 : 128;
+    int intensityBright = (colorInt & 0b1000) ? 255 : 128;
+    int intensityDark = (colorInt & 0b1000) ? 96 : 64;
     ImColor conColor(
-        (colorInt & 0b0100) ? intensity : 0,
-        (colorInt & 0b0010) ? intensity : 0,
-        (colorInt & 0b0001) ? intensity : 0,
+        (colorInt & 0b0100) ? intensityBright : intensityDark,
+        (colorInt & 0b0010) ? intensityBright : intensityDark,
+        (colorInt & 0b0001) ? intensityBright : intensityDark,
         255
     );
 
