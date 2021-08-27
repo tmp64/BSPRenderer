@@ -2,6 +2,7 @@ set(PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/base_view.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/base_view_2d.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/dev_console_dialog.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/dev_console_overlay.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/gui_app_base.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/imgui_controls.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/input_system.h
@@ -13,6 +14,7 @@ set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view_2d.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_overlay.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/gui_app_base.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/input_system.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp

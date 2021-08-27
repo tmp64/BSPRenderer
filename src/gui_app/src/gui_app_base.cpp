@@ -94,6 +94,7 @@ GuiAppBase::GuiAppBase()
 
     // Dev console
     appfw::getConsole().addConsoleReceiver(&m_DevConsole);
+    appfw::getConsole().addConsoleReceiver(&m_DevConsoleOverlay);
     InputSystem::get().bindKey(SDL_SCANCODE_GRAVE, "toggleconsole");
 
     printi("GuiAppBase initialized.");
@@ -278,6 +279,7 @@ void GuiAppBase::internalTick() {
             m_DevConsole.Draw("Developer Console", &m_bIsConsoleVisible);
         }
 
+        m_DevConsoleOverlay.tick();
         m_ProfDialog.tick();
 
         tick();

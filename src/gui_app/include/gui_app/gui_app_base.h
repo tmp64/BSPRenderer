@@ -11,6 +11,7 @@
 #include <gui_app/utils.h>
 #include <gui_app/input_system.h>
 #include <gui_app/dev_console_dialog.h>
+#include <gui_app/dev_console_overlay.h>
 #include <gui_app/profiler_dialog.h>
 
 class GuiAppInfo {
@@ -136,6 +137,7 @@ protected:
     RendererSystemAppComponent m_RendererSystem;
     InputSystem m_InputSystem;
     DevConsoleDialog m_DevConsole;
+    DevConsoleOverlay m_DevConsoleOverlay;
     ProfilerDialog m_ProfDialog;
 
     bool m_bIsRunning = false;
