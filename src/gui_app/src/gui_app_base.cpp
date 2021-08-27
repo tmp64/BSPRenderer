@@ -8,7 +8,7 @@ ConVar<double> app_fps_max("app_fps_max", 60, "Application framerate");
 ConVar<bool> app_sync_rates("app_sync_rates", false, "Syncs TPS and FPS, uses value from app_fps_max for the rate.");
 ConVar<bool> app_vsync("app_vsync", true, "Enable vertical synchronization");
 ConVar<bool> app_vsync_finish("app_vsync_finish", true,
-                              "Wait for image to be fully displayed after backbuffer swap");
+                              "Wait for image to be fully displayed before rendering");
 
 static ConCommand cmd_toggleconsole("toggleconsole", "Toggles console dialog", [](const CmdString &) {
     GuiAppBase::getBaseInstance().setConsoleVisible(!GuiAppBase::getBaseInstance().isConsoleVisible());
