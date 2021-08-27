@@ -359,8 +359,10 @@ void ImGuiAppComponent::newTick() {
 
 void ImGuiAppComponent::draw() {
     appfw::Prof prof("ImGui");
+    glEnable(GL_FRAMEBUFFER_SRGB);
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    glDisable(GL_FRAMEBUFFER_SRGB);
 }
 
 ImFont *ImGuiAppComponent::loadFont(std::string_view filepath, float size_pixels) {

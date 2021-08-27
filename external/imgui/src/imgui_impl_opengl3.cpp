@@ -579,13 +579,17 @@ bool    ImGui_ImplOpenGL3_CreateDeviceObjects()
         "}\n";
 
     const GLchar* fragment_shader_glsl_130 =
+        "#define GAMMA 2.2\n"
         "uniform sampler2D Texture;\n"
         "in vec2 Frag_UV;\n"
         "in vec4 Frag_Color;\n"
         "out vec4 Out_Color;\n"
         "void main()\n"
         "{\n"
-        "    Out_Color = Frag_Color * texture(Texture, Frag_UV.st);\n"
+        "    vec4 gamma = vec4(GAMMA, GAMMA, GAMMA, 1.0);\n"
+        "    vec4 fragColor = pow(Frag_Color, gamma);\n"
+        "    vec4 texColor = pow(texture(Texture, Frag_UV.st), gamma);\n"
+        "    Out_Color = fragColor * texColor;\n"
         "}\n";
 
     const GLchar* fragment_shader_glsl_300_es =
