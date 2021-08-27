@@ -102,14 +102,6 @@ struct Face : public bsp::BSPFace {
 };
 
 /**
- * Sunlight information.
- */
-struct EnvLight {
-    glm::vec3 vColor = glm::vec3(0, 0, 0);     // color * brightness
-    glm::vec3 vDirection = glm::vec3(0, 0, 0); // Direction of sun rays
-};
-
-/**
  * Returns true if two floats are almost equal.
  */
 inline bool floatEquals(float l, float r) { return std::abs(l - r) <= EPSILON; }
