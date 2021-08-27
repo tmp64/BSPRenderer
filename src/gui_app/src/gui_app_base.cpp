@@ -293,6 +293,14 @@ void GuiAppBase::internalDraw() {
     try {
         m_DrawProfData.begin();
 
+        if (app_vsync_finish.getValue()) {
+            // https://www.khronos.org/opengl/wiki/Swap_Interval
+            // GPU vs CPU synchronization
+            // This should remove lag caused by VSync
+            appfw::Prof prof("glFinish");
+            glFinish();
+        }
+
         if (m_bAutoClear) {
             glClearColor(m_vAutoClearColor.r, m_vAutoClearColor.g, m_vAutoClearColor.b, m_vAutoClearColor.a);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -305,13 +313,6 @@ void GuiAppBase::internalDraw() {
         {
             appfw::Prof prof("Swap Buffers");
             SDL_GL_SwapWindow(m_Window.getWindow());
-
-            if (app_vsync.getValue() && app_vsync_finish.getValue()) {
-                // https://www.khronos.org/opengl/wiki/Swap_Interval
-                // GPU vs CPU synchronization
-                // This should remove lag caused by VSync
-                glFinish();
-            }
         }
 
         m_DrawProfData.end();
