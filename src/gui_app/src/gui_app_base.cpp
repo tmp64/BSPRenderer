@@ -103,6 +103,7 @@ GuiAppBase::GuiAppBase()
 GuiAppBase::~GuiAppBase() {
     AFW_ASSERT(m_sBaseInstance);
 
+    appfw::getConsole().removeConsoleReceiver(&m_DevConsoleOverlay);
     appfw::getConsole().removeConsoleReceiver(&m_DevConsole);
 
     m_sBaseInstance = nullptr;
