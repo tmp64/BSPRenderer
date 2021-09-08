@@ -41,7 +41,6 @@ target_link_libraries(gui_app
 	renderer
 	SDL2::SDL2
 	SDL2::SDL2main
-	nlohmann_json
 )
 
 appfw_get_std_pch(PCH_STD_HEADERS)

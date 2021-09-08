@@ -40,7 +40,6 @@ set(APPFW_ENABLE_GLM ON)
 add_subdirectory(external/appfw)
 add_subdirectory(external/glad_debug)
 add_subdirectory(external/imgui)
-add_subdirectory(external/nlohmann_json)
 add_subdirectory(external/taskflow)
 message(STATUS ">>>>>> Dependencies end")
 

@@ -3,7 +3,6 @@
 #include <optional>
 #include <memory>
 #include <map>
-#include <nlohmann/json_fwd.hpp>
 #include <yaml-cpp/yaml.h>
 #include <appfw/filesystem.h>
 

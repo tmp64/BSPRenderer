@@ -1,4 +1,3 @@
-#include <nlohmann/json.hpp>
 #include <appfw/timer.h>
 #include <appfw/init.h>
 #include <appfw/appfw.h>

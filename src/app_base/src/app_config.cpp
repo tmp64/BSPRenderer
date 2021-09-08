@@ -1,5 +1,4 @@
 #include <fstream>
-#include <nlohmann/json.hpp>
 #include <appfw/appfw.h>
 #include <app_base/app_config.h>
 
