@@ -46,6 +46,8 @@ message(STATUS ">>>>>> Dependencies end")
 # Libraries
 add_subdirectory(src/stb)
 add_subdirectory(src/app_base)
+add_subdirectory(src/app_console_launcher)
+add_subdirectory(src/app_gui_launcher)
 add_subdirectory(src/gui_app)
 add_subdirectory(src/bsp)
 add_subdirectory(src/rad)
