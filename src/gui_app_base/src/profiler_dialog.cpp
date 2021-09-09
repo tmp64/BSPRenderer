@@ -1,5 +1,5 @@
-#include <gui_app/profiler_dialog.h>
-#include <gui_app/gui_app_base.h>
+#include <gui_app_base/profiler_dialog.h>
+#include <gui_app_base/gui_app_base.h>
 
 ConVar<bool> prof_ui("prof_ui", true, "Show profiler dialog");
 

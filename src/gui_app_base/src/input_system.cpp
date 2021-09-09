@@ -1,7 +1,7 @@
 #include <imgui_impl_sdl.h>
 #include <appfw/appfw.h>
-#include <gui_app/input_system.h>
-#include <gui_app/gui_app_base.h>
+#include <gui_app_base/input_system.h>
+#include <gui_app_base/gui_app_base.h>
 
 static ConCommand cmd_bind("bind", "Binds a key to a command", [](const CmdString &cmd) {
     if (cmd.size() != 2 && cmd.size() != 3) {

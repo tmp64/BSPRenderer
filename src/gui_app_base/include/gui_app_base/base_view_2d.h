@@ -1,6 +1,6 @@
 #ifndef GUI_APP_BASE_VIEW_2D_H
 #define GUI_APP_BASE_VIEW_2D_H
-#include <gui_app/base_view.h>
+#include <gui_app_base/base_view.h>
 
 class BaseView2D : public BaseView {
 public:

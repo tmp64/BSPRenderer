@@ -1,13 +1,13 @@
 set(PUBLIC_HEADERS
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/base_view.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/base_view_2d.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/dev_console_dialog.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/dev_console_overlay.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/gui_app_base.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/imgui_controls.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/input_system.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/profiler_dialog.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app/utils.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/base_view.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/base_view_2d.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/dev_console_dialog.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/dev_console_overlay.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/gui_app_base.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/imgui_controls.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/input_system.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/profiler_dialog.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/utils.h
 )
 
 set(PRIVATE_SOURCES
@@ -22,17 +22,17 @@ set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/utils.cpp
 )
 
-add_library(gui_app STATIC
+add_library(gui_app_base STATIC
 	${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
 	${PUBLIC_HEADERS}
 	${PRIVATE_SOURCES}
 )
 
-appfw_module(gui_app)
-target_include_directories(gui_app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_include_directories(gui_app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+appfw_module(gui_app_base)
+target_include_directories(gui_app_base PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(gui_app_base PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-target_link_libraries(gui_app
+target_link_libraries(gui_app_base
 	appfw
 	app_base
 	glad
@@ -45,7 +45,7 @@ target_link_libraries(gui_app
 
 appfw_get_std_pch(PCH_STD_HEADERS)
 appfw_get_pch(PCH_APPFW_HEADERS)
-target_precompile_headers(gui_app PRIVATE
+target_precompile_headers(gui_app_base PRIVATE
     ${PCH_STD_HEADERS}
     ${PCH_APPFW_HEADERS}
 )

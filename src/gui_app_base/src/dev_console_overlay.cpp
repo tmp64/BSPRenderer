@@ -1,5 +1,5 @@
-#include <gui_app/dev_console_overlay.h>
-#include <gui_app/gui_app_base.h>
+#include <gui_app_base/dev_console_overlay.h>
+#include <gui_app_base/gui_app_base.h>
 
 void DevConsoleOverlay::tick() {
     ImGuiWindowFlags window_flags =

@@ -1,5 +1,5 @@
 #include <renderer/base_shader.h>
-#include <gui_app/base_view_2d.h>
+#include <gui_app_base/base_view_2d.h>
 
 //-----------------------------------------------------------
 // GridShader

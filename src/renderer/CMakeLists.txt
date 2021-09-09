@@ -41,7 +41,7 @@ target_link_libraries(renderer
 	bsp
 	glad
 	glm::glm
-	gui_app
+	gui_app_base
 	imgui
 	stb
 )

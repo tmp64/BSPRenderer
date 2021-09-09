@@ -4,7 +4,7 @@
 #include <appfw/appfw.h>
 #include <renderer/base_shader.h>
 #include <renderer/utils.h>
-#include <gui_app/base_view.h>
+#include <gui_app_base/base_view.h>
 
 #ifdef GLAD_OPENGL_ES
 #define glTexImage2DMultisample glTexStorage2DMultisample

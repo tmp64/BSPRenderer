@@ -1,7 +1,7 @@
 #include "SDL.h"
 #include <appfw/appfw.h>
 #include <appfw/init.h>
-#include <gui_app/gui_app_base.h>
+#include <gui_app_base/gui_app_base.h>
 
 int app_runmain(int argc, char **argv) {
     SDLAppComponent sdl;

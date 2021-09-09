@@ -8,8 +8,8 @@
 #include <appfw/dbg.h>
 #include <renderer/shader_manager.h>
 #include <renderer/material_manager.h>
-#include <gui_app/utils.h>
-#include <gui_app/gui_app_base.h>
+#include <gui_app_base/utils.h>
+#include <gui_app_base/gui_app_base.h>
 
 #ifndef GL_CONTEXT_FLAG_DEBUG_BIT
 #define GL_CONTEXT_FLAG_DEBUG_BIT 2

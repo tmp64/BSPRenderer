@@ -1,6 +1,6 @@
 #ifndef APP_H
 #define APP_H
-#include <gui_app/gui_app_base.h>
+#include <gui_app_base/gui_app_base.h>
 #include <renderer/scene_renderer.h>
 #include "world_state.h"
 #include "renderer.h"

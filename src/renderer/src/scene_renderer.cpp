@@ -5,7 +5,7 @@
 #include <stb_image.h>
 #include <renderer/scene_renderer.h>
 #include <imgui.h>
-#include <gui_app/imgui_controls.h>
+#include <gui_app_base/imgui_controls.h>
 #include "scene_shaders.h"
 
 ConVar<int> r_cull("r_cull", 1,

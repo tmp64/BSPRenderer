@@ -10,7 +10,7 @@ add_executable(bspviewer
 	src/renderer.h
 	src/world_state.cpp
 	src/world_state.h
-	../gui_app/src/gui_app.manifest
+	../gui_app_base/src/gui_app.manifest
 )
 
 appfw_module(bspviewer)
@@ -20,7 +20,7 @@ target_include_directories(bspviewer PRIVATE
 )
 
 target_link_libraries(bspviewer
-	gui_app
+	gui_app_base
 )
 
 appfw_get_std_pch(PCH_STD_HEADERS)

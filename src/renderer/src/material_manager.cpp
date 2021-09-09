@@ -2,7 +2,7 @@
 #include <appfw/prof.h>
 #include <appfw/timer.h>
 #include <bsp/wad_file.h>
-#include <gui_app/imgui_controls.h>
+#include <gui_app_base/imgui_controls.h>
 #include <stb_image.h>
 #include <renderer/material_manager.h>
 

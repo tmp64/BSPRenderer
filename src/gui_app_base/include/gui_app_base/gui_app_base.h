@@ -8,11 +8,11 @@
 #include <appfw/compiler.h>
 #include <appfw/prof.h>
 #include <app_base/app_config.h>
-#include <gui_app/utils.h>
-#include <gui_app/input_system.h>
-#include <gui_app/dev_console_dialog.h>
-#include <gui_app/dev_console_overlay.h>
-#include <gui_app/profiler_dialog.h>
+#include <gui_app_base/utils.h>
+#include <gui_app_base/input_system.h>
+#include <gui_app_base/dev_console_dialog.h>
+#include <gui_app_base/dev_console_overlay.h>
+#include <gui_app_base/profiler_dialog.h>
 
 class GuiAppInfo {
 public:

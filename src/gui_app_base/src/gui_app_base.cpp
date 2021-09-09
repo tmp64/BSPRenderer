@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <iostream>
 #include <appfw/init.h>
-#include <gui_app/gui_app_base.h>
+#include <gui_app_base/gui_app_base.h>
 
 ConVar<double> app_tps_max("app_tps_max", 100, "Application tickrate");
 ConVar<double> app_fps_max("app_fps_max", 60, "Application framerate");
