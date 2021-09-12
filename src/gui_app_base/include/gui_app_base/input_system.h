@@ -6,12 +6,11 @@
 #include <SDL.h>
 #include <appfw/utils.h>
 #include <appfw/appfw.h>
+#include <app_base/app_component.h>
 
-class InputSystem : appfw::NoCopy {
+class InputSystem : public AppComponentBase<InputSystem> {
 public:
     static constexpr size_t MAX_MOUSE_BUTTONS = 5;
-
-    static inline InputSystem &get() { return *m_sInstance; }
 
     InputSystem();
     ~InputSystem();
@@ -20,12 +19,12 @@ public:
      * Handles an SDL2 event.
      * @return true if handled, false if ignored
      */
-    bool handleSDLEvent(SDL_Event event);
+    bool handleSDLEvent(const SDL_Event &event);
 
     /**
      * Called every tick to perform actions for held keys.
      */
-    void tick();
+    void tick() override;
 
     /**
      * If true, keys and mouse movements are sent to the app, cursor is hidden,
@@ -81,8 +80,6 @@ public:
     void discardMouseMovement();
 
 private:
-    static inline InputSystem *m_sInstance = nullptr;
-
     bool m_bGrabInput = false;
     int m_iMouseRelX = 0;
     int m_iMouseRelY = 0;

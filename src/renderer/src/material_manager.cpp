@@ -94,13 +94,8 @@ Material::Material(const bsp::WADTexture &texture, std::vector<uint8_t> &buffer)
 //----------------------------------------------------------------
 // Material Manager
 //----------------------------------------------------------------
-MaterialManager &MaterialManager::get() {
-    static MaterialManager singleton;
-    return singleton;
-}
-
-void MaterialManager::init() {
-    AFW_ASSERT(m_Materials.empty());
+MaterialManager::MaterialManager() {
+    setTickEnabled(true);
     m_Materials.emplace_back(nullptr);
 
     if (isAnisoSupported()) {
@@ -112,7 +107,7 @@ void MaterialManager::init() {
     }
 }
 
-void MaterialManager::shutdown() {
+MaterialManager::~MaterialManager() {
     m_Map.clear();
     m_Materials.clear();
 }

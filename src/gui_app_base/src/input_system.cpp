@@ -54,8 +54,7 @@ static ConCommand
 });
 
 InputSystem::InputSystem() {
-    AFW_ASSERT(!m_sInstance);
-    m_sInstance = this;
+    setTickEnabled(true);
     createScancodeMap();
     setGrabInput(false);
 
@@ -64,11 +63,9 @@ InputSystem::InputSystem() {
 }
 
 InputSystem::~InputSystem() {
-    AFW_ASSERT(m_sInstance);
-    m_sInstance = nullptr;
 }
 
-bool InputSystem::handleSDLEvent(SDL_Event event) {
+bool InputSystem::handleSDLEvent(const SDL_Event &event) {
     auto fnProcessImGui = [&]() {
         ImGuiIO& io = ImGui::GetIO();
         if (io.WantCaptureMouse || io.WantCaptureKeyboard) {

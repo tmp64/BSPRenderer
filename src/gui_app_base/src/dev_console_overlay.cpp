@@ -1,5 +1,5 @@
-#include <gui_app_base/dev_console_overlay.h>
 #include <gui_app_base/gui_app_base.h>
+#include "dev_console_overlay.h"
 
 void DevConsoleOverlay::tick() {
     ImGuiWindowFlags window_flags =
@@ -45,7 +45,9 @@ void DevConsoleOverlay::tick() {
     ImGui::End();
 }
 
-void DevConsoleOverlay::onAdd(appfw::ConsoleSystem *) {}
+void DevConsoleOverlay::onAdd(appfw::ConsoleSystem *m_pConSystem) {
+    m_pConSystem->printPreviousMessages(this);
+}
 
 void DevConsoleOverlay::onRemove(appfw::ConsoleSystem *) {}
 
@@ -54,7 +56,7 @@ void DevConsoleOverlay::print(const appfw::ConMsgInfo &info, std::string_view ms
     Item &item = m_Items[m_uIdx];
     item.text = msg;
     item.color = getColor(info);
-    item.endTime = GuiAppBase::getBaseInstance().getCurrentTime() + EXPIRATION_TIME;
+    item.endTime = GuiAppBase::getBaseInstance().getTime() + EXPIRATION_TIME;
     m_uIdx = (m_uIdx + 1) % ITEM_COUNT;
 }
 
@@ -99,5 +101,5 @@ void DevConsoleOverlay::drawText(Item &item) {
 }
 
 bool DevConsoleOverlay::Item::isExpired() {
-    return GuiAppBase::getBaseInstance().getCurrentTime() > endTime;
+    return GuiAppBase::getBaseInstance().getTime() > endTime;
 }

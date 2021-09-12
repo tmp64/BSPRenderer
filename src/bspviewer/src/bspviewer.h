@@ -7,14 +7,16 @@
 
 class BSPViewer : public GuiAppBase {
 public:
+    using BaseClass = GuiAppBase;
+
     static BSPViewer &get();
 
     BSPViewer();
     ~BSPViewer();
 
-    virtual void tick() override;
-    virtual void draw() override;
-    virtual void onWindowSizeChange(int wide, int tall) override;
+    void tick() override;
+    void drawBackground() override;
+    void onWindowSizeChange(int wide, int tall) override;
 
     /**
      * Load a .bsp map

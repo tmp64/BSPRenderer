@@ -1,6 +1,7 @@
 #ifndef APP_BASE_H
 #define APP_BASE_H
 #include <vector>
+#include <fmt/format.h>
 #include <appfw/utils.h>
 #include <appfw/prof.h>
 #include <app_base/components.h>
@@ -49,6 +50,9 @@ public:
 
     //! Returns the app config
     inline AppConfig &getConfig() { return m_Config.getConfig(); }
+
+    //! Returns the app framerate.
+    double getFrameRate();
 
 protected:
     //! Called after all components lateInit

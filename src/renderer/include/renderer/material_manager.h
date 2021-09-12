@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <renderer/raii.h>
+#include <app_base/app_component.h>
 
 constexpr size_t NULL_MATERIAL = 0; //!< Index of a null material (black-purple checkerboard)
 constexpr size_t INVALID_MATERIAL = std::numeric_limits<size_t>::max(); //!< Index of an invalid material (can't be used with getMaterial)
@@ -63,24 +64,15 @@ private:
 /**
  * Loads WAD files and provides access to materials.
  */
-class MaterialManager {
+class MaterialManager : public AppComponentBase<MaterialManager> {
 public:
-    static MaterialManager &get();
-    
-    /**
-     * Initializes the material manager.
-     */
-    void init();
-
-    /**
-     * Releases used resources.
-     */
-    void shutdown();
+    MaterialManager();
+    ~MaterialManager();
 
     /**
      * Per-tick update.
      */
-    void tick();
+    void tick() override;
 
     /**
      * Returns whether specified WAD is loaded or not.

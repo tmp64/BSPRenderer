@@ -1,27 +1,15 @@
 #ifndef RENDERER_SHADER_MANAGER_H
 #define RENDERER_SHADER_MANAGER_H
 #include <vector>
+#include <app_base/app_component.h>
 #include <renderer/shader_definitions.h>
 
 class BaseShader;
 
-class ShaderManager {
+class ShaderManager : public AppComponentBase<ShaderManager> {
 public:
-    /**
-     * Returns instance of shader manager.
-     */
-    static ShaderManager &get();
-
-    /**
-     * Initializes shader manager.
-     * Calls registerAllAvailableItems.
-     */
-    void init();
-
-    /**
-     * Deletes all shaders.
-     */
-    void shutdown();
+    ShaderManager();
+    ~ShaderManager();
 
     /**
      * Adds all unregistered shaders to this system.

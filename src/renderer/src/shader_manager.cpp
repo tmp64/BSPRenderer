@@ -4,12 +4,7 @@
 
 ConCommand r_reloadshaders("r_reloadshaders", "Reloads all shaders", [](auto &) { ShaderManager::get().reloadShaders(); });
 
-ShaderManager &ShaderManager::get() {
-    static ShaderManager singleton;
-    return singleton;
-}
-
-void ShaderManager::init() {
+ShaderManager::ShaderManager() {
     // Add default definitions
     getVertDefinitions().addDef("IFACE_VF", "out");
     getFragDefinitions().addDef("IFACE_VF", "in");
@@ -18,7 +13,9 @@ void ShaderManager::init() {
     reloadShaders();
 }
 
-void ShaderManager::shutdown() { destroyAllShaders(); }
+ShaderManager::~ShaderManager() {
+    destroyAllShaders();
+}
 
 void ShaderManager::registerAllAvailableItems() {
     auto &list = BaseShader::getUnregItems();

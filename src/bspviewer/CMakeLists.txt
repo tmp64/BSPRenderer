@@ -21,6 +21,7 @@ target_include_directories(bspviewer PRIVATE
 
 target_link_libraries(bspviewer
 	gui_app_base
+	app_gui_launcher
 )
 
 appfw_get_std_pch(PCH_STD_HEADERS)

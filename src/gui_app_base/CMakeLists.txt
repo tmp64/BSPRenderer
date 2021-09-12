@@ -1,25 +1,26 @@
 set(PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/base_view.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/base_view_2d.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/dev_console_dialog.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/dev_console_overlay.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/gui_app_base.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/gui_components.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/imgui_controls.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/input_system.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/profiler_dialog.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/utils.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/opengl_context.h
 )
 
 set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view_2d.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_overlay.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_overlay.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/gui_app_base.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/gui_components.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/input_system.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/opengl_context.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/profiler_dialog.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/utils.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/profiler_dialog.h
 )
 
 add_library(gui_app_base STATIC

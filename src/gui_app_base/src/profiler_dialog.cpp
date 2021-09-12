@@ -1,5 +1,5 @@
-#include <gui_app_base/profiler_dialog.h>
 #include <gui_app_base/gui_app_base.h>
+#include "profiler_dialog.h"
 
 ConVar<bool> prof_ui("prof_ui", true, "Show profiler dialog");
 
@@ -147,7 +147,7 @@ void ProfilerDialog::resetGraphData() {
     m_uTimingIndex = 0;
 
     if (m_uSelectedSection != 0) {
-        m_TimingLog.resize((size_t)(m_flRecordSecs * GuiAppBase::getBaseInstance().getTickRate()));
+        m_TimingLog.resize((size_t)(m_flRecordSecs * GuiAppBase::getBaseInstance().getFrameRate()));
     }
 }
 

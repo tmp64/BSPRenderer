@@ -1,5 +1,5 @@
 #include <appfw/appfw.h>
-#include <gui_app_base/dev_console_dialog.h>
+#include "dev_console_dialog.h"
 
 DevConsoleDialog::DevConsoleDialog() {
     ClearLog();

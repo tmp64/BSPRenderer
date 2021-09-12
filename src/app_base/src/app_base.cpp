@@ -168,6 +168,10 @@ void AppBase::processTick() {
     }
 }
 
+double AppBase::getFrameRate() {
+    return app_fps_max.getValue();
+}
+
 static AppFatalErrorHandler s_FatalErrorHandler = nullptr;
 
 [[noreturn]] void app_vfatalError(const char *format, fmt::format_args args) {

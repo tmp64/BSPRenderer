@@ -13,8 +13,6 @@
 
 #include "bspviewer.h"
 
-static ConCommand quit_cmd("quit", "Exits the app", []() { BSPViewer::get().quit(); });
-
 static ConCommand cmd_map("map", "Loads a map", [](const CmdString &cmd) {
     if (cmd.size() != 2) {
         printi("Usage: map <map name>");
@@ -51,30 +49,15 @@ static ConCommand cmd_setpos("setpos", "", [](const CmdString &cmd) {
 
 static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
 static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
-static ConVar<bool> gl_break_on_error("gl_break_on_error", false, "Break in debugger on OpenGL error");
 
 //----------------------------------------------------------------
 
-/**
- * Returns info for current app's initialization.
- * Must be implemented by the app.
- */
-const GuiAppInfo &app_getInitInfo() {
-    static GuiAppInfo info = {"bspviewer", fs::u8path("")};
-
+const AppInitInfo &app_getInitInfo() {
+    static AppInitInfo info = {"bspviewer", fs::u8path("")};
     return info;
 }
 
-/**
- * Creates an instance of GuiAppBase.
- * Must be implemented by the app.
- */
-std::unique_ptr<GuiAppBase> app_createSingleton() { return std::make_unique<BSPViewer>(); }
-
-/**
- * SDL2 application entry point.
- */
-extern "C" int main(int argc, char **argv) { return app_runmain(argc, argv); }
+std::unique_ptr<AppBase> app_createSingleton() { return std::make_unique<BSPViewer>(); }
 
 //----------------------------------------------------------------
 
@@ -108,9 +91,8 @@ BSPViewer::~BSPViewer() {
 }
 
 void BSPViewer::tick() {
-    //
+    BaseClass::tick();
     ImGui::ShowDemoWindow();
-    //
 
     switch (m_LoadingState) {
     case LoadingState::NotLoaded: {
@@ -132,7 +114,9 @@ void BSPViewer::tick() {
     showInfoDialog();
 }
 
-void BSPViewer::draw() {
+void BSPViewer::drawBackground() {
+    BaseClass::drawBackground();
+
     if (m_LoadingState == LoadingState::Loaded) {
         Renderer::get().draw();
     }
@@ -156,8 +140,6 @@ void BSPViewer::showInfoDialog() {
     ImColor red = ImColor(255, 0, 0, 255);
 
     if (ImGui::Begin("BSPViewer Stats", nullptr, window_flags)) {
-        showStatsUI();
-
         ImGui::Separator();
         ImGui::Text("Pos: X: %9.3f / Y: %9.3f / Z: %9.3f", m_vPos.x, m_vPos.y, m_vPos.z);
         ImGui::Text("Rot: P: %9.3f / Y: %9.3f / R: %9.3f", m_vRot.x, m_vRot.y, m_vRot.z);
@@ -207,7 +189,7 @@ void BSPViewer::processUserInput() {
 
     // Translate the camera
     {
-        float delta = cam_speed.getValue() * (float)m_flLastFrameTime;
+        float delta = cam_speed.getValue() * getTimeDelta();
         const Uint8 *state = SDL_GetKeyboardState(nullptr);
 
         auto fnMove = [&](float x, float y, float z) {
