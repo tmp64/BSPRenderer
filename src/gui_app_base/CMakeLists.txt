@@ -1,4 +1,4 @@
-set(PUBLIC_HEADERS
+set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/base_view.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/base_view_2d.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/gui_app_base.h
@@ -6,9 +6,7 @@ set(PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/imgui_controls.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/input_system.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/opengl_context.h
-)
 
-set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view_2d.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.cpp
@@ -25,8 +23,7 @@ set(PRIVATE_SOURCES
 
 add_library(gui_app_base STATIC
 	${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
-	${PUBLIC_HEADERS}
-	${PRIVATE_SOURCES}
+	${SOURCE_FILES}
 )
 
 appfw_module(gui_app_base)
@@ -51,6 +48,4 @@ target_precompile_headers(gui_app_base PRIVATE
     ${PCH_APPFW_HEADERS}
 )
 
-source_group("Public Headers" FILES ${PUBLIC_HEADERS})
-source_group("Private Headers" FILES ${PRIVATE_HEADERS})
-source_group("Private Sources" FILES ${PRIVATE_SOURCES})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})

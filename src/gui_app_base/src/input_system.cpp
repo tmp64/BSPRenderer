@@ -111,7 +111,15 @@ bool InputSystem::handleSDLEvent(const SDL_Event &event) {
 
         fnProcessImGui();
         return true;
-    } 
+    }
+    case SDL_TEXTINPUT: {
+        // HACK: Ignore ` key so it isn't typed in the console
+        if (event.text.text[0] == '`' && event.text.text[1] == '\0') {
+            return true;
+        }
+
+        return fnProcessImGui();
+    }
     default: {
         return fnProcessImGui();
     }

@@ -49,4 +49,16 @@ inline void CvarSlider(const char *label, ConVar<float> &cvar, float v_min, floa
 	}
 }
 
+//! Shows an ImGui frame with close button that sets a cvar to false.
+inline bool ImGuiBeginCvar(const char *name, ConVar<bool> &cvar, ImGuiWindowFlags flags = 0) {
+    bool isVisible = cvar.getValue();
+    bool result = ImGui::Begin(name, &isVisible, flags);
+
+	if (isVisible != cvar.getValue()) {
+        cvar.setValue(isVisible);
+	}
+
+	return result;
+}
+
 #endif

@@ -1,7 +1,6 @@
 #include <appfw/appfw.h>
 #include <gui_app_base/gui_app_base.h>
 #include "dev_console_dialog.h"
-#include "dev_console_overlay.h"
 #include "profiler_dialog.h"
 
 ConVar<bool> app_vsync("app_vsync", true, "Enable vertical synchronization");
@@ -10,11 +9,6 @@ ConVar<bool> app_vsync_finish("app_vsync_finish", true,
 
 GuiAppBase::GuiAppBase() {
     m_pDevConsole = std::make_unique<DevConsoleDialog>();
-    appfw::getConsole().addConsoleReceiver(m_pDevConsole.get());
-
-    m_pDevConsoleOverlay = std::make_unique<DevConsoleOverlay>();
-    appfw::getConsole().addConsoleReceiver(m_pDevConsoleOverlay.get());
-
     m_pProfilerUI = std::make_unique<ProfilerDialog>();
 
     // Set VSync cvar callback
@@ -46,10 +40,7 @@ GuiAppBase::GuiAppBase() {
     app_vsync.setValue(app_vsync.getValue());
 }
 
-GuiAppBase::~GuiAppBase() {
-    appfw::getConsole().removeConsoleReceiver(m_pDevConsoleOverlay.get());
-    appfw::getConsole().removeConsoleReceiver(m_pDevConsole.get());
-}
+GuiAppBase::~GuiAppBase() = default;
 
 void GuiAppBase::lateInit() {
     // Update window size
@@ -64,8 +55,7 @@ void GuiAppBase::beginTick() {
 }
 
 void GuiAppBase::tick() {
-    m_pDevConsole->Draw("Developer Console", nullptr);
-    m_pDevConsoleOverlay->tick();
+    m_pDevConsole->tick();
     m_pProfilerUI->tick();
 }
 

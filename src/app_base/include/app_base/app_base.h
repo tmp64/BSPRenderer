@@ -29,7 +29,7 @@ public:
     static inline bool isBaseReady() { return m_spInstance != nullptr; }
 
     AppBase();
-    ~AppBase();
+    virtual ~AppBase();
 
     //! Runs the event loop, blocks until the program finishes.
     //! @returns program return code

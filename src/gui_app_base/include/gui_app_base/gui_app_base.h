@@ -10,7 +10,6 @@
 #include <renderer/material_manager.h>
 
 class DevConsoleDialog;
-class DevConsoleOverlay;
 class ProfilerDialog;
 
 //! Base class for apps that use OpenGL and ImGui
@@ -66,7 +65,6 @@ private:
     ImGuiComponent m_ImGui;
     InputSystem m_InputSystem;
     std::unique_ptr<DevConsoleDialog> m_pDevConsole;
-    std::unique_ptr<DevConsoleOverlay> m_pDevConsoleOverlay;
     std::unique_ptr<ProfilerDialog> m_pProfilerUI;
 
     glm::ivec2 m_vWindowSize = glm::ivec2(0, 0);

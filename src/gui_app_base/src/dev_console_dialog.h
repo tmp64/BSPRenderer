@@ -7,30 +7,14 @@
 #include <appfw/utils.h>
 #include <appfw/console/console_system.h>
 
-class DevConsoleDialog : appfw::NoCopy, public appfw::IConsoleReceiver {
+class DevConsoleDialog : appfw::NoMove, public appfw::IConsoleReceiver {
 public:
     DevConsoleDialog();
     ~DevConsoleDialog();
 
-    // Portable helpers
-    static int Stricmp(const char *s1, const char *s2);
-    static int Strnicmp(const char *s1, const char *s2, int n);
-    static char *Strdup(const char *s);
-    static void Strtrim(char *s);
-
-    void ClearLog();
-
-    void AddLog(const char *fmt, ...);
-    void AddLog(ImVec4 color, const char *fmt, ...);
-
-    void Draw(const char *title, bool *p_open);
-
-    void ExecCommand(const char *command_line);
-
-    // In C++11 you'd be better off using lambdas for this sort of forwarding callbacks
-    static int TextEditCallbackStub(ImGuiInputTextCallbackData *data);
-
-    int TextEditCallback(ImGuiInputTextCallbackData *data);
+    void tick();
+    void clearLog();
+    void printText(std::string_view msg);
 
     // IConsoleReceiver
     void onAdd(appfw::ConsoleSystem *conSystem) override;
@@ -39,20 +23,52 @@ public:
     bool isThreadSafe() override;
 
 private:
-    struct LogEntry {
-        char *text;
-        ImVec4 color;
+    static constexpr size_t MAX_ITEM_COUNT = 1024;
+    static constexpr size_t OVERLAY_ITEM_COUNT = 6;
+    static constexpr float OVERLAY_OFFSET_X = 0.0f;
+    static constexpr float OVERLAY_OFFSET_Y = 0.0f;
+    static constexpr float OVERLAY_EXPIRATION_TIME = 5.0f;
+
+    struct Item {
+        ImVec4 dialogColor;
+        ImVec4 overlayColor;
+        std::string message;
+        float overlayEndTime = 0;
+        bool isExpired();
     };
 
-    char InputBuf[256];
-    ImVector<LogEntry> Items;
-    ImVector<char *> History;
-    int HistoryPos; // -1: new line, 0..History.Size-1 browsing history.
-    ImGuiTextFilter Filter;
-    bool AutoScroll;
-    bool ScrollToBottom;
-    appfw::ConsoleSystem *m_pConSystem = nullptr;
     std::mutex m_Mutex;
+    appfw::ConsoleSystem *m_pConSystem = nullptr;
+    bool m_bAutoScroll = true;
+    bool m_bScrollToBottom = false;
+
+    // Item ring buffer
+    std::vector<Item> m_Items;
+    size_t m_ItemOffset = 0;
+
+    // Input
+    char m_InputBuf[512] = {};
+
+    // History
+    std::vector<std::string> m_History;
+    int m_iHistoryPos = -1; // -1: new line, 0..History.Size-1 browsing history.
+
+    void showDialog();
+    void showOverlay();
+
+    Item &getItem(size_t idx);
+    ImVec4 getDialogItemColor(const appfw::ConMsgInfo &info);
+    ImVec4 getOverlayItemColor(const appfw::ConMsgInfo &info);
+
+    int textEditCallback(ImGuiInputTextCallbackData *data);
+    void execCommand(const char *commandline);
+
+    void drawOverlayTextShadow(Item &item);
+    void drawOverlayText(Item &item);
+
+    static int stricmp(const char *s1, const char *s2);
+    static int strnicmp(const char *s1, const char *s2, int n);
+    static void strtrim(char *s);
 };
 
 #endif
