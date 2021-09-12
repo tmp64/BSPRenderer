@@ -11,8 +11,6 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view_2d.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.h
-	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_overlay.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_overlay.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/gui_app_base.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/gui_components.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/input_system.cpp
