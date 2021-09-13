@@ -328,11 +328,11 @@ void SceneRenderer::createScreenQuad() {
     // clang-format on
 
     m_nQuadVao.create();
-    m_nQuadVbo.create();
+    m_nQuadVbo.create("SceneRenderer: Quad VBO");
 
     glBindVertexArray(m_nQuadVao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_nQuadVbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    m_nQuadVbo.bind(GL_ARRAY_BUFFER);
+    m_nQuadVbo.bufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(1);
@@ -341,32 +341,34 @@ void SceneRenderer::createScreenQuad() {
 }
 
 void SceneRenderer::createGlobalUniform() {
-    m_nGlobalUniform.create();
-    glBindBuffer(GL_UNIFORM_BUFFER, m_nGlobalUniform);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(GlobalUniform), nullptr, GL_DYNAMIC_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    m_GlobalUniformBuffer.create("SceneRenderer: Global Uniform");
+    m_GlobalUniformBuffer.bind(GL_UNIFORM_BUFFER);
+    m_GlobalUniformBuffer.bufferData(GL_UNIFORM_BUFFER, sizeof(GlobalUniform), nullptr, GL_DYNAMIC_DRAW);
+    m_GlobalUniformBuffer.unbind(GL_UNIFORM_BUFFER);
 }
 
 void SceneRenderer::recreateFramebuffer() {
     destroyFramebuffer();
 
     // Create FP color buffer
-    m_nColorBuffer.create();
-    glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_vViewportSize.x, m_vViewportSize.y, 0, GL_RGBA, GL_FLOAT, NULL);
+    m_nColorBuffer.create("SceneRenderer: Backbuffer color buffer");
+    glBindTexture(GL_TEXTURE_2D, m_nColorBuffer.getId());
+    m_nColorBuffer.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_vViewportSize.x, m_vViewportSize.y, 0,
+                              GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // Create depth buffer (renderbuffer)
-    m_nRenderBuffer.create();
-    glBindRenderbuffer(GL_RENDERBUFFER, m_nRenderBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, m_vViewportSize.x, m_vViewportSize.y);
+    // Create depth buffer
+    m_nRenderBuffer.create("SceneRenderer: Backbuffer depth buffer");
+    glBindRenderbuffer(GL_RENDERBUFFER, m_nRenderBuffer.getId());
+    m_nRenderBuffer.renderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, m_vViewportSize.x,
+                                        m_vViewportSize.y);
 
     // Attach buffers
     m_nHdrFramebuffer.create();
     glBindFramebuffer(GL_FRAMEBUFFER, m_nHdrFramebuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_nColorBuffer, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_nRenderBuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_nColorBuffer.getId(), 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_nRenderBuffer.getId());
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         throw std::runtime_error("SceneRenderer::recreateFramebuffer(): HDR framebuffer not complete");
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -505,15 +507,16 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
 
 void SceneRenderer::finishLoadBSPLightmaps() {
     // Load the block into the GPU
-    m_Data.bspLightmapBlockTex.create();
+    m_Data.bspLightmapBlockTex.create("SceneRenderer: BSP lightmap block");
     int filter = r_filter_lm.getValue() ? GL_LINEAR : GL_NEAREST;
-    glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex);
+    glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex.getId());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE, 0, GL_RGB,
-                 GL_UNSIGNED_BYTE, m_pLoadingState->bspLightmapBlock.getData());
+    m_Data.bspLightmapBlockTex.texImage2D(GL_TEXTURE_2D, 0, GL_RGB8, BSP_LIGHTMAP_BLOCK_SIZE,
+                                          BSP_LIGHTMAP_BLOCK_SIZE, 0, GL_RGB, GL_UNSIGNED_BYTE,
+                                          m_pLoadingState->bspLightmapBlock.getData());
     glGenerateMipmap(GL_TEXTURE_2D);
 
     m_pLoadingState->bspLightmapBlock.clear();
@@ -650,14 +653,15 @@ void SceneRenderer::finishLoadCustomLightmaps() {
     auto &blockData = m_pLoadingState->customLightmapTex;
 
     // Load the block into the GPU
-    m_Data.customLightmapBlockTex.create();
+    m_Data.customLightmapBlockTex.create("SceneRenderer: custom lightmap block");
     int filter = r_filter_lm.getValue() ? GL_LINEAR : GL_NEAREST;
-    glBindTexture(GL_TEXTURE_2D, m_Data.customLightmapBlockTex);
+    glBindTexture(GL_TEXTURE_2D, m_Data.customLightmapBlockTex.getId());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, blockSize.x, blockSize.y, 0, GL_RGB, GL_FLOAT,
+    m_Data.customLightmapBlockTex.texImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, blockSize.x, blockSize.y, 0,
+                                             GL_RGB, GL_FLOAT,
                  blockData.data());
     glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -668,12 +672,12 @@ void SceneRenderer::finishLoadCustomLightmaps() {
     if (!patchBuf.empty()) {
         m_Data.patchesVerts = (uint32_t)patchBuf.size();
         m_Data.patchesVao.create();
-        m_Data.patchesVbo.create();
+        m_Data.patchesVbo.create("SceneRenderer: Patches");
 
         glBindVertexArray(m_Data.patchesVao);
-        glBindBuffer(GL_ARRAY_BUFFER, m_Data.patchesVbo);
-        glBufferData(GL_ARRAY_BUFFER, m_Data.patchesVerts * sizeof(glm::vec3), patchBuf.data(),
-                     GL_STATIC_DRAW);
+        m_Data.patchesVbo.bind(GL_ARRAY_BUFFER);
+        m_Data.patchesVbo.bufferData(GL_ARRAY_BUFFER, m_Data.patchesVerts * sizeof(glm::vec3),
+                                     patchBuf.data(), GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
     }
@@ -765,11 +769,12 @@ void SceneRenderer::finishCreateSurfaceObjects() {
 
     // VAO for world geometry
     m_Data.surfVao.create();
-    m_Data.surfVbo.create();
+    m_Data.surfVbo.create("SceneRendere: Surface vertices");
     glBindVertexArray(m_Data.surfVao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_Data.surfVbo);
+    m_Data.surfVbo.bind(GL_ARRAY_BUFFER);
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * allVertices.size(), allVertices.data(), GL_STATIC_DRAW);
+    m_Data.surfVbo.bufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * allVertices.size(),
+                              allVertices.data(), GL_STATIC_DRAW);
     enableSurfaceAttribs();
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -778,10 +783,11 @@ void SceneRenderer::finishCreateSurfaceObjects() {
     printi("Maximum EBO size: {} B", maxEboSize * sizeof(uint16_t));
     printi("Vertex count: {}", allVertices.size());
     m_Data.surfEboData.resize(maxEboSize);
-    m_Data.surfEbo.create();
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.surfEbo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, maxEboSize * sizeof(uint16_t), nullptr, GL_DYNAMIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    m_Data.surfEbo.create("SceneRendere: Surface vertex indices");
+    m_Data.surfEbo.bind(GL_ELEMENT_ARRAY_BUFFER);
+    m_Data.surfEbo.bufferData(GL_ELEMENT_ARRAY_BUFFER, maxEboSize * sizeof(uint16_t), nullptr,
+                              GL_DYNAMIC_DRAW);
+    m_Data.surfEbo.unbind(GL_ELEMENT_ARRAY_BUFFER);
 
     printi("Surface objects: finished");
 }
@@ -999,9 +1005,9 @@ void SceneRenderer::frameSetup(float flSimTime, float flTimeDelta) {
     m_GlobalUniform.viParams1.x = r_texture.getValue();
     m_GlobalUniform.viParams1.y = r_lighting.getValue();
     
-    glBindBuffer(GL_UNIFORM_BUFFER, m_nGlobalUniform);
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(m_GlobalUniform), &m_GlobalUniform);
-    glBindBufferBase(GL_UNIFORM_BUFFER, GLOBAL_UNIFORM_BIND, m_nGlobalUniform);
+    m_GlobalUniformBuffer.bind(GL_UNIFORM_BUFFER);
+    m_GlobalUniformBuffer.bufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(m_GlobalUniform), &m_GlobalUniform);
+    glBindBufferBase(GL_UNIFORM_BUFFER, GLOBAL_UNIFORM_BIND, m_GlobalUniformBuffer.getId());
 
     // Bind lightmap - will be used for world and brush ents
     bindLightmapBlock();
@@ -1036,14 +1042,14 @@ void SceneRenderer::setupViewContext() {
 void SceneRenderer::bindLightmapBlock() {
     // Bind lightmap block texture
     if (r_lighting.getValue() == 2) {
-        if (m_Data.bspLightmapBlockTex != 0) {
+        if (m_Data.bspLightmapBlockTex.getId() != 0) {
             glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex);
+            glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex.getId());
         }
     } else if (r_lighting.getValue() == 3) {
-        if (m_Data.customLightmapBlockTex != 0) {
+        if (m_Data.customLightmapBlockTex.getId() != 0) {
             glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, m_Data.customLightmapBlockTex);
+            glBindTexture(GL_TEXTURE_2D, m_Data.customLightmapBlockTex.getId());
         }
     }
 }
@@ -1116,7 +1122,7 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 
     // Bind buffers
     glBindVertexArray(m_Data.surfVao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.surfEbo);
+    m_Data.surfEbo.bind(GL_ELEMENT_ARRAY_BUFFER);
     glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
     glEnable(GL_PRIMITIVE_RESTART);
 
@@ -1259,7 +1265,7 @@ void SceneRenderer::drawSkySurfacesIndexed() {
 
     // Bind buffers
     glBindVertexArray(m_Data.surfVao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_Data.surfEbo);
+    m_Data.surfEbo.bind(GL_ELEMENT_ARRAY_BUFFER);
     glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
     glEnable(GL_PRIMITIVE_RESTART);
 
@@ -1572,7 +1578,7 @@ void SceneRenderer::doPostProcessing() {
 
     Shaders::postprocess.enable();
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_nColorBuffer);
+    glBindTexture(GL_TEXTURE_2D, m_nColorBuffer.getId());
 
     Shaders::postprocess.setupUniforms();
 

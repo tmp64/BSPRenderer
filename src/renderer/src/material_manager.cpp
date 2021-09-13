@@ -56,13 +56,14 @@ Material::Material(std::nullptr_t) {
     const CheckerboardImage &img = CheckerboardImage::get();
     m_iWide = m_iTall = img.size;
 
-    m_Texture.create();
-    glBindTexture(GL_TEXTURE_2D, m_Texture);
+    m_Texture.create("null material");
+    glBindTexture(GL_TEXTURE_2D, m_Texture.getId());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_iWide, m_iTall, 0, GL_RGB, GL_UNSIGNED_BYTE, img.data.data());
+    m_Texture.texImage2D(GL_TEXTURE_2D, 0, GL_RGB8, m_iWide, m_iTall, 0, GL_RGB, GL_UNSIGNED_BYTE,
+                         img.data.data());
     glGenerateMipmap(GL_TEXTURE_2D);
 }
 
@@ -71,8 +72,8 @@ Material::Material(const bsp::WADTexture &texture, std::vector<uint8_t> &buffer)
     m_iWide = texture.getWide();
     m_iTall = texture.getTall();
 
-    m_Texture.create();
-    glBindTexture(GL_TEXTURE_2D, m_Texture);
+    m_Texture.create(m_Name);
+    glBindTexture(GL_TEXTURE_2D, m_Texture.getId());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -80,13 +81,13 @@ Material::Material(const bsp::WADTexture &texture, std::vector<uint8_t> &buffer)
 
     if (texture.isTransparent()) {
         texture.getRGBAPixels(buffer);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture.getWide(), texture.getTall(), 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                     buffer.data());
+        m_Texture.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture.getWide(), texture.getTall(), 0,
+                             GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
         glGenerateMipmap(GL_TEXTURE_2D);
     } else {
         texture.getRGBPixels(buffer);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texture.getWide(), texture.getTall(), 0, GL_RGB, GL_UNSIGNED_BYTE,
-                     buffer.data());
+        m_Texture.texImage2D(GL_TEXTURE_2D, 0, GL_RGB8, texture.getWide(), texture.getTall(), 0,
+                             GL_RGB, GL_UNSIGNED_BYTE, buffer.data());
         glGenerateMipmap(GL_TEXTURE_2D);
     }
 }

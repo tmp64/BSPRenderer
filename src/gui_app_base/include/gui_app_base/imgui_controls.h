@@ -54,11 +54,11 @@ inline bool ImGuiBeginCvar(const char *name, ConVar<bool> &cvar, ImGuiWindowFlag
     bool isVisible = cvar.getValue();
     bool result = ImGui::Begin(name, &isVisible, flags);
 
-	if (isVisible != cvar.getValue()) {
+    if (isVisible != cvar.getValue()) {
         cvar.setValue(isVisible);
-	}
+    }
 
-	return result;
+    return result;
 }
 
 #endif

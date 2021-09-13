@@ -7,7 +7,7 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
-#include <renderer/raii.h>
+#include <renderer/gpu_managed_objects.h>
 #include <app_base/app_component.h>
 
 constexpr size_t NULL_MATERIAL = 0; //!< Index of a null material (black-purple checkerboard)
@@ -41,7 +41,7 @@ public:
      */
     inline void bindTextures() const {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_Texture);
+        glBindTexture(GL_TEXTURE_2D, m_Texture.getId());
     }
 
     /**
@@ -56,7 +56,7 @@ public:
 
 private:
     std::string m_Name;
-    GLTexture m_Texture;
+    GPUTexture m_Texture;
     int m_iWide = 0;
     int m_iTall = 0;
 };

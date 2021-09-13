@@ -6,6 +6,7 @@
 #include <gui_app_base/gui_components.h>
 #include <gui_app_base/opengl_context.h>
 #include <gui_app_base/input_system.h>
+#include <renderer/gpu_resource_manager.h>
 #include <renderer/shader_manager.h>
 #include <renderer/material_manager.h>
 
@@ -54,6 +55,7 @@ protected:
 
 private:
     struct GraphicsSubSystem {
+        GPUResourceManager m_GPUManager;
         ShaderManager m_ShaderManager;
         MaterialManager m_MaterialManager;
     };

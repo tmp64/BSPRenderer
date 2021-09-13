@@ -2,6 +2,8 @@ set(RNDR_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/base_shader.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/client_entity.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/const.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/gpu_managed_objects.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/gpu_resource_manager.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/material_manager.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/model.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/raii.h
@@ -14,6 +16,8 @@ set(RNDR_PUBLIC_HEADERS
 
 set(RNDR_PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_shader.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/gpu_managed_objects.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/gpu_resource_manager.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/material_manager.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_renderer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_shaders.h

@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <app_base/texture_block.h>
+#include <renderer/gpu_managed_objects.h>
 #include <renderer/surface_renderer.h>
 #include <renderer/base_shader.h>
 #include <renderer/raii.h>
@@ -149,13 +150,13 @@ private:
         GLTexture skyboxCubemap;
         
         // Lightmaps
-        GLTexture bspLightmapBlockTex;
-        GLTexture customLightmapBlockTex;
+        GPUTexture bspLightmapBlockTex;
+        GPUTexture customLightmapBlockTex;
 
         // Brush geometry rendering
         GLVao surfVao;
-        GLBuffer surfVbo;
-        GLBuffer surfEbo;
+        GPUBuffer surfVbo;
+        GPUBuffer surfEbo;
         std::vector<uint16_t> surfEboData;
 
         // Brush entity rendering
@@ -164,7 +165,7 @@ private:
         // Patches
         uint32_t patchesVerts = 0;
         GLVao patchesVao;
-        GLBuffer patchesVbo;
+        GPUBuffer patchesVbo;
     };
 
     enum class LoadingStatus {
@@ -211,18 +212,18 @@ private:
 
     // Screen-wide quad
     GLVao m_nQuadVao;
-    GLBuffer m_nQuadVbo;
+    GPUBuffer m_nQuadVbo;
     void createScreenQuad();
 
     // Framebuffers
     bool m_bNeedRefreshFB = true;
     glm::ivec2 m_vViewportSize = glm::ivec2(1, 1);
     GLFramebuffer m_nHdrFramebuffer;
-    GLTexture m_nColorBuffer;
-    GLRenderbuffer m_nRenderBuffer;
+    GPUTexture m_nColorBuffer;
+    GPURenderbuffer m_nRenderBuffer;
 
     // Global uniform buffer
-    GLBuffer m_nGlobalUniform;
+    GPUBuffer m_GlobalUniformBuffer;
     GlobalUniform m_GlobalUniform;
     void createGlobalUniform();
 
