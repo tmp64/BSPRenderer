@@ -118,7 +118,7 @@ void AppConfig::executeCommands() {
         return;
     }
 
-    auto &item = getItem("commands").getYamlNode();
+    auto item = getItem("commands").getYamlNode();
 
     if (!item.IsSequence()) {
         throw std::logic_error("AppConfig: 'commands' is not a list");

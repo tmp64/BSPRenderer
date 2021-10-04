@@ -29,7 +29,7 @@ void AppBase::ComponentSubsystem::finalize() {
 }
 
 void AppBase::ComponentSubsystem::addComponent(AppComponent *comp) {
-    AFW_ASSERT_REL(!AppBase::getBaseInstance().isBaseReady() ||
+    AFW_ASSERT_REL(!AppBase::isBaseReady() ||
                    !AppBase::getBaseInstance().m_bInitialized);
 
     components.push_back(comp);
