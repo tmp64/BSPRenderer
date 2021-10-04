@@ -113,7 +113,14 @@ ImFont *ImGuiComponent::loadFontOrDefault(std::string_view filepath, float sizeP
 
 void ImGuiComponent::setupScale() {
     AppConfig &config = AppBase::getBaseInstance().getConfig();
-    float guiScale = config.getItem("gui").get<float>("imgui_scale", 0.0f);
+    float guiScale = 1.0f;
+
+    if (getCommandLine().doesArgHaveValue("--gui-scale")) {
+        guiScale = getCommandLine().getArgFloat("--gui-scale");
+    } else {
+        guiScale = config.getItem("gui").get<float>("imgui_scale", 0.0f);
+    }
+
     guiScale = std::max(guiScale, 0.0f);
 
     if (guiScale == 0.0f) {
