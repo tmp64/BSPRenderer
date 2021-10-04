@@ -54,6 +54,9 @@ ImGuiComponent::ImGuiComponent() {
     ImGui_ImplSDL2_InitForOpenGL(pWindow, glContext);
     ImGui_ImplOpenGL3_Init();
 
+    // Set window rounding (disabled in 1.80)
+    ImGui::GetStyle().WindowRounding = 7;
+
     setupScale();
 }
 
