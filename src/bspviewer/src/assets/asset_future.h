@@ -40,7 +40,7 @@ public:
     void setFuture(std::future<T> &&future) {
         AFW_ASSERT(&future != this);
         AFW_ASSERT(m_SharedState);
-        AFW_ASSERT(!valid());
+        AFW_ASSERT(!std::future<T>::valid());
         std::future<T>::operator=(std::move(future));
     }
 

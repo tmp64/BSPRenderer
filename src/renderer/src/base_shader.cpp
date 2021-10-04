@@ -147,7 +147,7 @@ std::string BaseShader::loadShaderFile(GLenum shaderType, std::string_view path)
     // Handle #include
     char includeError[256];
     std::unique_ptr<char, decltype(&std::free)> processedFile(
-        stb_include_string(rawData.data(), nullptr, "assets:shaders", nullptr, includeError),
+        stb_include_string(rawData.data(), nullptr, (char *)"assets:shaders", nullptr, includeError),
         &free);
 
     if (!processedFile) {

@@ -131,7 +131,7 @@ template <typename T>
 class ShaderUniform : public BaseShader::UniformBase {
 public:
     inline ShaderUniform() {
-        static_assert(appfw::utils::FalseT<T>::value, "Unknown uniform type");
+        static_assert(appfw::FalseT<T>::value, "Unknown uniform type");
     }
 };
 

@@ -199,8 +199,8 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
 
     // Load lumps
     auto fnLoadLump = [&](int lumpId, auto &storage) {
-        using Container = std::remove_reference<decltype(storage)>::type;
-        using DataType = Container::value_type;
+        using Container = typename std::remove_reference<decltype(storage)>::type;
+        using DataType = typename Container::value_type;
         const BSPLump &lumpInfo = bspHeader.lump[lumpId];
 
         if (lumpInfo.nOffset + lumpInfo.nLength > (int32_t)data.size()) {
