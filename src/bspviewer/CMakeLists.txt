@@ -1,5 +1,17 @@
-add_executable(bspviewer
+set(SOURCE_FILES
 	CMakeLists.txt
+	src/assets/asset.cpp
+	src/assets/asset.h
+	src/assets/asset_future.h
+	src/assets/asset_manager.cpp
+	src/assets/asset_manager.h
+	src/assets/level_asset.cpp
+	src/assets/level_asset.h
+	src/assets/wad_asset.cpp
+	src/assets/wad_asset.h
+	src/assets/wad_material_asset.cpp
+	src/assets/wad_material_asset.h
+
 	src/base_entity.cpp
 	src/base_entity.h
 	src/brush_model.cpp
@@ -10,6 +22,10 @@ add_executable(bspviewer
 	src/renderer.h
 	src/world_state.cpp
 	src/world_state.h
+)
+
+add_executable(bspviewer
+	${SOURCE_FILES}
 	../gui_app_base/src/gui_app.manifest
 )
 
@@ -30,3 +46,5 @@ target_precompile_headers(bspviewer PRIVATE
     ${PCH_STD_HEADERS}
     ${PCH_APPFW_HEADERS}
 )
+
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})

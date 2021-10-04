@@ -1,7 +1,6 @@
 #ifndef RENDERER_MATERIAL_MANAGER_H
 #define RENDERER_MATERIAL_MANAGER_H
 #include <appfw/utils.h>
-#include <bsp/wad_texture.h>
 #include <cstddef>
 #include <glad/glad.h>
 #include <vector>
@@ -9,9 +8,6 @@
 #include <mutex>
 #include <renderer/gpu_managed_objects.h>
 #include <app_base/app_component.h>
-
-constexpr size_t NULL_MATERIAL = 0; //!< Index of a null material (black-purple checkerboard)
-constexpr size_t INVALID_MATERIAL = std::numeric_limits<size_t>::max(); //!< Index of an invalid material (can't be used with getMaterial)
 
 struct CheckerboardImage : appfw::NoCopy {
     std::vector<uint8_t> data;
@@ -22,94 +18,92 @@ struct CheckerboardImage : appfw::NoCopy {
     static const CheckerboardImage &get();
 };
 
-/**
- * A material that can have multiple textures.
- */
 class Material : appfw::NoCopy {
 public:
-    Material() = default;
-    Material(std::nullptr_t);
-    Material(const bsp::WADTexture &texture, std::vector<uint8_t> &buffer);
+    enum class Type
+    {
+        None,
+        Surface, //!< A 2D material
+    };
 
-    /**
-     * Returns name of the material.
-     */
+    Material(std::string_view name);
+    Material(std::nullptr_t);
+
+    //! Returns name of the material.
     inline const std::string &getName() const { return m_Name; }
 
-    /**
-     * Binds texture to GL_TEXTURE0.
-     */
-    inline void bindTextures() const {
+    //! Binds the color texture to GL_TEXTURE0.
+    inline void bindSurfaceTextures() const {
+        AFW_ASSERT(m_Type == Type::Surface);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_Texture.getId());
     }
 
-    /**
-     * Width of the material texture.
-     */
+    //! Type of the material
+    inline Type getType() const { return m_Type; }
+
+    //! Width of the material.
     inline int getWide() const { return m_iWide; }
 
-    /**
-     * Height og the material texture.
-     */
+    //! Height of the material.
     inline int getTall() const { return m_iTall; }
 
+    //! Sets the materials's RGB8 color data
+    void setImageRGB8(int wide, int tall, const void *data);
+
+    //! Sets the materials's RGBA8 color data
+    void setImageRGBA8(int wide, int tall, const void *data);
+
 private:
+    std::list<Material>::iterator m_Iter; 
     std::string m_Name;
     GPUTexture m_Texture;
+    Type m_Type = Type::None;
     int m_iWide = 0;
     int m_iTall = 0;
+
+    void initSurface();
+
+    friend class MaterialManager;
 };
 
 /**
- * Loads WAD files and provides access to materials.
+ * Provides access to materials.
  */
 class MaterialManager : public AppComponentBase<MaterialManager> {
 public:
     MaterialManager();
     ~MaterialManager();
 
-    /**
-     * Per-tick update.
-     */
+    //! Per-tick update.
     void tick() override;
 
-    /**
-     * Returns whether specified WAD is loaded or not.
-     */
-    bool isWadLoaded(const std::string &name);
+    //! Returns the default black-purple material.
+    Material *getNullMaterial();
 
-    /**
-     * Loads a WAD file into the manager.
-     */
-    void loadWadFile(const fs::path &name);
+    //! Creates a new material.
+    Material *createMaterial(std::string_view name);
 
-    /**
-     * Returns an index of specified material or NULL_MATERIAL if not found.
-     */
-    size_t findMaterial(const std::string &name);
+    //! Destroys a material. mat will become an invalid pointer.
+    void destroyMaterial(Material *mat);
 
-    /**
-     * Returns a material.
-     * Don't keep the reference as it may be invalidated.
-     * @param   index   An index returned by findMaterial. Must be valid or behavior is undefined.
-     */
-    inline const Material &getMaterial(size_t index) { return m_Materials[index]; }
-
-    /**
-     * Checks if anisotropic filtering is supported.
-     */
+    //! Checks if anisotropic filtering is supported.
     bool isAnisoSupported();
 
 private:
+    // Filtering settings
     float m_flMaxAniso = 0;
     bool m_bLinearFiltering = false;
     int m_iMipMapping = 0;
-    int m_iAniso = 0;
-    std::vector<std::string> m_LoadedWadNames;
-    std::vector<Material> m_Materials;
-    std::unordered_map<std::string, size_t> m_Map;
-    std::mutex m_Mutex;
+    int m_iAniso = 1;
+
+    // Matrials
+    std::list<Material> m_Materials;
+
+    //! Updates texture filtering settings of currently bound texture.
+    void updateTextureFiltering(GLenum target);
+
+    friend class Material;
 };
 
 #endif

@@ -122,10 +122,36 @@ void SurfaceRenderer::setLevel(const bsp::Level *level) {
     }
 }
 
+void SurfaceRenderer::setSurfaceMaterial(size_t i, Material *pMat) {
+    m_Data.surfaces[i].pMaterial = pMat;
+}
+
+void SurfaceRenderer::refreshMaterialIndexes() {
+    unsigned nextMatIdx = 0;
+    std::map<Material *, unsigned> mats;
+
+    // Assign unique indexes to materials
+    for (Surface &i : m_Data.surfaces) {
+        auto it = mats.find(i.pMaterial);
+
+        if (it == mats.end()) {
+            mats[i.pMaterial] = nextMatIdx;
+            nextMatIdx++;
+        }
+    }
+
+    // Write those indexes into surfaces
+    for (Surface &i : m_Data.surfaces) {
+        i.uMaterialIdx = mats[i.pMaterial];
+    }
+
+    m_Data.uMaxMaterialIdx = nextMatIdx;
+}
+
 void SurfaceRenderer::calcWorldSurfaces() {
     AFW_ASSERT(m_pContext);
-    m_pContext->m_WorldTextureChain.resize(m_Data.nMaxMaterial + 1);
-    m_pContext->m_WorldTextureChainFrames.resize(m_Data.nMaxMaterial + 1);
+    m_pContext->m_WorldTextureChain.resize(m_Data.uMaxMaterialIdx);
+    m_pContext->m_WorldTextureChainFrames.resize(m_Data.uMaxMaterialIdx);
     m_pContext->getSkySurfaces().clear();
 
     if (!m_pLevel) {
@@ -217,14 +243,11 @@ void SurfaceRenderer::createSurfaces() {
         const bsp::BSPTextureInfo &texInfo = m_pLevel->getTexInfo().at(face.iTextureInfo);
         const bsp::BSPMipTex &tex = m_pLevel->getTextures().at(texInfo.iMiptex);
         surface.pTexInfo = &texInfo;
-        surface.nMatIndex = MaterialManager::get().findMaterial(tex.szName);
 
         if (!strncmp(tex.szName, "sky", 3)) {
             // Sky surface
             surface.iFlags |= SURF_DRAWSKY;
         }
-
-        m_Data.nMaxMaterial = std::max(m_Data.nMaxMaterial, surface.nMatIndex);
     }
 }
 
@@ -362,14 +385,15 @@ void SurfaceRenderer::recursiveWorldNodes(int node) noexcept {
         if (surf.iFlags & SURF_DRAWSKY) {
             m_pContext->m_SkySurfaces.push_back(idx);
         } else {
-            size_t mat = surf.nMatIndex;
-            unsigned frame = m_pContext->m_WorldTextureChainFrames[mat];
+            unsigned matIdx = surf.uMaterialIdx;
+            unsigned frame = m_pContext->m_WorldTextureChainFrames[matIdx];
             if (frame != m_pContext->m_uWorldTextureChainFrame) {
-                m_pContext->m_WorldTextureChainFrames[mat] = m_pContext->m_uWorldTextureChainFrame;
-                m_pContext->m_WorldTextureChain[mat].clear();
+                m_pContext->m_WorldTextureChainFrames[matIdx] =
+                    m_pContext->m_uWorldTextureChainFrame;
+                m_pContext->m_WorldTextureChain[matIdx].clear();
             }
 
-            m_pContext->m_WorldTextureChain[mat].push_back(idx);
+            m_pContext->m_WorldTextureChain[matIdx].push_back(idx);
         }
     }
 

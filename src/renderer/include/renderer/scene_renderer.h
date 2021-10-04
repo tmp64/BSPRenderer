@@ -11,6 +11,9 @@
 
 class SceneRenderer : appfw::NoCopy {
 public:
+    //! Called during loading from main thread to get the material.
+    using MaterialCallback = std::function<Material *(const bsp::BSPMipTex &tex)>;
+
     //! Called during rendering to update the entity list.
     using EntListCallback = std::function<void()>;
 
@@ -71,6 +74,9 @@ public:
     //! Sets size of the viewport.
     void setViewportSize(const glm::ivec2 &size);
 
+    //! Sets the material callback.
+    inline void setMaterialCallback(const MaterialCallback &fn) { m_pfnMaterialCb = fn; }
+
     //! Sets the entitiy list callback.
     inline void setEntListCallback(const EntListCallback &fn) { m_pfnEntListCb = fn; }
 
@@ -117,7 +123,7 @@ private:
     struct Surface {
         glm::vec3 m_Color;
         GLsizei m_iVertexCount = 0;
-        size_t m_nMatIdx = NULL_MATERIAL;
+        Material *m_pMat = nullptr;
 
         uint16_t m_nFirstVertex; //!< Index of first vertex in the vertex buffer
 
@@ -205,6 +211,7 @@ private:
     LoadingStatus m_LoadingStatus;
     std::unique_ptr<LoadingState> m_pLoadingState;
     EntListCallback m_pfnEntListCb;
+    MaterialCallback m_pfnMaterialCb;
     std::vector<ClientEntity *> m_SolidEntityList;
     std::vector<ClientEntity *> m_TransEntityList;
     std::vector<size_t> m_SortBuffer;

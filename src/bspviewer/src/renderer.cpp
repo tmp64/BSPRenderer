@@ -1,6 +1,7 @@
 #include "renderer.h"
 #include "world_state.h"
 #include "bspviewer.h"
+#include "assets/asset_manager.h"
 
 static ConVar<float> fov("fov", 120.f, "Horizontal field of view");
 
@@ -8,6 +9,14 @@ Renderer::Renderer() {
     AFW_ASSERT(!m_spInstance);
     m_spInstance = this;
 
+    m_SceneRenderer.setMaterialCallback([](const bsp::BSPMipTex &tex) -> Material * {
+        WADMaterialAssetRef mat = AssetManager::get().findMaterialByName(tex.szName);
+        if (mat) {
+            return mat->getMaterial();
+        } else {
+            return nullptr;
+        }
+    });
     m_SceneRenderer.setEntListCallback([this]() { addVisibleEnts(); });
     m_VisEnts.resize(MAX_VISIBLE_ENTS);
 }

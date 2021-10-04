@@ -49,47 +49,45 @@ const CheckerboardImage &CheckerboardImage::get() {
     return img;
 }
 
+Material::Material(std::string_view name) {
+    m_Name = name;
+    m_Texture.create(name);
+}
+
 //----------------------------------------------------------------
 // Material
 //----------------------------------------------------------------
-Material::Material(std::nullptr_t) {
+Material::Material(std::nullptr_t) : Material("null material") {
     const CheckerboardImage &img = CheckerboardImage::get();
-    m_iWide = m_iTall = img.size;
+    setImageRGB8(img.size, img.size, img.data.data());
+}
 
-    m_Texture.create("null material");
-    glBindTexture(GL_TEXTURE_2D, m_Texture.getId());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    m_Texture.texImage2D(GL_TEXTURE_2D, 0, GL_RGB8, m_iWide, m_iTall, 0, GL_RGB, GL_UNSIGNED_BYTE,
-                         img.data.data());
+void Material::setImageRGB8(int wide, int tall, const void *data) {
+    initSurface();
+    m_iWide = wide;
+    m_iTall = tall;
+    m_Texture.texImage2D(GL_TEXTURE_2D, 0, GL_RGB8, wide, tall, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
 }
 
-Material::Material(const bsp::WADTexture &texture, std::vector<uint8_t> &buffer) {
-    m_Name = texture.getName();
-    m_iWide = texture.getWide();
-    m_iTall = texture.getTall();
+void Material::setImageRGBA8(int wide, int tall, const void *data) {
+    initSurface();
+    m_iWide = wide;
+    m_iTall = tall;
+    m_Texture.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, wide, tall, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+}
 
-    m_Texture.create(m_Name);
-    glBindTexture(GL_TEXTURE_2D, m_Texture.getId());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-    if (texture.isTransparent()) {
-        texture.getRGBAPixels(buffer);
-        m_Texture.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture.getWide(), texture.getTall(), 0,
-                             GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
-        glGenerateMipmap(GL_TEXTURE_2D);
-    } else {
-        texture.getRGBPixels(buffer);
-        m_Texture.texImage2D(GL_TEXTURE_2D, 0, GL_RGB8, texture.getWide(), texture.getTall(), 0,
-                             GL_RGB, GL_UNSIGNED_BYTE, buffer.data());
-        glGenerateMipmap(GL_TEXTURE_2D);
+void Material::initSurface() {
+    if (m_Type == Type::None) {
+        m_Type = Type::Surface;
+        glBindTexture(GL_TEXTURE_2D, m_Texture.getId());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        MaterialManager::get().updateTextureFiltering(GL_TEXTURE_2D);
     }
+
+    AFW_ASSERT_REL_MSG(m_Type == Type::Surface, "Can't change material type after image was set");
 }
 
 //----------------------------------------------------------------
@@ -109,8 +107,11 @@ MaterialManager::MaterialManager() {
 }
 
 MaterialManager::~MaterialManager() {
-    m_Map.clear();
-    m_Materials.clear();
+    // null material will always be present
+    if (m_Materials.size() > 1) {
+        printw("MaterialManager: {} material(s) have leaked.", m_Materials.size());
+        AFW_ASSERT_MSG(false, "Material resource leak detected");
+    }
 }
 
 void MaterialManager::tick() {
@@ -121,60 +122,23 @@ void MaterialManager::tick() {
     int iAniso = std::clamp(mat_aniso.getValue(), 1, (int)m_flMaxAniso);
 
     if (m_bLinearFiltering != bLinear || m_iMipMapping != iMipMap || m_iAniso != iAniso) {
-        int min = 0;
-        int mag = 0;
-
-        if (bLinear) {
-            // Linear filtering enabled
-            mag = GL_LINEAR;
-
-            if (iMipMap == 0) {
-                // No mip-mapping
-                min = GL_LINEAR;
-            } else if (iMipMap == 1) {
-                // Nearest mipmap level + linear
-                min = GL_LINEAR_MIPMAP_NEAREST;
-            } else if (iMipMap == 2) {
-                // Linear mipmap level + linear
-                min = GL_LINEAR_MIPMAP_LINEAR;
-            }
-        } else {
-            // Linear filtering disabled
-            mag = GL_NEAREST;
-
-            if (iMipMap == 0) {
-                // No mip-mapping
-                min = GL_NEAREST;
-            } else if (iMipMap == 1) {
-                // Nearest mipmap level + linear
-                min = GL_NEAREST_MIPMAP_NEAREST;
-            } else if (iMipMap == 2) {
-                // Linear mipmap level + linear
-                min = GL_NEAREST_MIPMAP_LINEAR;
-            }
-        }
-
-        // Update for all materials
-        for (size_t i = 0; i < m_Materials.size(); i++) {
-            m_Materials[i].bindTextures();
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag);
-            
-            if (isAnisoSupported()) {
-                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, (float)iAniso);
-            }
-        }
-
         m_bLinearFiltering = bLinear;
         m_iMipMapping = iMipMap;
         m_iAniso = iAniso;
+
+        // Update for all materials
+        for (Material &mat : m_Materials) {
+            if (mat.getType() == Material::Type::Surface) {
+                mat.bindSurfaceTextures();
+                updateTextureFiltering(GL_TEXTURE_2D);
+            }
+        }
     }
 
     // Show UI
-    bool showUI = mat_ui.getValue();
-    if (showUI) {
+    if (mat_ui.getValue()) {
         ImGui::SetNextWindowBgAlpha(0.2f);
-        if (ImGui::Begin("Material manager", &showUI)) {
+        if (ImGuiBeginCvar("Material manager", mat_ui)) {
             ImGui::Text("Count: %d", (int)m_Materials.size());
             CvarCheckbox("Linear filtering", mat_linear);
 
@@ -198,64 +162,65 @@ void MaterialManager::tick() {
         }
 
         ImGui::End();
-        if (showUI != mat_ui.getValue()) {
-            mat_ui.setValue(showUI);
-        }
     }
 }
 
-bool MaterialManager::isWadLoaded(const std::string &name) {
-    return std::find(m_LoadedWadNames.begin(), m_LoadedWadNames.end(), name) != m_LoadedWadNames.end();
+Material *MaterialManager::getNullMaterial() {
+    return &(*m_Materials.begin());
 }
 
-void MaterialManager::loadWadFile(const fs::path &name) {
-    std::lock_guard lock(m_Mutex);
-
-    std::string wadFileName = name.filename().u8string();
-
-    if (isWadLoaded(wadFileName)) {
-        return;
-    }
-
-    try {
-        appfw::Timer timer;
-        timer.start();
-
-        bsp::WADFile wad(name);
-        std::vector<uint8_t> buffer;
-        buffer.reserve(512 * 512);  // Reserver up to 512x512 px
-        m_Materials.reserve(m_Materials.size() + wad.getTextures().size());
-
-        for (const bsp::WADTexture &tex : wad.getTextures()) {
-            auto it = m_Map.find(tex.getName());
-            if (it == m_Map.end()) {
-                m_Materials.emplace_back(tex, buffer);
-                m_Map[tex.getName()] = m_Materials.size() - 1;
-            } else {
-                printw("{}: texture {} already loaded from other WAD", wadFileName, tex.getName());
-            }
-        }
-        
-        timer.stop();
-        m_LoadedWadNames.push_back(wadFileName);
-        printi("Loaded {} in {:.3f} s", name.filename().u8string(), timer.dseconds());
-    }
-    catch (const std::exception &e) {
-        printe("Failed to load WAD {}: {}", name.filename().u8string(), e.what());
-    }
+Material *MaterialManager::createMaterial(std::string_view name) {
+    auto it = m_Materials.emplace(m_Materials.end(), name);
+    it->m_Iter = it;
+    return &(*it);
 }
 
-size_t MaterialManager::findMaterial(const std::string &name) { 
-    std::lock_guard lock(m_Mutex);
-    auto it = m_Map.find(name);
-
-    if (it == m_Map.end()) {
-        return NULL_MATERIAL;
-    } else {
-        return it->second;    
-    }
+void MaterialManager::destroyMaterial(Material *mat) {
+    m_Materials.erase(mat->m_Iter);
 }
 
 bool MaterialManager::isAnisoSupported() {
     return GLAD_GL_ARB_texture_filter_anisotropic || GLAD_GL_EXT_texture_filter_anisotropic;
+}
+
+void MaterialManager::updateTextureFiltering(GLenum target) {
+    int min = 0;
+    int mag = 0;
+
+    if (m_bLinearFiltering) {
+        // Linear filtering enabled
+        mag = GL_LINEAR;
+
+        if (m_iMipMapping == 0) {
+            // No mip-mapping
+            min = GL_LINEAR;
+        } else if (m_iMipMapping == 1) {
+            // Nearest mipmap level + linear
+            min = GL_LINEAR_MIPMAP_NEAREST;
+        } else if (m_iMipMapping == 2) {
+            // Linear mipmap level + linear
+            min = GL_LINEAR_MIPMAP_LINEAR;
+        }
+    } else {
+        // Linear filtering disabled
+        mag = GL_NEAREST;
+
+        if (m_iMipMapping == 0) {
+            // No mip-mapping
+            min = GL_NEAREST;
+        } else if (m_iMipMapping == 1) {
+            // Nearest mipmap level + linear
+            min = GL_NEAREST_MIPMAP_NEAREST;
+        } else if (m_iMipMapping == 2) {
+            // Linear mipmap level + linear
+            min = GL_NEAREST_MIPMAP_LINEAR;
+        }
+    }
+
+    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, min);
+    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, mag);
+
+    if (isAnisoSupported()) {
+        glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY, (float)m_iAniso);
+    }
 }

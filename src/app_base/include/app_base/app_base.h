@@ -2,6 +2,7 @@
 #define APP_BASE_H
 #include <vector>
 #include <fmt/format.h>
+#include <taskflow/taskflow.hpp>
 #include <appfw/utils.h>
 #include <appfw/prof.h>
 #include <app_base/components.h>
@@ -54,6 +55,9 @@ public:
     //! Returns the app framerate.
     double getFrameRate();
 
+    //! Returns the global Taskflow executor instance.
+    inline tf::Executor &getExecutor() { return m_Executor; }
+
 protected:
     //! Called after all components lateInit
     virtual void lateInit() {}
@@ -91,6 +95,7 @@ private:
     int m_iExitCode = 0;         //!< App exit code
     float m_flTime = 0;          //!< Time since app start
     float m_flTickTime = 0;      //!< Time since the beginning of last tick
+    tf::Executor m_Executor;     //!< App-wide Taskflow executor
     appfw::ProfData m_ProfData;
 
     ComponentSubsystem m_Components;

@@ -173,7 +173,8 @@ public:
         const bsp::BSPPlane *pPlane = nullptr;
 
         const bsp::BSPTextureInfo *pTexInfo = nullptr;
-        size_t nMatIndex = NULL_MATERIAL;
+        Material *pMaterial = nullptr;
+        unsigned uMaterialIdx = 0; //!< Unique index of the material
 
         std::vector<glm::vec3> vVertices;
         glm::vec3 vMins, vMaxs;
@@ -202,7 +203,7 @@ public:
         std::vector<Node> nodes;
         std::vector<Leaf> leaves;
         std::vector<Surface> surfaces;
-        size_t nMaxMaterial = 0;
+        unsigned uMaxMaterialIdx; //! Maximum index of surfaces[i].uMatIdx (number of unique mats)
     };
 
     SurfaceRenderer();
@@ -236,6 +237,16 @@ public:
      * Returns a surface reference.
      */
     inline const Surface &getSurface(size_t i) { return m_Data.surfaces[i]; }
+
+    /**
+     * Updates surface material. You must call refreshMaterialIndexes later.
+     */
+    void setSurfaceMaterial(size_t i, Material *pMat);
+
+    /**
+     * Updates material indexes of the surfaces.
+     */
+    void refreshMaterialIndexes();
 
     /**
      * Calculates visible world surfaces and puts them into the context.

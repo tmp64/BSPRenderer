@@ -79,6 +79,9 @@ int AppBase::run() {
 
     lateInit();
 
+    // Execute cmd line commands
+    getCommandLine().execCommands();
+
     // Timings
     int64_t oldTime = -(int64_t)((1.0 / app_fps_max.getValue()) *
                                    1'000'000'000); // sane value so tick time is not zero

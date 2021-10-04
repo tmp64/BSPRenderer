@@ -28,6 +28,7 @@ target_include_directories(app_base PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(app_base
 	appfw
 	glm::glm
+	taskflow
 	yaml-cpp
 )
 
@@ -36,6 +37,7 @@ appfw_get_pch(PCH_APPFW_HEADERS)
 target_precompile_headers(app_base PRIVATE
     ${PCH_STD_HEADERS}
     ${PCH_APPFW_HEADERS}
+	<taskflow/taskflow.hpp>
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})

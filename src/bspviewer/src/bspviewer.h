@@ -4,6 +4,7 @@
 #include <renderer/scene_renderer.h>
 #include "world_state.h"
 #include "renderer.h"
+#include "assets/asset_manager.h"
 
 class BSPViewer : public GuiAppBase {
 public:
@@ -50,12 +51,15 @@ public:
 private:
     enum class LoadingState {
         NotLoaded,
-        Loading,
+        LoadingLevel,
+        LoadingRenderer,
         Loaded
     };
 
+    AssetManager m_AssetManager;
     LoadingState m_LoadingState = LoadingState::NotLoaded;
-    bsp::Level m_LoadedLevel;
+    LevelAssetRef m_pLoadedLevel;
+    std::future<LevelAssetRef> m_FutureLoadedLevel;
     Renderer m_Renderer;
     WorldState *m_pWorldState = nullptr;
     glm::vec3 m_vPos = {0.f, 0.f, 0.f};

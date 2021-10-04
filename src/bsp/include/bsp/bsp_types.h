@@ -401,7 +401,8 @@ struct BSPModel {
 //----------------------------------------------------------------
 constexpr char WAD3_MAGIC[] = "WAD3";
 constexpr char WAD2_MAGIC[] = "WAD2";
-constexpr size_t WAD_COLORTABLE_SIZE = 256;
+constexpr size_t WAD_COLORTABLE_SIZE = 256; //!< Number of pixels in the color table
+constexpr size_t WAD_COLORTABLE_SIZE_BYTES = WAD_COLORTABLE_SIZE * 3; //!< Size of the color table
 
 struct WADHeader {
     /**

@@ -66,6 +66,7 @@ void SceneRenderer::beginLoading(const bsp::Level *level, std::string_view path)
     m_Data.customLightmapPath = getFileSystem().findExistingFile(std::string(path) + ".lm", std::nothrow);
 
     m_pLevel = level;
+    m_Surf.setLevel(m_pLevel);
     loadTextures();
     loadSkyBox();
 
@@ -86,11 +87,12 @@ void SceneRenderer::optimizeBrushModel(Model *model) {
     }
 
     // Sort the list by material
-    std::sort(om.surfs.begin(), om.surfs.end(), [this](const unsigned &lhsidx, const unsigned &rhsidx) {
-        auto &lhs = m_Surf.getSurface(lhsidx);
-        auto &rhs = m_Surf.getSurface(rhsidx);
-        return lhs.nMatIndex < rhs.nMatIndex;
-    });
+    std::sort(om.surfs.begin(), om.surfs.end(),
+              [this](const unsigned &lhsidx, const unsigned &rhsidx) {
+                  auto &lhs = m_Surf.getSurface(lhsidx);
+                  auto &rhs = m_Surf.getSurface(rhsidx);
+                  return lhs.uMaterialIdx < rhs.uMaterialIdx;
+              });
 
     model->setOptModelIdx((unsigned)m_Data.optBrushModels.size());
     m_Data.optBrushModels.push_back(std::move(om));
@@ -382,7 +384,6 @@ void SceneRenderer::destroyFramebuffer() {
 
 void SceneRenderer::asyncCreateSurfaces() {
     printi("Creating surfaces...");
-    m_Surf.setLevel(m_pLevel);
 
     m_Data.surfaces.resize(m_Surf.getSurfaceCount());
 
@@ -390,7 +391,7 @@ void SceneRenderer::asyncCreateSurfaces() {
         Surface &surf = m_Data.surfaces[i];
         const SurfaceRenderer::Surface &baseSurf = m_Surf.getSurface(i);
         
-        surf.m_nMatIdx = baseSurf.nMatIndex;
+        surf.m_pMat = baseSurf.pMaterial;
         surf.m_iVertexCount = (GLsizei)baseSurf.vVertices.size();
 
         auto fnGetRandColor = []() { return (rand() % 256) / 255.f; };
@@ -710,7 +711,7 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
         }
 
         const bsp::BSPTextureInfo &texInfo = *baseSurf.pTexInfo;
-        const Material &material = MaterialManager::get().getMaterial(surf.m_nMatIdx);
+        const Material &material = *surf.m_pMat;
 
         for (size_t j = 0; j < baseSurf.vVertices.size(); j++) {
             SurfaceVertex v;
@@ -811,55 +812,20 @@ void SceneRenderer::enableSurfaceAttribs() {
 }
 
 void SceneRenderer::loadTextures() {
-    auto &ws = m_pLevel->getEntities().getWorldspawn();
-    std::string wads = ws.getValue<std::string>("wad", "");
-    
-    if (wads.empty()) {
-        printw("Level doesn't reference any WAD files.");
-        return;
-    }
+    size_t surfCount = m_Surf.getSurfaceCount();
+    for (size_t i = 0; i < surfCount; i++) {
+        const SurfaceRenderer::Surface &surf = m_Surf.getSurface(i);
+        const bsp::BSPMipTex &tex = m_pLevel->getTextures().at(surf.pTexInfo->iMiptex);
+        Material *mat = m_pfnMaterialCb(tex);
 
-    size_t oldsep = static_cast<size_t>(0) - 1;
-    size_t sep = 0;
-
-    auto fnLoadWad = [&](const std::string &wadpath) {
-        if (wadpath.empty()) {
-            return;
+        if (!mat) {
+            mat = MaterialManager::get().getNullMaterial();
         }
 
-        // Find last '/' or '\'
-        size_t pos = 0;
-
-        size_t slashpos = wadpath.find_last_of('/');
-        if (slashpos != wadpath.npos)
-            pos = slashpos;
-
-        size_t backslashpos = wadpath.find_last_of('\\');
-        if (backslashpos != wadpath.npos && (slashpos == wadpath.npos || backslashpos > slashpos))
-            pos = backslashpos;
-
-        // Load the WAD
-        std::string wadname = wadpath.substr(pos + 1);
-        fs::path path = getFileSystem().findExistingFile("assets:" + wadname, std::nothrow);
-
-        if (!path.empty()) {
-            if (!MaterialManager::get().isWadLoaded(wadname)) {
-                printi("Loading WAD {}", wadname);
-                MaterialManager::get().loadWadFile(path);
-            }
-        } else {
-            printe("WAD {} not found", wadname);
-        }
-    };
-
-    while ((sep = wads.find(';', sep)) != wads.npos) {
-        std::string wadpath = wads.substr(oldsep + 1, sep - oldsep - 1);
-        fnLoadWad(wadpath);
-        oldsep = sep;
-        sep++;
+        m_Surf.setSurfaceMaterial(i, mat);
     }
 
-    fnLoadWad(wads.substr(oldsep + 1));
+    m_Surf.refreshMaterialIndexes();
 }
 
 void SceneRenderer::loadSkyBox() {
@@ -1089,8 +1055,8 @@ void SceneRenderer::drawWorldSurfacesVao() {
         }
 
         // Bind material
-        const Material &mat = MaterialManager::get().getMaterial(m_Data.surfaces[textureChain[i][0]].m_nMatIdx);
-        mat.bindTextures();
+        const Material &mat = *m_Data.surfaces[textureChain[i][0]].m_pMat;
+        mat.bindSurfaceTextures();
 
         for (unsigned j : textureChain[i]) {
             Surface &surf = m_Data.surfaces[j];
@@ -1135,8 +1101,8 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
         }
 
         // Bind material
-        const Material &mat = MaterialManager::get().getMaterial(m_Data.surfaces[textureChain[i][0]].m_nMatIdx);
-        mat.bindTextures();
+        const Material &mat = *m_Data.surfaces[textureChain[i][0]].m_pMat;
+        mat.bindSurfaceTextures();
 
         // Fill the EBO
         unsigned eboIdx = 0;
@@ -1428,7 +1394,7 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
 
     // Draw surfaces
     auto &surfs = m_Data.optBrushModels[model->getOptModelIdx()].surfs;
-    size_t lastMat = INVALID_MATERIAL;
+    Material *lastMat = nullptr;
 
     for (unsigned i : surfs) {
         Surface &surf = m_Data.surfaces[i];
@@ -1442,10 +1408,9 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
             Shaders::brushent.setColor(surf.m_Color);
         } else if (r_texture.getValue() == 2) {
             // Bind material
-            if (lastMat != surf.m_nMatIdx) {
-                const Material &mat = MaterialManager::get().getMaterial(surf.m_nMatIdx);
-                mat.bindTextures();
-                lastMat = surf.m_nMatIdx;
+            if (lastMat != surf.m_pMat) {
+                surf.m_pMat->bindSurfaceTextures();
+                lastMat = surf.m_pMat;
             }
         }
 
@@ -1548,8 +1513,7 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
 
 void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
     // Bind material
-    const Material &mat = MaterialManager::get().getMaterial(surf.m_nMatIdx);
-    mat.bindTextures();
+    surf.m_pMat->bindSurfaceTextures();
 
     if (r_texture.getValue() == 1) {
         Shaders::brushent.setColor(surf.m_Color);
