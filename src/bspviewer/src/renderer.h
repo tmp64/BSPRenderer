@@ -2,6 +2,7 @@
 #define RENDERER_H
 #include <appfw/utils.h>
 #include <renderer/scene_renderer.h>
+#include "assets/level_asset.h"
 
 class Renderer : appfw::NoMove {
 public:
@@ -14,7 +15,7 @@ public:
     void setViewportSize(const glm::ivec2 &size);
 
     //! Loads the level, path is passed to scene renderer to load custom lightmaps
-	void loadLevel(const std::string &path);
+    void loadLevel(LevelAssetRef &level);
 
     //! Unloads the level
     void unloadLevel();

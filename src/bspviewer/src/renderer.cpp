@@ -28,9 +28,9 @@ Renderer::~Renderer() {
 
 void Renderer::setViewportSize(const glm::ivec2 &size) { m_SceneRenderer.setViewportSize(size); }
 
-void Renderer::loadLevel(const std::string &path) {
+void Renderer::loadLevel(LevelAssetRef &level) {
     AFW_ASSERT(m_SceneRenderer.getLevel() == nullptr);
-    m_SceneRenderer.beginLoading(&WorldState::get().getLevel(), path);
+    m_SceneRenderer.beginLoading(&level->getLevel(), level->getPath());
 }
 
 void Renderer::unloadLevel() {
@@ -43,13 +43,7 @@ void Renderer::tick() {
 
 bool Renderer::loadingTick() {
     AFW_ASSERT(m_SceneRenderer.isLoading());
-    bool isFinished = m_SceneRenderer.loadingTick();
-
-    if (isFinished) {
-        WorldState::get().onRendererReady();
-    }
-
-    return isFinished;
+    return m_SceneRenderer.loadingTick();
 }
 
 void Renderer::draw() {

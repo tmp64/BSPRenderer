@@ -78,11 +78,10 @@ BSPViewer::BSPViewer() {
 BSPViewer::~BSPViewer() {
     AFW_ASSERT(m_sSingleton);
 
-    while (m_LoadingState == LoadingState::LoadingLevel ||
-           m_LoadingState == LoadingState::LoadingRenderer) {
-        // Run until loading finishes
-        loadingTick();
-        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    if (m_pLevelLoader) {
+        // Abort loading process. This may block.
+        printw("Level is still loading. Shutdown may take a while.");
+        m_pLevelLoader = nullptr;
     }
 
     unloadLevel();
@@ -93,22 +92,18 @@ void BSPViewer::tick() {
     BaseClass::tick();
     ImGui::ShowDemoWindow();
 
-    switch (m_LoadingState) {
-    case LoadingState::NotLoaded: {
+    if (m_pLevelLoader) {
+        // Level is loading
+        AFW_ASSERT(!m_pWorldState);
         InputSystem::get().discardMouseMovement();
-        break;
-    }
-    case LoadingState::LoadingLevel:
-    case LoadingState::LoadingRenderer: {
         loadingTick();
-        InputSystem::get().discardMouseMovement();
-        break;
-    }
-    case LoadingState::Loaded: {
-        Renderer::get().tick();
+    } else if (m_pWorldState) {
+        // Level is loaded
         processUserInput();
-        break;
-    }
+        Renderer::get().tick();
+    } else {
+        // Level is not loaded
+        InputSystem::get().discardMouseMovement();
     }
 
     showInfoDialog();
@@ -117,7 +112,7 @@ void BSPViewer::tick() {
 void BSPViewer::drawBackground() {
     BaseClass::drawBackground();
 
-    if (m_LoadingState == LoadingState::Loaded) {
+    if (m_pWorldState) {
         Renderer::get().draw();
     }
 }
@@ -227,7 +222,7 @@ void BSPViewer::processUserInput() {
 void BSPViewer::setDrawDebugTextEnabled(bool state) { m_bDrawDebugText = state; }
 
 void BSPViewer::loadLevel(const std::string &name) {
-    if (m_LoadingState == LoadingState::LoadingLevel || m_LoadingState == LoadingState::LoadingRenderer) {
+    if (m_pLevelLoader) {
         printe("Can't load a level while loading another level.");
         return;
     }
@@ -238,59 +233,42 @@ void BSPViewer::loadLevel(const std::string &name) {
     printi("Loading map {}", path);
 
     try {
-        AFW_ASSERT(!m_pWorldState);
-        m_FutureLoadedLevel = AssetManager::get().loadLevel(path);
-
-        m_vPos = {0.f, 0.f, 0.f};
-        m_vRot = {0.f, 0.f, 0.f};
-
-        m_LoadingState = LoadingState::LoadingLevel;
+        m_pLevelLoader = std::make_unique<LevelLoader>(path);
     } catch (const std::exception &e) {
         printe("Failed to load the map: {}", e.what());
-        unloadLevel();
         return;
     }
 }
 
 void BSPViewer::unloadLevel() {
-    if (m_LoadingState == LoadingState::NotLoaded) {
-        return;
-    }
-
-    AFW_ASSERT(m_LoadingState == LoadingState::Loaded);
-
-    if (m_LoadingState != LoadingState::Loaded) {
+    if (m_pLevelLoader) {
+        // Level loading can't be aborted
+        // Can't block until it finished either: event loop must be running for asset loading to
+        // finish
+        AFW_ASSERT(!m_pWorldState);
         throw std::logic_error("can't unload while loading");
     }
 
-    delete m_pWorldState;
-    m_pWorldState = nullptr;
-    Renderer::get().unloadLevel();
-    m_LoadingState = LoadingState::NotLoaded;
+    if (m_pWorldState) {
+        m_pWorldState = nullptr;
+        return;
+    }
 }
 
 void BSPViewer::loadingTick() {
     try {
-        if (m_LoadingState == LoadingState::LoadingLevel) {
-            AFW_ASSERT(!m_pWorldState);
+        if (m_pLevelLoader->tick()) {
+            // Loading has finished
+            LevelAssetRef level = m_pLevelLoader->getLevel();
+            m_pLevelLoader = nullptr;
+            m_pWorldState = std::make_unique<WorldState>(level);
 
-            if (appfw::isFutureReady(m_FutureLoadedLevel)) {
-                m_pLoadedLevel = m_FutureLoadedLevel.get();
-                m_pWorldState = new WorldState();
-                WorldState::get().loadLevel(m_pLoadedLevel->getLevel());
-                Renderer::get().loadLevel(m_pLoadedLevel->getPath());
-                m_LoadingState = LoadingState::LoadingRenderer;
-                printd("Future finished");
-            }
-        } else if (m_LoadingState == LoadingState::LoadingRenderer) {
-            if (Renderer::get().loadingTick()) {
-                printi("Loading finished");
-                m_LoadingState = LoadingState::Loaded;
-            }
+            m_vPos = {0.f, 0.f, 0.f};
+            m_vRot = {0.f, 0.f, 0.f};
         }
     } catch (const std::exception &e) {
         printe("Failed to load the map: {}", e.what());
-        m_LoadingState = LoadingState::Loaded;
-        unloadLevel();
+        m_pLevelLoader = nullptr;
+        m_pWorldState = nullptr;
     }
 }

@@ -18,6 +18,8 @@ set(SOURCE_FILES
 	src/brush_model.h
 	src/bspviewer.cpp
 	src/bspviewer.h
+	src/level_loader.cpp
+	src/level_loader.h
 	src/renderer.cpp
 	src/renderer.h
 	src/world_state.cpp

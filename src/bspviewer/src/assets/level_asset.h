@@ -18,8 +18,8 @@ public:
 
     struct SharedState {
         std::atomic<Progress> progress = Progress::ReadingBSP;
-        std::atomic<int> loadedCount;
-        std::atomic<int> totalCount;
+        std::atomic<int> loadedCount = -1;
+        std::atomic<int> totalCount = -1;
     };
 
     //! Returns a reference to bsp::Level

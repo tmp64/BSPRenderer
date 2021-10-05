@@ -6,19 +6,22 @@
 #include <bsp/level.h>
 #include "base_entity.h"
 #include "brush_model.h"
+#include "assets/level_asset.h"
 
 class WorldState : appfw::NoMove {
 public:
     static inline WorldState &get() { return *m_spInstance; }
 
-    WorldState();
+    WorldState(LevelAssetRef level);
     ~WorldState();
 
-    inline bool isLoaded() { return m_pLevel != nullptr; }
-    void loadLevel(const bsp::Level &level);
-    inline const bsp::Level &getLevel() { return *m_pLevel; }
+    //! Returns the level.
+    inline const bsp::Level &getLevel() { return m_pLevelAsset->getLevel(); }
+
+    //! Returns the brush model or nullptr if doesn't exist.
     BrushModel *getBrushModel(size_t idx);
 
+    //! Returns the list of all entities.
     inline auto &getEntList() { return m_EntityList; }
 
     //!< Called when renderer is fully loaded
@@ -41,25 +44,26 @@ private:
         int topnode; // for overflows where each leaf can't be stored individually
     };
 
-    const bsp::Level *m_pLevel = nullptr;
+    // Level info
+    LevelAssetRef m_pLevelAsset;
+    bsp::Level *m_pLevel;
     std::vector<std::unique_ptr<BaseEntity>> m_EntityList;
     std::vector<BrushModel> m_BrushModels;
+
+    // Vis culling
     std::array<uint8_t, bsp::MAX_MAP_LEAFS / 8> m_VisBuf;
 
+    // Level loading
     void loadBrushModels();
     void loadEntities();
+    void optimizeBrushModels();
 
-    /**
-     * Returns true if AABB is visible in VIS.
-     */
+    //! Returns true if AABB is visible in VIS.
     bool isBoxVisible(const glm::vec3 &mins, const glm::vec3 &maxs, const uint8_t *visbits);
 
-    /**
-     * Fills specified list with leafs in which AABB is located.
-     * @returns number of list items
-     */
+    //! Fills specified list with leafs in which AABB is located.
+    //! @returns number of list items
     int boxLeafNums(const glm::vec3 &mins, const glm::vec3 &maxs, appfw::span<short> list);
-
     void boxLeafNums_r(LeafList &ll, int node);
 
     static inline WorldState *m_spInstance = nullptr;

@@ -2,9 +2,10 @@
 #define APP_H
 #include <gui_app_base/gui_app_base.h>
 #include <renderer/scene_renderer.h>
+#include "assets/asset_manager.h"
 #include "world_state.h"
 #include "renderer.h"
-#include "assets/asset_manager.h"
+#include "level_loader.h"
 
 class BSPViewer : public GuiAppBase {
 public:
@@ -25,6 +26,8 @@ public:
      */
     void loadLevel(const std::string &name);
 
+    //! Unloads currently loaded level.
+    //! Throws if loading a level
     void unloadLevel();
 
     /**
@@ -49,19 +52,11 @@ public:
     inline float getAspectRatio() { return m_flAspectRatio; }
 
 private:
-    enum class LoadingState {
-        NotLoaded,
-        LoadingLevel,
-        LoadingRenderer,
-        Loaded
-    };
-
     AssetManager m_AssetManager;
-    LoadingState m_LoadingState = LoadingState::NotLoaded;
-    LevelAssetRef m_pLoadedLevel;
-    std::future<LevelAssetRef> m_FutureLoadedLevel;
     Renderer m_Renderer;
-    WorldState *m_pWorldState = nullptr;
+    std::unique_ptr<LevelLoader> m_pLevelLoader;
+    std::unique_ptr<WorldState> m_pWorldState;
+
     glm::vec3 m_vPos = {0.f, 0.f, 0.f};
     glm::vec3 m_vRot = {0.f, 0.f, 0.f};
     float m_flAspectRatio = 1.f;

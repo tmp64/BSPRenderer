@@ -62,26 +62,22 @@ int boxOnPlaneSide(const glm::vec3 &emins, const glm::vec3 &emaxs, const bsp::BS
     return sides;
 }
 
-WorldState::WorldState() {
+WorldState::WorldState(LevelAssetRef level) {
     AFW_ASSERT(!m_spInstance);
     m_spInstance = this;
+
+    m_pLevelAsset = std::move(level);
+    m_pLevel = &m_pLevelAsset->getLevel();
+
+    loadBrushModels();
+    loadEntities();
+    optimizeBrushModels();
 }
 
 WorldState::~WorldState() {
     AFW_ASSERT(m_spInstance == this);
     m_spInstance = nullptr;
-}
-
-void WorldState::loadLevel(const bsp::Level &level) {
-    AFW_ASSERT(!m_pLevel);
-    if (m_pLevel) {
-        throw std::logic_error("world already loaded");
-    }
-
-    m_pLevel = &level;
-
-    loadBrushModels();
-    loadEntities();
+    Renderer::get().unloadLevel();
 }
 
 BrushModel *WorldState::getBrushModel(size_t idx) {
@@ -89,13 +85,6 @@ BrushModel *WorldState::getBrushModel(size_t idx) {
         return &m_BrushModels[idx];
     } else {
         return nullptr;
-    }
-}
-
-void WorldState::onRendererReady() {
-    for (auto &i : m_BrushModels) {
-        // Optimize the model
-        Renderer::get().optimizeBrushModel(&i);
     }
 }
 
@@ -170,6 +159,12 @@ void WorldState::loadEntities() {
 
     if (fail > 0) {
         printw("{} entities failed to load", fail);
+    }
+}
+
+void WorldState::optimizeBrushModels() {
+    for (auto &i : m_BrushModels) {
+        Renderer::get().optimizeBrushModel(&i);
     }
 }
 
