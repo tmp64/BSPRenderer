@@ -1399,9 +1399,10 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
     for (unsigned i : surfs) {
         Surface &surf = m_Data.surfaces[i];
 
-        if (m_Surf.cullSurface(m_Surf.getSurface(i))) {
-            continue;
-        }
+        // TODO: cullSurface doesn't account for translations/rotations
+        //if (m_Surf.cullSurface(m_Surf.getSurface(i))) {
+        //    continue;
+        //}
 
         if (r_texture.getValue() == 1) {
             // Set color
@@ -1478,9 +1479,10 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
     for (unsigned i = from; i < to; i++) {
         Surface &surf = m_Data.surfaces[i];
 
-        if (m_Surf.cullSurface(m_Surf.getSurface(i))) {
-            continue;
-        }
+        // TODO: cullSurface doesn't account for translations/rotations
+        //if (m_Surf.cullSurface(m_Surf.getSurface(i))) {
+        //    continue;
+        //}
 
         if (needSort && !r_nosort.getValue()) {
             // Add to sorting list
