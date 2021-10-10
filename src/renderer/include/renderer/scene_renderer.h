@@ -13,6 +13,8 @@ class IRendererEngine;
 
 class SceneRenderer : appfw::NoCopy {
 public:
+    static constexpr int GLOBAL_UNIFORM_BIND = 0;
+
     SceneRenderer();
     ~SceneRenderer();
 
@@ -95,8 +97,6 @@ private:
     static constexpr int BSP_LIGHTMAP_PADDING = 2;
     static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
     static constexpr int MAX_TRANS_SURFS_PER_MODEL = 512; //!< Maximum number of surfaces per transparent model
-
-    static constexpr int GLOBAL_UNIFORM_BIND = 0;
 
     class WorldShader;
     class SkyBoxShader;

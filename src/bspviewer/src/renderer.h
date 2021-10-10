@@ -1,6 +1,7 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 #include <appfw/utils.h>
+#include <renderer/gpu_managed_objects.h>
 #include <renderer/scene_renderer.h>
 #include <renderer/renderer_engine_interface.h>
 #include "assets/level_asset.h"
@@ -44,8 +45,16 @@ public:
     void drawTransTriangles(unsigned &drawcallCount) override;
 
 private:
+    static constexpr int BOX_VERT_COUNT = 6 * 2 * 3; // 6 sides * 2 triangles * 3 verts
+
     SceneRenderer m_SceneRenderer;
     std::vector<ClientEntity> m_VisEnts;
+    std::vector<glm::mat4> m_BoxTransforms;
+    unsigned m_uBoxCount = 0;
+
+    GLVao m_BoxVao;
+    GPUBuffer m_BoxVbo;
+    GPUBuffer m_BoxInstances;
 
     void updateVisibleEnts();
 
