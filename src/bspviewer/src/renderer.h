@@ -2,9 +2,10 @@
 #define RENDERER_H
 #include <appfw/utils.h>
 #include <renderer/scene_renderer.h>
+#include <renderer/renderer_engine_interface.h>
 #include "assets/level_asset.h"
 
-class Renderer : appfw::NoMove {
+class Renderer : public IRendererEngine, appfw::NoMove {
 public:
     static inline Renderer &get() { return *m_spInstance; }
 
@@ -37,11 +38,16 @@ public:
      */
     void optimizeBrushModel(Model *model);
 
+    // IRendererEngine
+    Material *getMaterial(const bsp::BSPMipTex &tex) override;
+    void drawNormalTriangles(unsigned &drawcallCount) override;
+    void drawTransTriangles(unsigned &drawcallCount) override;
+
 private:
     SceneRenderer m_SceneRenderer;
     std::vector<ClientEntity> m_VisEnts;
 
-    void addVisibleEnts();
+    void updateVisibleEnts();
 
 	static inline Renderer *m_spInstance = nullptr;
 };

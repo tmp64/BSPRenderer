@@ -9,14 +9,10 @@
 #include <renderer/raii.h>
 #include <renderer/client_entity.h>
 
+class IRendererEngine;
+
 class SceneRenderer : appfw::NoCopy {
 public:
-    //! Called during loading from main thread to get the material.
-    using MaterialCallback = std::function<Material *(const bsp::BSPMipTex &tex)>;
-
-    //! Called during rendering to update the entity list.
-    using EntListCallback = std::function<void()>;
-
     SceneRenderer();
     ~SceneRenderer();
 
@@ -36,6 +32,9 @@ public:
         //! Time of the last frame
         double flFrameTime = 0;
     };
+
+    //! Sets the engine.
+    inline void setEngine(IRendererEngine *engine) { m_pEngine = engine; }
 
     //! Returns level set to the renderer.
     inline const bsp::Level *getLevel() { return m_pLevel; }
@@ -74,12 +73,6 @@ public:
     //! Sets size of the viewport.
     void setViewportSize(const glm::ivec2 &size);
 
-    //! Sets the material callback.
-    inline void setMaterialCallback(const MaterialCallback &fn) { m_pfnMaterialCb = fn; }
-
-    //! Sets the entitiy list callback.
-    inline void setEntListCallback(const EntListCallback &fn) { m_pfnEntListCb = fn; }
-
     //! Renders the image to the screen.
     void renderScene(GLint targetFb, float flSimTime, float flTimeDelta);
 
@@ -89,7 +82,9 @@ public:
     //! Shows ImGui dialog with debug info.
     void showDebugDialog(const char *title, bool *isVisible = nullptr);
 
-    //! During EntListCallback:
+    //! Clears the entity list.
+    void clearEntities();
+
     //! Adds an entity into rendering list.
     //! @returns true if entity was added, false if limit reached
     bool addEntity(ClientEntity *pClent);
@@ -204,14 +199,13 @@ private:
         int maxEboSize = 0; //!< Maximum number of elements in the EBO (if all surfaces are visible at the same time)
     };
 
+    IRendererEngine *m_pEngine = nullptr;
     const bsp::Level *m_pLevel = nullptr;
     SurfaceRenderer m_Surf;
     LevelData m_Data;
     RenderingStats m_Stats;
     LoadingStatus m_LoadingStatus;
     std::unique_ptr<LoadingState> m_pLoadingState;
-    EntListCallback m_pfnEntListCb;
-    MaterialCallback m_pfnMaterialCb;
     std::vector<ClientEntity *> m_SolidEntityList;
     std::vector<ClientEntity *> m_TransEntityList;
     std::vector<size_t> m_SortBuffer;
@@ -287,9 +281,11 @@ private:
 
     //! Draws solid entities
     void drawSolidEntities();
+    void drawSolidTriangles();
 
     //! Draws transparent entities
     void drawTransEntities();
+    void drawTransTriangles();
 
     //! Draws a solid brush entity
     void drawSolidBrushEntity(ClientEntity *pClent);

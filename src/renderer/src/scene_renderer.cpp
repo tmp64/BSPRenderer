@@ -4,6 +4,7 @@
 #include <app_base/lightmap.h>
 #include <stb_image.h>
 #include <renderer/scene_renderer.h>
+#include <renderer/renderer_engine_interface.h>
 #include <imgui.h>
 #include <gui_app_base/imgui_controls.h>
 #include "scene_shaders.h"
@@ -217,11 +218,6 @@ void SceneRenderer::renderScene(GLint targetFb, float flSimTime, float flTimeDel
 
     frameSetup(flSimTime, flTimeDelta);
 
-    if (r_drawents.getValue()) {
-        appfw::Prof prof("Entity list");
-        m_pfnEntListCb();
-    }
-
     if (r_drawworld.getValue()) {
         drawWorldSurfaces();
 
@@ -233,7 +229,9 @@ void SceneRenderer::renderScene(GLint targetFb, float flSimTime, float flTimeDel
     if (r_drawents.getValue()) {
         appfw::Prof prof("Entities");
         drawSolidEntities();
+        drawSolidTriangles();
         drawTransEntities();
+        drawTransTriangles();
     }
 
     // Draw patches
@@ -300,6 +298,12 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
 
         ImGui::End();
     }
+}
+
+void SceneRenderer::clearEntities() {
+    m_SolidEntityList.clear();
+    m_TransEntityList.clear();
+    m_uVisibleEntCount = 0;
 }
 
 bool SceneRenderer::addEntity(ClientEntity *pClent) {
@@ -816,7 +820,7 @@ void SceneRenderer::loadTextures() {
     for (size_t i = 0; i < surfCount; i++) {
         const SurfaceRenderer::Surface &surf = m_Surf.getSurface(i);
         const bsp::BSPMipTex &tex = m_pLevel->getTextures().at(surf.pTexInfo->iMiptex);
-        Material *mat = m_pfnMaterialCb(tex);
+        Material *mat = m_pEngine->getMaterial(tex);
 
         if (!mat) {
             mat = MaterialManager::get().getNullMaterial();
@@ -940,11 +944,6 @@ void SceneRenderer::frameSetup(float flSimTime, float flTimeDelta) {
 
     prepareHdrFramebuffer();
     setupViewContext();
-
-    // Reset entity lists
-    m_SolidEntityList.clear();
-    m_TransEntityList.clear();
-    m_uVisibleEntCount = 0;
 
     // Depth test
     glEnable(GL_DEPTH_TEST);
@@ -1305,6 +1304,11 @@ void SceneRenderer::drawSolidEntities() {
     setRenderMode(kRenderNormal);
 }
 
+void SceneRenderer::drawSolidTriangles() {
+    appfw::Prof prof("Solid Triangles");
+    m_pEngine->drawNormalTriangles(m_Stats.uDrawCallCount);
+}
+
 void SceneRenderer::drawTransEntities() {
     appfw::Prof prof("Trans");
 
@@ -1356,6 +1360,11 @@ void SceneRenderer::drawTransEntities() {
     }
 
     setRenderMode(kRenderNormal);
+}
+
+void SceneRenderer::drawTransTriangles() {
+    appfw::Prof prof("Trans Triangles");
+    m_pEngine->drawTransTriangles(m_Stats.uDrawCallCount);
 }
 
 void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {

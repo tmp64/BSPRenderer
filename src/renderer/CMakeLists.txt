@@ -7,6 +7,7 @@ set(RNDR_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/material_manager.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/model.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/raii.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/renderer_engine_interface.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/shader_definitions.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/shader_manager.h

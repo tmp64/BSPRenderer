@@ -9,15 +9,7 @@ Renderer::Renderer() {
     AFW_ASSERT(!m_spInstance);
     m_spInstance = this;
 
-    m_SceneRenderer.setMaterialCallback([](const bsp::BSPMipTex &tex) -> Material * {
-        WADMaterialAssetRef mat = AssetManager::get().findMaterialByName(tex.szName);
-        if (mat) {
-            return mat->getMaterial();
-        } else {
-            return nullptr;
-        }
-    });
-    m_SceneRenderer.setEntListCallback([this]() { addVisibleEnts(); });
+    m_SceneRenderer.setEngine(this);
     m_VisEnts.resize(MAX_VISIBLE_ENTS);
 }
 
@@ -49,12 +41,30 @@ bool Renderer::loadingTick() {
 void Renderer::draw() {
     m_SceneRenderer.setPerspective(fov.getValue(), BSPViewer::get().getAspectRatio(), 4, 8192);
     m_SceneRenderer.setPerspViewOrigin(BSPViewer::get().getCameraPos(), BSPViewer::get().getCameraRot());
+    updateVisibleEnts();
     m_SceneRenderer.renderScene(0, 0, 0); // 0 is the main framebuffer
 }
 
-void Renderer::optimizeBrushModel(Model *model) { m_SceneRenderer.optimizeBrushModel(model); }
+void Renderer::optimizeBrushModel(Model *model) {
+    m_SceneRenderer.optimizeBrushModel(model);
+}
 
-void Renderer::addVisibleEnts() {
+Material *Renderer::getMaterial(const bsp::BSPMipTex &tex) {
+    WADMaterialAssetRef mat = AssetManager::get().findMaterialByName(tex.szName);
+    if (mat) {
+        return mat->getMaterial();
+    } else {
+        return nullptr;
+    }
+}
+
+void Renderer::drawNormalTriangles(unsigned &drawcallCount) {}
+
+void Renderer::drawTransTriangles(unsigned &drawcallCount) {}
+
+void Renderer::updateVisibleEnts() {
+    appfw::Prof prof("Entity List");
+    m_SceneRenderer.clearEntities();
     auto &ents = WorldState::get().getEntList();
     unsigned entCount = 0;
 
