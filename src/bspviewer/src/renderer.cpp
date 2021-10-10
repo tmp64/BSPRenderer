@@ -76,7 +76,7 @@ void Renderer::updateVisibleEnts() {
             {
                 glm::vec3 mins = pEnt->getOrigin() + pEnt->getModel()->getMins();
                 glm::vec3 maxs = pEnt->getOrigin() + pEnt->getModel()->getMaxs();
-                if (!WorldState::get().boxInPvs(BSPViewer::get().getCameraPos(), mins, maxs)) {
+                if (!Vis::get().boxInPvs(BSPViewer::get().getCameraPos(), mins, maxs)) {
                     continue;
                 }
             }

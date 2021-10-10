@@ -22,6 +22,8 @@ set(SOURCE_FILES
 	src/level_loader.h
 	src/renderer.cpp
 	src/renderer.h
+	src/vis.cpp
+	src/vis.h
 	src/world_state.cpp
 	src/world_state.h
 )
