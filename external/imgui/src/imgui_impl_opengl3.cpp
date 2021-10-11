@@ -15,6 +15,7 @@
 
 // CUSTOM CHANGES
 // - Modified fragment_shader_glsl_130 to support gamma-correction
+// - Added enabling/disabling of GL_FRAMEBUFFER_SRGB
 
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
@@ -436,6 +437,9 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     ImVec2 clip_off = draw_data->DisplayPos;         // (0,0) unless using multi-viewports
     ImVec2 clip_scale = draw_data->FramebufferScale; // (1,1) unless using retina display which are often (2,2)
 
+    // Enable sRGB for gamma-correct rendering
+    glEnable(GL_FRAMEBUFFER_SRGB);
+
     // Render command lists
     for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
@@ -479,6 +483,9 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
             }
         }
     }
+
+    // Disable sRGB
+    glDisable(GL_FRAMEBUFFER_SRGB);
 
     // Destroy the temporary VAO
 #ifdef IMGUI_IMPL_OPENGL_USE_VERTEX_ARRAY

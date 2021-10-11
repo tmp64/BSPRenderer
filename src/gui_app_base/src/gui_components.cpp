@@ -42,20 +42,29 @@ ImGuiComponent::ImGuiComponent() {
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    // ImGuiIO &io = ImGui::GetIO();
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;   // Enable Docking
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport / Platform Windows
+    // io.ConfigViewportsNoAutoMerge = true;
+    // io.ConfigViewportsNoTaskBarIcon = true;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
     // ImGui::StyleColorsClassic();
 
+    // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look
+    // identical to regular ones.
+    ImGuiStyle &style = ImGui::GetStyle();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    }
+
     // Setup Platform/Renderer bindings
     ImGui_ImplSDL2_InitForOpenGL(pWindow, glContext);
     ImGui_ImplOpenGL3_Init();
-
-    // Set window rounding (disabled in 1.80)
-    ImGui::GetStyle().WindowRounding = 7;
 
     setupScale();
 }
@@ -75,10 +84,24 @@ void ImGuiComponent::endTick() {
 
 void ImGuiComponent::render() {
     appfw::Prof prof("ImGui");
-    glEnable(GL_FRAMEBUFFER_SRGB);
+    ImGuiIO &io = ImGui::GetIO();
+
     ImGui::Render();
+    glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    glDisable(GL_FRAMEBUFFER_SRGB);
+
+    // Update and Render additional Platform Windows
+    // (Platform functions may change the current OpenGL context, so we save/restore it to make it
+    // easier to paste this code elsewhere.
+    //  For this specific demo app we could also call SDL_GL_MakeCurrent(window, gl_context)
+    //  directly)
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        SDL_Window *backup_current_window = SDL_GL_GetCurrentWindow();
+        SDL_GLContext backup_current_context = SDL_GL_GetCurrentContext();
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        SDL_GL_MakeCurrent(backup_current_window, backup_current_context);
+    }
 }
 
 ImFont *ImGuiComponent::loadFont(std::string_view filepath, float sizePixels) {
