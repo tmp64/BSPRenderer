@@ -20,10 +20,10 @@ MainWindowComponent::MainWindowComponent() {
     OpenGLContext::setupWindowAttributes();
 
     // Create window
-    m_pWindow =
-        SDL_CreateWindow(cfg.get<std::string>("win_title").c_str(), SDL_WINDOWPOS_CENTERED,
-                         SDL_WINDOWPOS_CENTERED, cfg.get<int>("win_width"),
-                         cfg.get<int>("win_height"), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    m_pWindow = SDL_CreateWindow(cfg.get<std::string>("win_title").c_str(), SDL_WINDOWPOS_CENTERED,
+                                 SDL_WINDOWPOS_CENTERED, cfg.get<int>("win_width"),
+                                 cfg.get<int>("win_height"), flags);
 
     if (!m_pWindow) {
         app_fatalError("Failed to create window: {}", SDL_GetError());
