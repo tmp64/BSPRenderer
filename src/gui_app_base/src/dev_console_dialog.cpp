@@ -195,9 +195,11 @@ void DevConsoleDialog::showOverlay() {
         ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoBackground;
 
-    ImGuiIO &io = ImGui::GetIO();
+    ImVec2 viewportSize = ImGui::GetMainViewport()->WorkSize;
+    ImVec2 viewportPos = ImGui::GetMainViewport()->WorkPos;
     ImVec2 windowPos =
-        ImVec2(OVERLAY_OFFSET_X * ImGui::GetFontSize(), io.DisplaySize.y - OVERLAY_OFFSET_Y * ImGui::GetFontSize());
+        ImVec2(viewportPos.x + OVERLAY_OFFSET_X * ImGui::GetFontSize(),
+               viewportPos.y + viewportSize.y - OVERLAY_OFFSET_Y * ImGui::GetFontSize());
     ImVec2 windowPosPivot = ImVec2(0.0f, 1.0f);
     ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always, windowPosPivot);
 
