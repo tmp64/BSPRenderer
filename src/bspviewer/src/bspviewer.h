@@ -16,6 +16,7 @@ public:
     BSPViewer();
     ~BSPViewer();
 
+    void beginTick() override;
     void tick() override;
     void drawBackground() override;
     void onWindowSizeChange(int wide, int tall) override;
@@ -53,6 +54,8 @@ private:
     glm::vec3 m_vRot = {0.f, 0.f, 0.f};
     float m_flAspectRatio = 1.f;
 
+    void showDockSpace();
+    void showMainMenuBar();
     void loadingTick();
 
     static inline BSPViewer *m_sSingleton = nullptr;

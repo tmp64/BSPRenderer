@@ -83,6 +83,12 @@ BSPViewer::~BSPViewer() {
     m_sSingleton = nullptr;
 }
 
+void BSPViewer::beginTick() {
+    BaseClass::beginTick();
+    showDockSpace();
+    showMainMenuBar();
+}
+
 void BSPViewer::tick() {
     BaseClass::tick();
     ImGui::ShowDemoWindow();
@@ -212,6 +218,35 @@ void BSPViewer::unloadLevel() {
     if (m_pWorldState) {
         m_pWorldState = nullptr;
         return;
+    }
+}
+
+void BSPViewer::showDockSpace() {
+    ImGuiDockNodeFlags flags = ImGuiDockNodeFlags_PassthruCentralNode;
+    ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), flags);
+}
+
+void BSPViewer::showMainMenuBar() {
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Edit")) {
+            if (ImGui::MenuItem("Undo", "CTRL+Z")) {
+            }
+            if (ImGui::MenuItem("Redo", "CTRL+Y", false, false)) {
+            } // Disabled item
+            ImGui::Separator();
+            if (ImGui::MenuItem("Cut", "CTRL+X")) {
+            }
+            if (ImGui::MenuItem("Copy", "CTRL+C")) {
+            }
+            if (ImGui::MenuItem("Paste", "CTRL+V")) {
+            }
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMainMenuBar();
     }
 }
 
