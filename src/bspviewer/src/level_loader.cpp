@@ -1,7 +1,7 @@
 #include <imgui.h>
 #include "assets/asset_manager.h"
 #include "level_loader.h"
-#include "renderer.h"
+#include "main_view_renderer.h"
 
 LevelLoader::LevelLoader(std::string_view path) {
     m_Status = Status::Level;
@@ -11,7 +11,7 @@ LevelLoader::LevelLoader(std::string_view path) {
 LevelLoader::~LevelLoader() {
     if (m_Status == Status::Renderer) {
         // Wait for renderer to finish loading
-        while (!Renderer::get().loadingTick()) {
+        while (!MainViewRenderer::get().loadingTick()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
     } else {
@@ -33,7 +33,7 @@ bool LevelLoader::tick() {
 
             printi("Setting up the renderer...");
             m_Status = Status::Renderer;
-            Renderer::get().loadLevel(m_pLevel);
+            MainViewRenderer::get().loadLevel(m_pLevel);
         } else {
             // Update progress status
             std::shared_ptr<LevelAsset::SharedState> state = m_Future.getState();
@@ -58,7 +58,7 @@ bool LevelLoader::tick() {
     case Status::Renderer: {
         action = "Setting up the renderer";
         
-        if (Renderer::get().loadingTick()) {
+        if (MainViewRenderer::get().loadingTick()) {
             // Finished
             m_Status = Status::Finished;
             return true;

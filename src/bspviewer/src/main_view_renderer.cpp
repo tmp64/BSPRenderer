@@ -1,4 +1,4 @@
-#include "renderer.h"
+#include "main_view_renderer.h"
 #include "world_state.h"
 #include "bspviewer.h"
 #include "assets/asset_manager.h"
@@ -25,7 +25,7 @@ static ImVec2 imVecFloor(ImVec2 vec) {
     return ImVec2(floor(vec.x), floor(vec.y));
 }
 
-Renderer::Renderer() {
+MainViewRenderer::MainViewRenderer() {
     AFW_ASSERT(!m_spInstance);
     m_spInstance = this;
 
@@ -90,23 +90,23 @@ Renderer::Renderer() {
     glBindVertexArray(0);
 }
 
-Renderer::~Renderer() {
+MainViewRenderer::~MainViewRenderer() {
     AFW_ASSERT(m_spInstance == this);
     m_spInstance = nullptr;
 }
 
-void Renderer::setViewportSize(const glm::ivec2 &size) { m_SceneRenderer.setViewportSize(size); }
+void MainViewRenderer::setViewportSize(const glm::ivec2 &size) { m_SceneRenderer.setViewportSize(size); }
 
-void Renderer::loadLevel(LevelAssetRef &level) {
+void MainViewRenderer::loadLevel(LevelAssetRef &level) {
     AFW_ASSERT(m_SceneRenderer.getLevel() == nullptr);
     m_SceneRenderer.beginLoading(&level->getLevel(), level->getPath());
 }
 
-void Renderer::unloadLevel() {
+void MainViewRenderer::unloadLevel() {
     m_SceneRenderer.unloadLevel();
 }
 
-void Renderer::showMainView() {
+void MainViewRenderer::showMainView() {
     m_SceneRenderer.showDebugDialog("Renderer");
 
     ImVec2 newPadding = ImGui::GetStyle().WindowPadding;
@@ -160,12 +160,12 @@ void Renderer::showMainView() {
     ImGui::PopStyleVar();
 }
 
-bool Renderer::loadingTick() {
+bool MainViewRenderer::loadingTick() {
     AFW_ASSERT(m_SceneRenderer.isLoading());
     return m_SceneRenderer.loadingTick();
 }
 
-void Renderer::renderMainView() {
+void MainViewRenderer::renderMainView() {
     // Scale viewport FOV
     // Assume that v_fov is hor fov at 4:3 aspect ratio
     // Keep vertical fov constant, only scale horizontal
@@ -184,11 +184,11 @@ void Renderer::renderMainView() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Renderer::optimizeBrushModel(Model *model) {
+void MainViewRenderer::optimizeBrushModel(Model *model) {
     m_SceneRenderer.optimizeBrushModel(model);
 }
 
-Material *Renderer::getMaterial(const bsp::BSPMipTex &tex) {
+Material *MainViewRenderer::getMaterial(const bsp::BSPMipTex &tex) {
     WADMaterialAssetRef mat = AssetManager::get().findMaterialByName(tex.szName);
     if (mat) {
         return mat->getMaterial();
@@ -197,7 +197,7 @@ Material *Renderer::getMaterial(const bsp::BSPMipTex &tex) {
     }
 }
 
-void Renderer::drawNormalTriangles(unsigned &drawcallCount) {
+void MainViewRenderer::drawNormalTriangles(unsigned &drawcallCount) {
     if (m_uBoxCount > 0) {
         glBindVertexArray(m_BoxVao);
         s_EntityBoxShader.enable();
@@ -208,9 +208,9 @@ void Renderer::drawNormalTriangles(unsigned &drawcallCount) {
     }
 }
 
-void Renderer::drawTransTriangles(unsigned &drawcallCount) {}
+void MainViewRenderer::drawTransTriangles(unsigned &drawcallCount) {}
 
-void Renderer::updateVisibleEnts() {
+void MainViewRenderer::updateVisibleEnts() {
     appfw::Prof prof("Entity List");
     m_SceneRenderer.clearEntities();
     auto &ents = WorldState::get().getEntList();
@@ -267,7 +267,7 @@ void Renderer::updateVisibleEnts() {
     }
 }
 
-void Renderer::refreshFramebuffer() {
+void MainViewRenderer::refreshFramebuffer() {
     // Create color buffer
     m_ColorBuffer.create("Main View FB");
     glBindTexture(GL_TEXTURE_2D, m_ColorBuffer.getId());
@@ -283,6 +283,6 @@ void Renderer::refreshFramebuffer() {
                            m_ColorBuffer.getId(), 0);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         throw std::runtime_error(
-            "Renderer::refreshFramebuffer(): framebuffer not complete");
+            "MainViewRenderer::refreshFramebuffer(): framebuffer not complete");
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

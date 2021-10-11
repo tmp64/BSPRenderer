@@ -1,5 +1,5 @@
 #include "world_state.h"
-#include "renderer.h"
+#include "main_view_renderer.h"
 
 WorldState::WorldState(LevelAssetRef level) {
     AFW_ASSERT(!m_spInstance);
@@ -18,7 +18,7 @@ WorldState::~WorldState() {
     AFW_ASSERT(m_spInstance == this);
     m_spInstance = nullptr;
     m_Vis.setLevel(nullptr);
-    Renderer::get().unloadLevel();
+    MainViewRenderer::get().unloadLevel();
 }
 
 BrushModel *WorldState::getBrushModel(size_t idx) {
@@ -105,6 +105,6 @@ void WorldState::loadEntities() {
 
 void WorldState::optimizeBrushModels() {
     for (auto &i : m_BrushModels) {
-        Renderer::get().optimizeBrushModel(&i);
+        MainViewRenderer::get().optimizeBrushModel(&i);
     }
 }

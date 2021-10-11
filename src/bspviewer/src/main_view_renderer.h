@@ -6,12 +6,12 @@
 #include <renderer/renderer_engine_interface.h>
 #include "assets/level_asset.h"
 
-class Renderer : public IRendererEngine, appfw::NoMove {
+class MainViewRenderer : public IRendererEngine, appfw::NoMove {
 public:
-    static inline Renderer &get() { return *m_spInstance; }
+    static inline MainViewRenderer &get() { return *m_spInstance; }
 
-	Renderer();
-    ~Renderer();
+	MainViewRenderer();
+    ~MainViewRenderer();
 
     //! Sets size of the viewport.
     void setViewportSize(const glm::ivec2 &size);
@@ -67,7 +67,7 @@ private:
     void updateVisibleEnts();
     void refreshFramebuffer();
 
-	static inline Renderer *m_spInstance = nullptr;
+	static inline MainViewRenderer *m_spInstance = nullptr;
 };
 
 #endif

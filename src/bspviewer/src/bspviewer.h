@@ -4,7 +4,7 @@
 #include <renderer/scene_renderer.h>
 #include "assets/asset_manager.h"
 #include "world_state.h"
-#include "renderer.h"
+#include "main_view_renderer.h"
 #include "level_loader.h"
 
 class BSPViewer : public GuiAppBase {
@@ -53,7 +53,7 @@ public:
 
 private:
     AssetManager m_AssetManager;
-    Renderer m_Renderer;
+    MainViewRenderer m_Renderer;
     std::unique_ptr<LevelLoader> m_pLevelLoader;
     std::unique_ptr<WorldState> m_pWorldState;
 

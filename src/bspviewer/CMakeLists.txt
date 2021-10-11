@@ -20,8 +20,8 @@ set(SOURCE_FILES
 	src/bspviewer.h
 	src/level_loader.cpp
 	src/level_loader.h
-	src/renderer.cpp
-	src/renderer.h
+	src/main_view_renderer.cpp
+	src/main_view_renderer.h
 	src/vis.cpp
 	src/vis.h
 	src/world_state.cpp

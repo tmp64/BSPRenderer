@@ -99,7 +99,7 @@ void BSPViewer::tick() {
     } else if (m_pWorldState) {
         // Level is loaded
         processUserInput();
-        Renderer::get().showMainView();
+        MainViewRenderer::get().showMainView();
     } else {
         // Level is not loaded
         InputSystem::get().discardMouseMovement();
@@ -112,7 +112,7 @@ void BSPViewer::drawBackground() {
     BaseClass::drawBackground();
 
     if (m_pWorldState) {
-        Renderer::get().renderMainView();
+        MainViewRenderer::get().renderMainView();
     }
 }
 
