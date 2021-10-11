@@ -22,10 +22,6 @@ static ConCommand cmd_map("map", "Loads a map", [](const CmdString &cmd) {
     BSPViewer::get().loadLevel(cmd[1]);
 });
 
-static ConCommand cmd_toggle_debug_text("toggle_debug_text", "", []() {
-    BSPViewer::get().setDrawDebugTextEnabled(!BSPViewer::get().isDrawDebugTextEnabled());
-});
-
 static ConCommand cmd_getpos("getpos", "", [](const CmdString &) {
     auto pos = BSPViewer::get().getCameraPos();
     auto rot = BSPViewer::get().getCameraRot();
@@ -104,8 +100,6 @@ void BSPViewer::tick() {
         // Level is not loaded
         InputSystem::get().discardMouseMovement();
     }
-
-    showInfoDialog();
 }
 
 void BSPViewer::drawBackground() {
@@ -119,36 +113,6 @@ void BSPViewer::drawBackground() {
 void BSPViewer::onWindowSizeChange(int wide, int tall) {
     m_flAspectRatio = (float)wide / tall;
     glViewport(0, 0, wide, tall);
-}
-
-void BSPViewer::showInfoDialog() {
-    static bool open = true;
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize |
-                                    ImGuiWindowFlags_NoFocusOnAppearing |
-                                    ImGuiWindowFlags_NoNav;
-
-    ImGui::SetNextWindowBgAlpha(0.2f);
-
-    ImColor cyan = ImColor(0, 255, 255, 255);
-    ImColor red = ImColor(255, 0, 0, 255);
-
-    if (ImGui::Begin("BSPViewer Stats", nullptr, window_flags)) {
-        ImGui::Separator();
-        ImGui::Text("Pos: X: %9.3f / Y: %9.3f / Z: %9.3f", m_vPos.x, m_vPos.y, m_vPos.z);
-        ImGui::Text("Rot: P: %9.3f / Y: %9.3f / R: %9.3f", m_vRot.x, m_vRot.y, m_vRot.z);
-
-        ImGui::Separator();
-        ImGui::Text("%s", glGetString(GL_VENDOR));
-        ImGui::Text("%s", glGetString(GL_RENDERER));
-
-        ImGui::Separator();
-        if (InputSystem::get().isInputGrabbed()) {
-            ImGui::Text("Input grabbed");
-        } else {
-            ImGui::TextColored(red, "Input released");
-        }
-    }
-    ImGui::End();
 }
 
 void BSPViewer::processUserInput() {
@@ -216,8 +180,6 @@ void BSPViewer::processUserInput() {
         }
     }
 }
-
-void BSPViewer::setDrawDebugTextEnabled(bool state) { m_bDrawDebugText = state; }
 
 void BSPViewer::loadLevel(const std::string &name) {
     if (m_pLevelLoader) {

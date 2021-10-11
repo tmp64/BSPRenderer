@@ -31,17 +31,9 @@ public:
     void unloadLevel();
 
     /**
-     * Shows dialog with framerates and position.
-     */
-    void showInfoDialog();
-
-    /**
      * Moves and rotates the camera if input is grabbed.
      */
     void processUserInput();
-
-    void setDrawDebugTextEnabled(bool state);
-    inline bool isDrawDebugTextEnabled() { return m_bDrawDebugText; }
 
     inline glm::vec3 getCameraPos() { return m_vPos; }
     inline glm::vec3 getCameraRot() { return m_vRot; }
@@ -60,8 +52,6 @@ private:
     glm::vec3 m_vPos = {0.f, 0.f, 0.f};
     glm::vec3 m_vRot = {0.f, 0.f, 0.f};
     float m_flAspectRatio = 1.f;
-
-    bool m_bDrawDebugText = true;
 
     void loadingTick();
 
