@@ -66,7 +66,6 @@ BSPViewer::BSPViewer() {
     m_sSingleton = this;
 
     setAutoClearEnabled(true);
-    setAutoClearColor({0, 0.5f, 0, 1});
 
     // Init input
     InputSystem::get().bindKey(SDL_SCANCODE_F3, "toggle_debug_text");
@@ -100,7 +99,7 @@ void BSPViewer::tick() {
     } else if (m_pWorldState) {
         // Level is loaded
         processUserInput();
-        Renderer::get().tick();
+        Renderer::get().showMainView();
     } else {
         // Level is not loaded
         InputSystem::get().discardMouseMovement();
@@ -113,14 +112,13 @@ void BSPViewer::drawBackground() {
     BaseClass::drawBackground();
 
     if (m_pWorldState) {
-        Renderer::get().draw();
+        Renderer::get().renderMainView();
     }
 }
 
 void BSPViewer::onWindowSizeChange(int wide, int tall) {
     m_flAspectRatio = (float)wide / tall;
     glViewport(0, 0, wide, tall);
-    Renderer::get().setViewportSize({wide, tall});
 }
 
 void BSPViewer::showInfoDialog() {

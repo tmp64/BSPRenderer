@@ -992,6 +992,7 @@ void SceneRenderer::prepareHdrFramebuffer() {
 
     glBindFramebuffer(GL_FRAMEBUFFER, m_nHdrFramebuffer);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glViewport(0, 0, m_vViewportSize.x, m_vViewportSize.y);
 }
 
 void SceneRenderer::setupViewContext() {

@@ -22,8 +22,8 @@ public:
     //! Unloads the level
     void unloadLevel();
 
-    //! Does main loop thinking (e.g. shows debug dialog)
-    void tick();
+    //! Shows the main view (and renderer debug dialog)
+    void showMainView();
 
     /**
      * Should be called during loading from main thread.
@@ -31,8 +31,8 @@ public:
      */
     bool loadingTick();
 
-    //! Renders the image into main framebuffer
-    void draw();
+    //! Renders the viewport
+    void renderMainView();
 
     /**
      * Creates an optimized model for a brush model for more effficient solid rendering.
@@ -47,16 +47,25 @@ public:
 private:
     static constexpr int BOX_VERT_COUNT = 6 * 2 * 3; // 6 sides * 2 triangles * 3 verts
 
+    glm::ivec2 m_vViewportSize = glm::ivec2(0, 0);
     SceneRenderer m_SceneRenderer;
+
+    // Entities to render
     std::vector<ClientEntity> m_VisEnts;
     std::vector<glm::mat4> m_BoxTransforms;
     unsigned m_uBoxCount = 0;
 
+    // Entity boxes
     GLVao m_BoxVao;
     GPUBuffer m_BoxVbo;
     GPUBuffer m_BoxInstances;
 
+    // Backbuffer
+    GLFramebuffer m_Framebuffer;
+    GPUTexture m_ColorBuffer;
+
     void updateVisibleEnts();
+    void refreshFramebuffer();
 
 	static inline Renderer *m_spInstance = nullptr;
 };

@@ -3,7 +3,7 @@
 #include "bspviewer.h"
 #include "assets/asset_manager.h"
 
-static ConVar<float> fov("fov", 120.f, "Horizontal field of view");
+static ConVar<float> v_fov("v_fov", 120.f, "Horizontal field of view");
 
 class EntityBoxShader : public BaseShader {
 public:
@@ -20,6 +20,10 @@ private:
 };
 
 static EntityBoxShader s_EntityBoxShader;
+
+static ImVec2 imVecFloor(ImVec2 vec) {
+    return ImVec2(floor(vec.x), floor(vec.y));
+}
 
 Renderer::Renderer() {
     AFW_ASSERT(!m_spInstance);
@@ -102,8 +106,58 @@ void Renderer::unloadLevel() {
     m_SceneRenderer.unloadLevel();
 }
 
-void Renderer::tick() {
+void Renderer::showMainView() {
     m_SceneRenderer.showDebugDialog("Renderer");
+
+    ImVec2 newPadding = ImGui::GetStyle().WindowPadding;
+    newPadding.x *= 0.33f;
+    newPadding.y *= 0.33f;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, newPadding);
+
+    if (ImGui::Begin("Main View")) {
+        // FOV slider
+        float fov = v_fov.getValue();
+        ImGui::PushItemWidth(320);
+        if (ImGui::SliderFloat("FOV", &fov, 90, 150, "%.f")) {
+            v_fov.setValue(fov);
+        }
+        ImGui::PopItemWidth();
+
+        // Viewport
+        ImVec2 vMin = imVecFloor(ImGui::GetCursorPos());
+        ImVec2 vMax = imVecFloor(ImGui::GetWindowContentRegionMax());
+        ImVec2 vSize(vMax.x - vMin.x, vMax.y - vMin.y);
+        glm::ivec2 vViewportSize = glm::ivec2(vSize.x, vSize.y);
+
+        if (vViewportSize != m_vViewportSize && vViewportSize.x > 0 && vViewportSize.y > 0) {
+            m_vViewportSize = vViewportSize;
+            refreshFramebuffer();
+            m_SceneRenderer.setViewportSize(vViewportSize);
+        }
+
+        ImVec2 oldCursor = ImGui::GetCursorPos();
+        ImGui::Image(reinterpret_cast<ImTextureID>(m_ColorBuffer.getId()), vSize,
+                           ImVec2(0, 1), ImVec2(1, 0));
+
+        ImGui::SetCursorPos(oldCursor);
+        ImGui::InvisibleButton("viewport", vSize);
+
+        // Mouse input
+        ImVec2 windowPos = ImGui::GetWindowPos();
+        vMin.x += windowPos.x;
+        vMin.y += windowPos.y;
+        vMax.x += windowPos.x;
+        vMax.y += windowPos.y;
+
+        if (ImGui::IsWindowFocused() && ImGui::IsMouseHoveringRect(vMin, vMax)) {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                
+            }
+        }
+    }
+
+    ImGui::End();
+    ImGui::PopStyleVar();
 }
 
 bool Renderer::loadingTick() {
@@ -111,11 +165,23 @@ bool Renderer::loadingTick() {
     return m_SceneRenderer.loadingTick();
 }
 
-void Renderer::draw() {
-    m_SceneRenderer.setPerspective(fov.getValue(), BSPViewer::get().getAspectRatio(), 4, 8192);
+void Renderer::renderMainView() {
+    // Scale viewport FOV
+    // Assume that v_fov is hor fov at 4:3 aspect ratio
+    // Keep vertical fov constant, only scale horizontal
+    constexpr float DEFAULT_ASPECT = 4.0f / 3.0f;
+    float aspect = (float)m_vViewportSize.x / m_vViewportSize.y;
+    float fovx = glm::radians(v_fov.getValue());
+    float xtan = tan(fovx / 2);
+    float ytan = xtan / DEFAULT_ASPECT;
+    xtan = ytan * aspect;
+    fovx = glm::degrees(2 * atan(xtan));
+
+    m_SceneRenderer.setPerspective(fovx, aspect, 4, 8192);
     m_SceneRenderer.setPerspViewOrigin(BSPViewer::get().getCameraPos(), BSPViewer::get().getCameraRot());
     updateVisibleEnts();
-    m_SceneRenderer.renderScene(0, 0, 0); // 0 is the main framebuffer
+    m_SceneRenderer.renderScene(m_Framebuffer, 0, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Renderer::optimizeBrushModel(Model *model) {
@@ -199,4 +265,24 @@ void Renderer::updateVisibleEnts() {
         m_BoxInstances.bufferSubData(GL_ARRAY_BUFFER, 0, m_uBoxCount * sizeof(glm::mat4),
                                      m_BoxTransforms.data());
     }
+}
+
+void Renderer::refreshFramebuffer() {
+    // Create color buffer
+    m_ColorBuffer.create("Main View FB");
+    glBindTexture(GL_TEXTURE_2D, m_ColorBuffer.getId());
+    m_ColorBuffer.texImage2D(GL_TEXTURE_2D, 0, GL_RGB8, m_vViewportSize.x, m_vViewportSize.y, 0,
+                              GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // Attach buffers
+    m_Framebuffer.create();
+    glBindFramebuffer(GL_FRAMEBUFFER, m_Framebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           m_ColorBuffer.getId(), 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        throw std::runtime_error(
+            "Renderer::refreshFramebuffer(): framebuffer not complete");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
