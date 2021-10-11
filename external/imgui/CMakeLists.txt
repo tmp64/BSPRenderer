@@ -21,8 +21,8 @@ add_library(imgui STATIC
 
 target_include_directories(imgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-target_compile_definitions(imgui PUBLIC
-	IMGUI_IMPL_OPENGL_LOADER_GLAD
+target_compile_definitions(imgui PRIVATE
+	IMGUI_IMPL_OPENGL_LOADER_CUSTOM
 )
 
 target_link_libraries(imgui

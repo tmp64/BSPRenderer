@@ -133,7 +133,7 @@ bool InputSystem::isInputGrabbed() { return m_bGrabInput; }
 void InputSystem::setGrabInput(bool state) {
     if (state) {
         SDL_SetRelativeMouseMode(SDL_TRUE);
-        ImGui_ImplSDL2_ResetInput(); //!< Unstuck all keys
+        // FIXME: ImGui_ImplSDL2_ResetInput(); //!< Unstuck all keys
 
     } else {
         SDL_SetRelativeMouseMode(SDL_FALSE);
