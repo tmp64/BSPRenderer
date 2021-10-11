@@ -33,7 +33,9 @@ void ProfilerDialog::tick() {
             const appfw::ProfNode &root = profData->getPrevRootNode();
 
             if (root.pSection) {
-                float width = ImGui::GetWindowContentRegionWidth() - 6.0f * ImGui::GetFontSize();
+                float contentWidth =
+                    ImGui::GetWindowContentRegionMax().x - ImGui::GetWindowContentRegionMin().x;
+                float width = contentWidth - 6.0f * ImGui::GetFontSize();
                 ImGui::Columns(2, "tree", true);
                 ImGui::SetColumnWidth(0, width);
                 showNode(root);

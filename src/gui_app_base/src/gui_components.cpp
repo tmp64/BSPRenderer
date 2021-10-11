@@ -71,9 +71,8 @@ ImGuiComponent::ImGuiComponent() {
 
 void ImGuiComponent::beginTick() {
     appfw::Prof prof("ImGui Begin Frame");
-    SDL_Window *pWindow = MainWindowComponent::get().getWindow();
     ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplSDL2_NewFrame(pWindow);
+    ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
 }
 

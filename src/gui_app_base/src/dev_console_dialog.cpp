@@ -132,7 +132,8 @@ void DevConsoleDialog::showDialog() {
         }
 
         std::lock_guard lock(m_Mutex);
-        ImGuiListClipper clipper((int)m_Items.size());
+        ImGuiListClipper clipper;
+        clipper.Begin((int)m_Items.size());
 
         while (clipper.Step()) {
             for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
