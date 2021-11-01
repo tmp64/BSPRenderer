@@ -4,7 +4,7 @@
 #include <input/key_codes.h>
 #include <input/key_bind.h>
 
-#define DEBUG_BINDS 1
+#define DEBUG_BINDS 0
 
 #if DEBUG_BINDS
 static KeyBind testBinds[] = {
