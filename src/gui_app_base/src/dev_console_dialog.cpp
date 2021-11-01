@@ -4,7 +4,7 @@
 #include <gui_app_base/gui_app_base.h>
 #include "dev_console_dialog.h"
 
-ConVar<bool> dev_console("dev_console", false, "Show developer console");
+ConVar<bool> dev_console("dev_console", true, "Show developer console");
 ConVar<bool> dev_console_overlay("dev_console_overlay", false, "Show developer console overlay");
 static ConCommand cmd_toggleconsole("toggleconsole", "Toggle the developer console",
                                     []() { dev_console.setValue(!dev_console.getValue()); });
@@ -39,12 +39,12 @@ DevConsoleDialog::~DevConsoleDialog() {
 }
 
 void DevConsoleDialog::tick() {
-    if (consoleKeyBind.isPressed()) {
-        dev_console.setValue(!dev_console.getValue());
-    }
-
     if (dev_console.getValue()) {
         showDialog();
+    } else {
+        if (consoleKeyBind.isPressed()) {
+            dev_console.setValue(true);
+        }
     }
 
     if (dev_console_overlay.getValue()) {
@@ -188,6 +188,12 @@ void DevConsoleDialog::showDialog() {
     ImGui::SetItemDefaultFocus();
     if (reclaimFocus || ImGui::IsWindowAppearing()) {
         ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget (input line)
+    }
+
+    if (consoleKeyBind.isPressed()) {
+        if (!ImGui::IsWindowFocused()) {
+            ImGui::SetKeyboardFocusHere(-1);
+        }
     }
 
     ImGui::End();
