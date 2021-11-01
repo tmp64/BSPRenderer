@@ -53,6 +53,8 @@
 //  2017-08-25: Inputs: MousePos set to -FLT_MAX,-FLT_MAX when mouse is unavailable/missing (instead of -1,-1).
 //  2016-10-15: Misc: Added a void* user_data parameter to Clipboard function handlers.
 
+// Custom changes: MouseIsGrabbed
+
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 
@@ -89,6 +91,8 @@ struct ImGui_ImplSDL2_Data
     char*       ClipboardTextData;
     bool        MouseCanUseGlobalState;
     bool        UseVulkan;
+
+    bool MouseIsGrabbed;
 
     ImGui_ImplSDL2_Data()   { memset(this, 0, sizeof(*this)); }
 };
@@ -191,6 +195,10 @@ bool ImGui_ImplSDL2_ProcessEvent(const SDL_Event* event)
         break;
     }
     return false;
+}
+
+void ImGui_ImplSDL2_SetMouseIsGrabbed(bool state) {
+    ImGui_ImplSDL2_GetBackendData()->MouseIsGrabbed = state;
 }
 
 static bool ImGui_ImplSDL2_Init(SDL_Window* window, void* sdl_gl_context)
@@ -372,7 +380,10 @@ static void ImGui_ImplSDL2_UpdateMousePosAndButtons()
         mouse_window = focused_window;
 
     // SDL_CaptureMouse() let the OS know e.g. that our imgui drag outside the SDL window boundaries shouldn't e.g. trigger other operations outside
-    SDL_CaptureMouse(ImGui::IsAnyMouseDown() ? SDL_TRUE : SDL_FALSE);
+    if (!bd->MouseIsGrabbed)
+        SDL_CaptureMouse(ImGui::IsAnyMouseDown() ? SDL_TRUE : SDL_FALSE);
+    else
+        SDL_CaptureMouse(SDL_FALSE);
 #else
     // SDL 2.0.3 and non-windowed systems: single-viewport only
     SDL_Window* mouse_window = (SDL_GetWindowFlags(bd->Window) & SDL_WINDOW_INPUT_FOCUS) ? bd->Window : NULL;

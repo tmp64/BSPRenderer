@@ -22,8 +22,8 @@ public:
     //! Unloads the level
     void unloadLevel();
 
-    //! Shows the main view (and renderer debug dialog)
-    void showMainView();
+    //! Shows dialogs and processes input
+    void tick();
 
     /**
      * Should be called during loading from main thread.
@@ -39,6 +39,12 @@ public:
      */
     void optimizeBrushModel(Model *model);
 
+    inline glm::vec3 getCameraPos() { return m_vPosition; }
+    inline glm::vec3 getCameraRot() { return m_vRotation; }
+
+    inline void setCameraPos(glm::vec3 pos) { m_vPosition = pos; }
+    inline void setCameraRot(glm::vec3 rot) { m_vRotation = rot; }
+
     // IRendererEngine
     Material *getMaterial(const bsp::BSPMipTex &tex) override;
     void drawNormalTriangles(unsigned &drawcallCount) override;
@@ -46,6 +52,7 @@ public:
 
 private:
     static constexpr int BOX_VERT_COUNT = 6 * 2 * 3; // 6 sides * 2 triangles * 3 verts
+    static constexpr float MAX_PITCH = 89.9f;
 
     glm::ivec2 m_vViewportSize = glm::ivec2(0, 0);
     SceneRenderer m_SceneRenderer;
@@ -64,8 +71,15 @@ private:
     GLFramebuffer m_Framebuffer;
     GPUTexture m_ColorBuffer;
 
+    // Main view
+    glm::vec3 m_vPosition = {0.f, 0.f, 0.f};
+    glm::vec3 m_vRotation = {0.f, 0.f, 0.f};
+    glm::ivec2 m_SavedMousePos = glm::ivec2(0, 0);
+
     void updateVisibleEnts();
     void refreshFramebuffer();
+    void rotateCamera();
+    void translateCamera();
 
 	static inline MainViewRenderer *m_spInstance = nullptr;
 };

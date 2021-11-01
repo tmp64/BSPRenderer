@@ -9,7 +9,7 @@ void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) 
         if (model[0] == '*') {
             // Brush model
             int modelidx = std::stoi(model.substr(1), nullptr, 10);
-            BrushModel *pModel = WorldState::get().getBrushModel(modelidx);
+            BrushModel *pModel = WorldState::get()->getBrushModel(modelidx);
 
             if (!pModel) {
                 printe("Entity {}: invalid model index '{}'", idx, model);

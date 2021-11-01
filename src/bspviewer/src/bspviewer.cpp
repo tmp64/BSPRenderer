@@ -22,30 +22,6 @@ static ConCommand cmd_map("map", "Loads a map", [](const CmdString &cmd) {
     BSPViewer::get().loadLevel(cmd[1]);
 });
 
-static ConCommand cmd_getpos("getpos", "", [](const CmdString &) {
-    auto pos = BSPViewer::get().getCameraPos();
-    auto rot = BSPViewer::get().getCameraRot();
-    printi("setpos {} {} {} {} {} {}", pos.x, pos.y, pos.z, rot.x, rot.y, rot.z);
-});
-
-static ConCommand cmd_setpos("setpos", "", [](const CmdString &cmd) {
-    if (cmd.size() < 4) {
-        printi("setpos <x> <y> <z> [pitch] [yaw] [roll]");
-        return;
-    }
-
-    glm::vec3 pos = {std::stof(cmd[1]), std::stof(cmd[2]), std::stof(cmd[3])};
-    BSPViewer::get().setCameraPos(pos);
-
-    if (cmd.size() >= 7) {
-        glm::vec3 rot = {std::stof(cmd[4]), std::stof(cmd[5]), std::stof(cmd[6])};
-        BSPViewer::get().setCameraRot(rot);
-    }
-});
-
-static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
-static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
-
 //----------------------------------------------------------------
 
 const AppInitInfo &app_getInitInfo() {
@@ -86,19 +62,12 @@ void BSPViewer::beginTick() {
 void BSPViewer::tick() {
     BaseClass::tick();
     ImGui::ShowDemoWindow();
+    MainViewRenderer::get().tick();
 
     if (m_pLevelLoader) {
         // Level is loading
         AFW_ASSERT(!m_pWorldState);
-        InputSystem::get().discardMouseMovement();
         loadingTick();
-    } else if (m_pWorldState) {
-        // Level is loaded
-        processUserInput();
-        MainViewRenderer::get().showMainView();
-    } else {
-        // Level is not loaded
-        InputSystem::get().discardMouseMovement();
     }
 }
 
@@ -111,74 +80,7 @@ void BSPViewer::drawBackground() {
 }
 
 void BSPViewer::onWindowSizeChange(int wide, int tall) {
-    m_flAspectRatio = (float)wide / tall;
     glViewport(0, 0, wide, tall);
-}
-
-void BSPViewer::processUserInput() {
-    if (!InputSystem::get().isInputGrabbed()) {
-        return;
-    }
-
-    // Rotate the camera
-    {
-        int xrel, yrel;
-        InputSystem::get().getMouseMovement(xrel, yrel);
-        glm::vec3 rot = m_vRot;
-
-        rot.y -= xrel * m_sens.getValue();
-        rot.x += yrel * m_sens.getValue();
-
-        if (rot.x < -90.0f) {
-            rot.x = -90.0f;
-        } else if (rot.x > 90.0f) {
-            rot.x = 90.0f;
-        }
-
-        if (rot.y < 0.0f) {
-            rot.y = 360.0f + rot.y;
-        } else if (rot.y > 360.f) {
-            rot.y = rot.y - 360.0f;
-        }
-
-        m_vRot = rot;
-    }
-
-    // Translate the camera
-    {
-        float delta = cam_speed.getValue() * getTimeDelta();
-        const Uint8 *state = SDL_GetKeyboardState(nullptr);
-
-        auto fnMove = [&](float x, float y, float z) {
-            m_vPos.x += x * delta;
-            m_vPos.y += y * delta;
-            m_vPos.z += z * delta;
-        };
-
-        // !!! In radians
-        float pitch = glm::radians(m_vRot.x);
-        float yaw = glm::radians(m_vRot.y);
-
-        if (state[SDL_SCANCODE_LSHIFT]) {
-            delta *= 5;
-        }
-
-        if (state[SDL_SCANCODE_W]) {
-            fnMove(cos(yaw) * cos(pitch), sin(yaw) * cos(pitch), -sin(pitch));
-        }
-
-        if (state[SDL_SCANCODE_S]) {
-            fnMove(-cos(yaw) * cos(pitch), -sin(yaw) * cos(pitch), sin(pitch));
-        }
-
-        if (state[SDL_SCANCODE_A]) {
-            fnMove(-cos(yaw - glm::pi<float>() / 2), -sin(yaw - glm::pi<float>() / 2), 0);
-        }
-
-        if (state[SDL_SCANCODE_D]) {
-            fnMove(cos(yaw - glm::pi<float>() / 2), sin(yaw - glm::pi<float>() / 2), 0);
-        }
-    }
 }
 
 void BSPViewer::loadLevel(const std::string &name) {
@@ -251,9 +153,6 @@ void BSPViewer::loadingTick() {
             LevelAssetRef level = m_pLevelLoader->getLevel();
             m_pLevelLoader = nullptr;
             m_pWorldState = std::make_unique<WorldState>(level);
-
-            m_vPos = {0.f, 0.f, 0.f};
-            m_vRot = {0.f, 0.f, 0.f};
         }
     } catch (const std::exception &e) {
         printe("Failed to load the map: {}", e.what());

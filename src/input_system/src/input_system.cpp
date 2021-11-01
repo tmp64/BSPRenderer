@@ -125,9 +125,12 @@ void InputSystem::tick() {
 
 void InputSystem::setGrabInput(bool state) {
     if (state) {
+        ImGui_ImplSDL2_SetMouseIsGrabbed(true);
         SDL_SetRelativeMouseMode(SDL_TRUE);
     } else {
+        ImGui_ImplSDL2_SetMouseIsGrabbed(false);
         SDL_SetRelativeMouseMode(SDL_FALSE);
+        discardMouseMovement();
     }
 
     m_bGrabInput = state;

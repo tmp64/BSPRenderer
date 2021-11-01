@@ -11,7 +11,7 @@
 
 class WorldState : appfw::NoMove {
 public:
-    static inline WorldState &get() { return *m_spInstance; }
+    static inline WorldState *get() { return m_spInstance; }
 
     WorldState(LevelAssetRef level);
     ~WorldState();

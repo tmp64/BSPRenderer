@@ -1,10 +1,34 @@
+#include <renderer/utils.h>
 #include "main_view_renderer.h"
 #include "world_state.h"
 #include "bspviewer.h"
 #include "assets/asset_manager.h"
 
+static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
+static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
 static ConVar<float> v_fov("v_fov", 120.f, "Horizontal field of view");
 static KeyBind grabToggleBind("Toggle main view mouse grab", KeyCode::Z);
+
+static ConCommand cmd_getpos("getpos", "", [](const CmdString &) {
+    auto pos = MainViewRenderer::get().getCameraPos();
+    auto rot = MainViewRenderer::get().getCameraRot();
+    printi("setpos {} {} {} {} {} {}", pos.x, pos.y, pos.z, rot.x, rot.y, rot.z);
+});
+
+static ConCommand cmd_setpos("setpos", "", [](const CmdString &cmd) {
+    if (cmd.size() < 4) {
+        printi("setpos <x> <y> <z> [pitch] [yaw] [roll]");
+        return;
+    }
+
+    glm::vec3 pos = {std::stof(cmd[1]), std::stof(cmd[2]), std::stof(cmd[3])};
+    MainViewRenderer::get().setCameraPos(pos);
+
+    if (cmd.size() >= 7) {
+        glm::vec3 rot = {std::stof(cmd[4]), std::stof(cmd[5]), std::stof(cmd[6])};
+        MainViewRenderer::get().setCameraRot(rot);
+    }
+});
 
 class EntityBoxShader : public BaseShader {
 public:
@@ -104,25 +128,16 @@ void MainViewRenderer::loadLevel(LevelAssetRef &level) {
 }
 
 void MainViewRenderer::unloadLevel() {
+    if (InputSystem::get().isInputGrabbed()) {
+        InputSystem::get().setGrabInput(false);
+    }
+
     m_SceneRenderer.unloadLevel();
+    m_vPosition = glm::vec3(0, 0, 0);
+    m_vRotation = glm::vec3(0, 0, 0);
 }
 
-void MainViewRenderer::showMainView() {
-    if (grabToggleBind.isPressed()) {
-        InputSystem::get().setGrabInput(!InputSystem::get().isInputGrabbed());
-    }
-
-    bool isGrabbed = InputSystem::get().isInputGrabbed();
-
-    if (isGrabbed) {
-        if (SDL_GetKeyboardState(nullptr)[(int)KeyCode::Escape]) {
-            InputSystem::get().setGrabInput(false);
-            isGrabbed = false;
-        }
-    }
-
-    m_SceneRenderer.showDebugDialog("Renderer");
-
+void MainViewRenderer::tick() {
     ImVec2 newPadding = ImGui::GetStyle().WindowPadding;
     newPadding.x *= 0.33f;
     newPadding.y *= 0.33f;
@@ -137,41 +152,71 @@ void MainViewRenderer::showMainView() {
         }
         ImGui::PopItemWidth();
 
-        // Viewport
-        ImVec2 vMin = imVecFloor(ImGui::GetCursorPos());
-        ImVec2 vMax = imVecFloor(ImGui::GetWindowContentRegionMax());
-        ImVec2 vSize(vMax.x - vMin.x, vMax.y - vMin.y);
-        glm::ivec2 vViewportSize = glm::ivec2(vSize.x, vSize.y);
+        if (WorldState::get()) {
+            bool isGrabbed = InputSystem::get().isInputGrabbed();
 
-        if (vViewportSize != m_vViewportSize && vViewportSize.x > 0 && vViewportSize.y > 0) {
-            m_vViewportSize = vViewportSize;
-            refreshFramebuffer();
-            m_SceneRenderer.setViewportSize(vViewportSize);
-        }
+            // Viewport
+            {
+                ImVec2 vMin = imVecFloor(ImGui::GetCursorPos());
+                ImVec2 vMax = imVecFloor(ImGui::GetWindowContentRegionMax());
+                ImVec2 vSize(vMax.x - vMin.x, vMax.y - vMin.y);
+                glm::ivec2 vViewportSize = glm::ivec2(vSize.x, vSize.y);
 
-        ImVec2 oldCursor = ImGui::GetCursorPos();
-        ImGui::Image(reinterpret_cast<ImTextureID>(m_ColorBuffer.getId()), vSize,
-                           ImVec2(0, 1), ImVec2(1, 0));
+                if (vViewportSize != m_vViewportSize && vViewportSize.x > 0 &&
+                    vViewportSize.y > 0) {
+                    m_vViewportSize = vViewportSize;
+                    refreshFramebuffer();
+                    m_SceneRenderer.setViewportSize(vViewportSize);
+                }
 
-        ImGui::SetCursorPos(oldCursor);
-        ImGui::InvisibleButton("viewport", vSize);
+                ImVec2 oldCursor = ImGui::GetCursorPos();
+                ImGui::Image(reinterpret_cast<ImTextureID>((uintptr_t)m_ColorBuffer.getId()), vSize,
+                             ImVec2(0, 1), ImVec2(1, 0));
 
-        // Mouse input
-        ImVec2 windowPos = ImGui::GetWindowPos();
-        vMin.x += windowPos.x;
-        vMin.y += windowPos.y;
-        vMax.x += windowPos.x;
-        vMax.y += windowPos.y;
-
-        if (ImGui::IsWindowFocused() && ImGui::IsMouseHoveringRect(vMin, vMax)) {
-            if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                
+                ImGui::SetCursorPos(oldCursor);
+                ImGui::InvisibleButton("viewport", vSize);
             }
+
+            // Mouse input
+            {
+                if (ImGui::IsItemHovered()) {
+                    if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                        if (!isGrabbed) {
+                            SDL_GetMouseState(&m_SavedMousePos.x, &m_SavedMousePos.y);
+                            InputSystem::get().setGrabInput(true);
+                        }
+                    } else {
+                        if (isGrabbed) {
+                            InputSystem::get().setGrabInput(false);
+                            SDL_WarpMouseInWindow(MainWindowComponent::get().getWindow(),
+                                                  m_SavedMousePos.x, m_SavedMousePos.y);
+                            isGrabbed = false;
+                        }
+                    }
+                }
+            }
+
+            if (isGrabbed) {
+                rotateCamera();
+                translateCamera();
+            }
+        } else {
+            ImGui::TextUnformatted("Not loaded.");
         }
     }
 
     ImGui::End();
     ImGui::PopStyleVar();
+
+    if (WorldState::get()) {
+        m_SceneRenderer.showDebugDialog("Renderer");
+    } else {
+        if (ImGui::Begin("Renderer")) {
+            ImGui::TextUnformatted("Not loaded.");
+        }
+
+        ImGui::End();
+    }
 }
 
 bool MainViewRenderer::loadingTick() {
@@ -192,7 +237,7 @@ void MainViewRenderer::renderMainView() {
     fovx = glm::degrees(2 * atan(xtan));
 
     m_SceneRenderer.setPerspective(fovx, aspect, 4, 8192);
-    m_SceneRenderer.setPerspViewOrigin(BSPViewer::get().getCameraPos(), BSPViewer::get().getCameraRot());
+    m_SceneRenderer.setPerspViewOrigin(m_vPosition, m_vRotation);
     updateVisibleEnts();
     m_SceneRenderer.renderScene(m_Framebuffer, 0, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -222,12 +267,12 @@ void MainViewRenderer::drawNormalTriangles(unsigned &drawcallCount) {
     }
 }
 
-void MainViewRenderer::drawTransTriangles(unsigned &drawcallCount) {}
+void MainViewRenderer::drawTransTriangles(unsigned &) {}
 
 void MainViewRenderer::updateVisibleEnts() {
     appfw::Prof prof("Entity List");
     m_SceneRenderer.clearEntities();
-    auto &ents = WorldState::get().getEntList();
+    auto &ents = WorldState::get()->getEntList();
     unsigned entCount = 0;
     m_uBoxCount = 0;
 
@@ -253,7 +298,7 @@ void MainViewRenderer::updateVisibleEnts() {
             {
                 glm::vec3 mins = pEnt->getOrigin() + pEnt->getModel()->getMins();
                 glm::vec3 maxs = pEnt->getOrigin() + pEnt->getModel()->getMaxs();
-                if (!Vis::get().boxInPvs(BSPViewer::get().getCameraPos(), mins, maxs)) {
+                if (!Vis::get().boxInPvs(m_vPosition, mins, maxs)) {
                     continue;
                 }
             }
@@ -299,4 +344,50 @@ void MainViewRenderer::refreshFramebuffer() {
         throw std::runtime_error(
             "MainViewRenderer::refreshFramebuffer(): framebuffer not complete");
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void MainViewRenderer::rotateCamera() {
+    int xrel, yrel;
+    InputSystem::get().getMouseMovement(xrel, yrel);
+
+    glm::vec3 rot = m_vRotation;
+
+    rot.y -= xrel * m_sens.getValue();
+    rot.x += yrel * m_sens.getValue();
+
+    rot.x = std::clamp(rot.x, -MAX_PITCH, MAX_PITCH);
+    rot.y = fmod(rot.y, 360.0f);
+
+    m_vRotation = rot;
+}
+
+void MainViewRenderer::translateCamera() {
+    float delta = cam_speed.getValue() * BSPViewer::get().getTimeDelta();
+    glm::vec3 forward, right, up;
+    angleVectors(m_vRotation, &forward, &right, &up);
+
+    glm::vec3 direction = glm::vec3(0, 0, 0);
+    const uint8_t *keys = SDL_GetKeyboardState(nullptr);
+
+    if (keys[SDL_SCANCODE_W]) {
+        direction += forward;
+    }
+
+    if (keys[SDL_SCANCODE_S]) {
+        direction -= forward;
+    }
+
+    if (keys[SDL_SCANCODE_D]) {
+        direction += right;
+    }
+
+    if (keys[SDL_SCANCODE_A]) {
+        direction -= right;
+    }
+
+    if (keys[SDL_SCANCODE_LSHIFT]) {
+        delta *= 5;
+    }
+
+    m_vPosition += direction * delta;
 }
