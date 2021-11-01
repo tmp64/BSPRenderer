@@ -4,6 +4,7 @@
 #include "assets/asset_manager.h"
 
 static ConVar<float> v_fov("v_fov", 120.f, "Horizontal field of view");
+static KeyBind grabToggleBind("Toggle main view mouse grab", KeyCode::Z);
 
 class EntityBoxShader : public BaseShader {
 public:
@@ -107,6 +108,19 @@ void MainViewRenderer::unloadLevel() {
 }
 
 void MainViewRenderer::showMainView() {
+    if (grabToggleBind.isPressed()) {
+        InputSystem::get().setGrabInput(!InputSystem::get().isInputGrabbed());
+    }
+
+    bool isGrabbed = InputSystem::get().isInputGrabbed();
+
+    if (isGrabbed) {
+        if (SDL_GetKeyboardState(nullptr)[(int)KeyCode::Escape]) {
+            InputSystem::get().setGrabInput(false);
+            isGrabbed = false;
+        }
+    }
+
     m_SceneRenderer.showDebugDialog("Renderer");
 
     ImVec2 newPadding = ImGui::GetStyle().WindowPadding;

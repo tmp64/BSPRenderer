@@ -50,6 +50,7 @@ void GuiAppBase::lateInit() {
 }
 
 void GuiAppBase::beginTick() {
+    m_InputSystem.beginTick();
     pollEvents();
     m_ImGui.beginTick();
 }

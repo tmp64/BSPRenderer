@@ -5,7 +5,8 @@
 #include <app_base/app_base.h>
 #include <gui_app_base/gui_components.h>
 #include <gui_app_base/opengl_context.h>
-#include <gui_app_base/input_system.h>
+#include <input/input_system.h>
+#include <input/key_bind.h>
 #include <renderer/gpu_resource_manager.h>
 #include <renderer/shader_manager.h>
 #include <renderer/material_manager.h>

@@ -62,12 +62,6 @@ BSPViewer::BSPViewer() {
     m_sSingleton = this;
 
     setAutoClearEnabled(true);
-
-    // Init input
-    InputSystem::get().bindKey(SDL_SCANCODE_F3, "toggle_debug_text");
-    InputSystem::get().bindKey(SDL_SCANCODE_GRAVE, "toggleconsole");
-    InputSystem::get().bindKey(InputSystem::get().getScancodeForKey("mouse1"), "trace1");
-    InputSystem::get().bindKey(InputSystem::get().getScancodeForKey("mouse2"), "trace2");
 }
 
 BSPViewer::~BSPViewer() {

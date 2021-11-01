@@ -4,7 +4,6 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/gui_app_base.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/gui_components.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/imgui_controls.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/input_system.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/opengl_context.h
 
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view.cpp
@@ -13,7 +12,6 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/gui_app_base.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/gui_components.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/input_system.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/opengl_context.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/profiler_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/profiler_dialog.h
@@ -34,6 +32,7 @@ target_link_libraries(gui_app_base
 	glad
 	glm::glm
 	imgui
+	input_system
 	renderer
 	SDL2::SDL2
 	SDL2::SDL2main

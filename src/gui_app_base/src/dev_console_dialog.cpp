@@ -1,14 +1,15 @@
 #include <fmt/printf.h>
 #include <appfw/appfw.h>
-#include <gui_app_base/input_system.h>
 #include <gui_app_base/imgui_controls.h>
 #include <gui_app_base/gui_app_base.h>
 #include "dev_console_dialog.h"
 
 ConVar<bool> dev_console("dev_console", false, "Show developer console");
-ConVar<bool> dev_console_overlay("dev_console_overlay", true, "Show developer console overlay");
+ConVar<bool> dev_console_overlay("dev_console_overlay", false, "Show developer console overlay");
 static ConCommand cmd_toggleconsole("toggleconsole", "Toggle the developer console",
                                     []() { dev_console.setValue(!dev_console.getValue()); });
+
+static KeyBind consoleKeyBind("Toggle developer console", KeyCode::Grave);
 
 DevConsoleDialog::DevConsoleDialog() {
     m_Items.reserve(MAX_ITEM_COUNT);
@@ -38,7 +39,11 @@ DevConsoleDialog::~DevConsoleDialog() {
 }
 
 void DevConsoleDialog::tick() {
-    if (dev_console.getValue() && !InputSystem::get().isInputGrabbed()) {
+    if (consoleKeyBind.isPressed()) {
+        dev_console.setValue(!dev_console.getValue());
+    }
+
+    if (dev_console.getValue()) {
         showDialog();
     }
 
