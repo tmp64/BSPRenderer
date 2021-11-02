@@ -10,10 +10,7 @@ layout (location = 1) in vec3 inNormal;
 // Texture coordinates
 layout (location = 2) in vec2 inTexCoord;
 
-// BSP lightmap texture coordinates
-layout (location = 3) in vec2 inBSPLMTexCoord;
-
-// Custom lightmap texture coordinates
-layout (location = 4) in vec2 inCustomLMTexCoord;
+// Lightmap texture coordinates
+layout (location = 3) in vec2 inLMTexCoord;
 
 #endif

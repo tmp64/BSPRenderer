@@ -8,6 +8,7 @@ layout (std140) uniform GlobalUniform {
     mat4 mMainView;
     vec4 vMainViewOrigin; // xyz
     vec4 vflParams1;      // x tex gamma, y screen gamma, z sim time, w sim time delta
+    vec4 vflParams2;      // x lightmap gamma
     ivec4 viParams1;      // x is texture type, y is lighting type
 } u_Global;
 
@@ -15,6 +16,7 @@ layout (std140) uniform GlobalUniform {
 #define uflGamma        vflParams1.y
 #define uflSimTime      vflParams1.z
 #define uflDeltaTime    vflParams1.w
+#define uflLMGamma      vflParams2.x
 #define uiTextureType   viParams1.x
 #define uiLightingType  viParams1.y
 

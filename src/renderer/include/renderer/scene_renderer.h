@@ -114,15 +114,25 @@ private:
     class PatchesShader;
     class PostProcessShader;
 
+    enum class LoadingStatus
+    {
+        NotLoading,
+        CreateSurfaces,       //!< Calls SurfaceRenderer::setLevel and fills m_Data.surfaces
+        AsyncTasks,           //!< Starts and waits for various tasks
+        CreateSurfaceObjects, //!< Creates VAOs and VBOs
+    };
+
+    enum class LightmapType
+    {
+        BSP = 0,
+        Custom = 1,
+    };
+
     struct SurfaceVertex {
         glm::vec3 position;
         glm::vec3 normal;
         glm::vec2 texture;
-        glm::vec2 bspLMTexture;
-        glm::vec2 customLMTexture;
     };
-
-    static_assert(sizeof(SurfaceVertex) == sizeof(float) * 12, "Size of Vertex is invalid");
 
     struct Surface {
         glm::vec3 m_Color;
@@ -149,6 +159,7 @@ private:
         glm::mat4 mMainView;
         glm::vec4 vMainViewOrigin; // xyz
         glm::vec4 vflParams1;      // x tex gamma, y screen gamma, z sim time, w sim time delta
+        glm::vec4 vflParams2;      // x lightmap gamma
         glm::ivec4 viParams1;      // x is texture type, y is lighting type
     };
 
@@ -162,6 +173,9 @@ private:
         // Lightmaps
         GPUTexture bspLightmapBlockTex;
         GPUTexture customLightmapBlockTex;
+        GPUBuffer bspLightmapCoords;
+        GPUBuffer customLightmapCoords;
+        LightmapType lightmapType = LightmapType::Custom;
 
         // Brush geometry rendering
         GLVao surfVao;
@@ -176,13 +190,6 @@ private:
         uint32_t patchesVerts = 0;
         GLVao patchesVao;
         GPUBuffer patchesVbo;
-    };
-
-    enum class LoadingStatus {
-        NotLoading,
-        CreateSurfaces, //!< Calls SurfaceRenderer::setLevel and fills m_Data.surfaces
-        AsyncTasks, //!< Starts and waits for various tasks
-        CreateSurfaceObjects, //!< Creates VAOs and VBOs
     };
 
     struct LoadingState {
@@ -200,6 +207,8 @@ private:
         std::vector<glm::vec3> customLightmapTex;
         std::vector<glm::vec3> patchBuffer;
         glm::ivec2 customLightmapTexSize;
+        std::vector<glm::vec2> bspLMCoordsBuf;
+        std::vector<glm::vec2> customLMCoordsBuf;
 
         // Surface objects
         std::future<void> createSurfaceObjectsResult;
@@ -253,7 +262,7 @@ private:
     void finishLoadCustomLightmaps();
     void asyncCreateSurfaceObjects();
     void finishCreateSurfaceObjects();
-    void enableSurfaceAttribs();
+    void updateVao();
     void loadTextures();
     void loadSkyBox();
     void finishLoading();

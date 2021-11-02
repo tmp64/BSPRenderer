@@ -75,13 +75,10 @@ void main(void) {
 		// Result
 		ligtmapColor = ambient + diffuse;
 	} else if (u_Global.uiLightingType == 2) {
-		// BSP lightmaps
-		ligtmapColor = texture(u_LMTexture, vsOut.vBSPLMTexCoord).rgb;
+		// Lightmaps
+		ligtmapColor = texture(u_LMTexture, vsOut.vLMTexCoord).rgb;
 		// Gamma correction
-		ligtmapColor.rgb = pow(ligtmapColor.rgb, vec3(1.5));
-	} else if (u_Global.uiLightingType == 3) {
-		// Custom lightmaps
-		ligtmapColor = texture(u_LMTexture, vsOut.vCustomLMTexCoord).rgb;
+		ligtmapColor.rgb = pow(ligtmapColor.rgb, vec3(u_Global.uflLMGamma));
 	}
 
 #ifdef ENTITY_SHADER

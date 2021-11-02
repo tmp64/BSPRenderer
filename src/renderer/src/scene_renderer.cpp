@@ -26,9 +26,9 @@ ConVar<bool> r_drawents("r_drawents", true, "Draw entities");
 ConVar<float> r_gamma("r_gamma", 2.2f, "Gamma");
 ConVar<float> r_texgamma("r_texgamma", 2.2f, "Texture gamma");
 ConVar<int> r_texture("r_texture", 2,
-                      "Which texture should be used:\n  0 - white color, 1 - random color, 2 - texture");
-ConVar<int> r_lighting("r_lighting", 3,
-                       "Lighting method:\n  0 - fullbright, 1 - shaded, 2 - BSP lightmaps, 3 - custom lightmaps");
+              "Which texture should be used:\n  0 - white color, 1 - random color, 2 - texture");
+ConVar<int> r_shading("r_shading", 2, "Lighting method:\n  0 - fullbright, 1 - shaded, 2 - lightmaps");
+ConVar<int> r_lightmap("r_lightmap", 1, "Used lightmap:\n  0 - BSP, 1 - custom");
 ConVar<bool> r_ebo("r_ebo", true, "Use indexed rendering");
 ConVar<bool> r_wireframe("r_wireframe", false, "Draw wireframes");
 ConVar<bool> r_nosort("r_nosort", false, "Disable transparent entity sorting");
@@ -36,9 +36,8 @@ ConVar<bool> r_notrans("r_notrans", false, "Disable entity transparency");
 ConVar<bool> r_filter_lm("r_filter_lm", true, "Filter lightmaps (requires map reload)");
 ConVar<bool> r_patches("r_patches", false, "Draw custom lightmap patches");
 
-static const char *r_lighting_values[] = {
-    "Fullbright", "Shaded", "BSP lightmaps", "Custom lightmaps"
-};
+static const char *r_shading_values[] = {"Fullbright", "Shaded", "Lightmaps"};
+static const char *r_lightmap_values[] = {"BSP", "Custom"};
 
 static inline bool isVectorNull(const glm::vec3 &v) { return v.x == 0.f && v.y == 0.f && v.z == 0.f; }
 
@@ -211,9 +210,22 @@ void SceneRenderer::renderScene(GLint targetFb, float flSimTime, float flTimeDel
     // Reset stats
     m_Stats = RenderingStats();
 
-    if (!m_Data.bCustomLMLoaded && r_lighting.getValue() == 3) {
-        r_lighting.setValue(2);
-        printw("Lighting type set to shaded since custom lightmaps are not loaded");
+    LightmapType newLmType = (LightmapType)std::clamp(r_lightmap.getValue(), 0, 1);
+
+    if (newLmType == LightmapType::Custom && !m_Data.bCustomLMLoaded) {
+        r_lightmap.setValue(0);
+        newLmType = LightmapType::BSP;
+        printw("Lightmap type set to BSP since custom lightmaps are not loaded");
+    }
+    
+    if (newLmType == LightmapType::BSP == 0 && m_pLevel->getLightMaps().size() == 0 && r_shading.getValue() == 2) {
+        r_shading.setValue(1);
+        printw("Lighting type set to shaded since no lightmaps are loaded");
+    }
+
+    if (m_Data.lightmapType != newLmType) {
+        m_Data.lightmapType = newLmType;
+        updateVao();
     }
 
     frameSetup(flSimTime, flTimeDelta);
@@ -282,14 +294,28 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         ImGui::SameLine();
         CvarCheckbox("Patches", r_patches);
 
-        int lighting = std::clamp(r_lighting.getValue(), 0, 3);
+        int lighting = std::clamp(r_shading.getValue(), 0, 2);
 
-        if (ImGui::BeginCombo("Lighting", r_lighting_values[lighting])) {
-            for (int i = 0; i <= 3; i++) {
-                if (ImGui::Selectable(r_lighting_values[i])) {
-                    r_lighting.setValue(i);
+        if (ImGui::BeginCombo("Shading", r_shading_values[lighting])) {
+            for (int i = 0; i <= 2; i++) {
+                if (ImGui::Selectable(r_shading_values[i])) {
+                    r_shading.setValue(i);
                 }
                 if (lighting == i) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        int lightmap = std::clamp(r_lightmap.getValue(), 0, 2);
+
+        if (ImGui::BeginCombo("Lightmaps", r_lightmap_values[lightmap])) {
+            for (int i = 0; i <= 1; i++) {
+                if (ImGui::Selectable(r_lightmap_values[i])) {
+                    r_lightmap.setValue(i);
+                }
+                if (lightmap == i) {
                     ImGui::SetItemDefaultFocus();
                 }
             }
@@ -707,6 +733,8 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
     unsigned maxEboSize = 0; // Sum of vertex counts of all surfaces + surface count (to account for primitive restart element)
 
     m_pLoadingState->surfVertices.resize(m_Data.surfaces.size());
+    m_pLoadingState->bspLMCoordsBuf.reserve(bsp::MAX_MAP_VERTS);
+    m_pLoadingState->customLMCoordsBuf.reserve(bsp::MAX_MAP_VERTS);
 
     for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
         Surface &surf = m_Data.surfaces[i];
@@ -742,20 +770,24 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
             v.texture.t /= material.getTall();
 
             // BSP lightmap texture
+            glm::vec2 bspLmCoord = glm::vec2(0, 0);
             if (surf.m_BSPLMSize.x != 0) {
-                v.bspLMTexture.s = glm::dot(v.position, texInfo.vS);
-                v.bspLMTexture.t = glm::dot(v.position, texInfo.vT);
-                v.bspLMTexture += glm::vec2(texInfo.fSShift, texInfo.fTShift);
-                v.bspLMTexture -= surf.m_vTextureMins;
-                v.bspLMTexture += glm::vec2(BSP_LIGHTMAP_DIVISOR / 2); // Shift by half-texel
-                v.bspLMTexture += surf.m_BSPLMOffset * BSP_LIGHTMAP_DIVISOR;
-                v.bspLMTexture /= BSP_LIGHTMAP_BLOCK_SIZE * BSP_LIGHTMAP_DIVISOR;
+                bspLmCoord.s = glm::dot(v.position, texInfo.vS);
+                bspLmCoord.t = glm::dot(v.position, texInfo.vT);
+                bspLmCoord += glm::vec2(texInfo.fSShift, texInfo.fTShift);
+                bspLmCoord -= surf.m_vTextureMins;
+                bspLmCoord += glm::vec2(BSP_LIGHTMAP_DIVISOR / 2); // Shift by half-texel
+                bspLmCoord += surf.m_BSPLMOffset * BSP_LIGHTMAP_DIVISOR;
+                bspLmCoord /= BSP_LIGHTMAP_BLOCK_SIZE * BSP_LIGHTMAP_DIVISOR;
             }
+            m_pLoadingState->bspLMCoordsBuf.push_back(bspLmCoord);
 
             // Custom lightmap texture
+            glm::vec2 customLmCoord = glm::vec2(0, 0);
             if (m_Data.bCustomLMLoaded && !surf.m_vCustomLMTexCoords.empty()) {
-                v.customLMTexture = surf.m_vCustomLMTexCoords[j];
+                customLmCoord = surf.m_vCustomLMTexCoords[j];
             }
+            m_pLoadingState->customLMCoordsBuf.push_back(customLmCoord);
 
             vertices.push_back(v);
 
@@ -780,23 +812,41 @@ void SceneRenderer::finishCreateSurfaceObjects() {
     unsigned maxEboSize = m_pLoadingState->maxEboSize;
     auto &allVertices = m_pLoadingState->allVertices;
 
-    // VAO for world geometry
-    m_Data.surfVao.create();
-    m_Data.surfVbo.create("SceneRendere: Surface vertices");
-    glBindVertexArray(m_Data.surfVao);
-    m_Data.surfVbo.bind(GL_ARRAY_BUFFER);
+    // Lightmap coord buffers
+    m_Data.bspLightmapCoords.create("BSP lm coords");
+    m_Data.bspLightmapCoords.bind(GL_ARRAY_BUFFER);
+    m_Data.bspLightmapCoords.bufferData(GL_ARRAY_BUFFER,
+                                        sizeof(glm::vec2) * m_pLoadingState->bspLMCoordsBuf.size(),
+                                        m_pLoadingState->bspLMCoordsBuf.data(), GL_STATIC_DRAW);
 
+    m_Data.customLightmapCoords.create("Custom lm coords");
+    m_Data.customLightmapCoords.bind(GL_ARRAY_BUFFER);
+    m_Data.customLightmapCoords.bufferData(
+        GL_ARRAY_BUFFER, sizeof(glm::vec2) * m_pLoadingState->customLMCoordsBuf.size(),
+        m_pLoadingState->customLMCoordsBuf.data(), GL_STATIC_DRAW);
+
+    // Surface vertices
+    m_Data.surfVbo.create("SceneRenderer: Surface vertices");
+    m_Data.surfVbo.bind(GL_ARRAY_BUFFER);
     m_Data.surfVbo.bufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * allVertices.size(),
                               allVertices.data(), GL_STATIC_DRAW);
-    enableSurfaceAttribs();
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+
+    // Set lightmap type
+    if (m_Data.customLightmapBlockTex.getId()) {
+        m_Data.lightmapType = LightmapType::Custom;
+    } else {
+        m_Data.lightmapType = LightmapType::BSP;
+    }
+
+    // Update the VAO
+    updateVao();
 
     // Create EBO
     printi("Maximum EBO size: {} B", maxEboSize * sizeof(uint16_t));
     printi("Vertex count: {}", allVertices.size());
     m_Data.surfEboData.resize(maxEboSize);
-    m_Data.surfEbo.create("SceneRendere: Surface vertex indices");
+    m_Data.surfEbo.create("SceneRenderer: Surface vertex indices");
     m_Data.surfEbo.bind(GL_ELEMENT_ARRAY_BUFFER);
     m_Data.surfEbo.bufferData(GL_ELEMENT_ARRAY_BUFFER, maxEboSize * sizeof(uint16_t), nullptr,
                               GL_DYNAMIC_DRAW);
@@ -805,22 +855,36 @@ void SceneRenderer::finishCreateSurfaceObjects() {
     printi("Surface objects: finished");
 }
 
-void SceneRenderer::enableSurfaceAttribs() {
+void SceneRenderer::updateVao() {
+    static_assert(sizeof(SurfaceVertex) == sizeof(float) * 8, "Size of Vertex is invalid");
+
+    m_Data.surfVao.create();
+    glBindVertexArray(m_Data.surfVao);
+
+    // Common attributes
+    m_Data.surfVbo.bind(GL_ARRAY_BUFFER);
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
-    glEnableVertexAttribArray(3);
-    glEnableVertexAttribArray(4);
     glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(SurfaceVertex),
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, position)));
     glVertexAttribPointer(1, 3, GL_FLOAT, false, sizeof(SurfaceVertex),
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, normal)));
     glVertexAttribPointer(2, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, texture)));
-    glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
-                          reinterpret_cast<void *>(offsetof(SurfaceVertex, bspLMTexture)));
-    glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
-                          reinterpret_cast<void *>(offsetof(SurfaceVertex, customLMTexture)));
+
+    // Lightmap attributes
+    if (m_Data.lightmapType == LightmapType::BSP) {
+        m_Data.bspLightmapCoords.bind(GL_ARRAY_BUFFER);
+    } else {
+        m_Data.customLightmapCoords.bind(GL_ARRAY_BUFFER);
+    }
+
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(glm::vec2), reinterpret_cast<void *>(0));
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 }
 
 void SceneRenderer::loadTextures() {
@@ -976,7 +1040,13 @@ void SceneRenderer::frameSetup(float flSimTime, float flTimeDelta) {
     m_GlobalUniform.vflParams1.z = flSimTime;
     m_GlobalUniform.vflParams1.w = flTimeDelta;
     m_GlobalUniform.viParams1.x = r_texture.getValue();
-    m_GlobalUniform.viParams1.y = r_lighting.getValue();
+    m_GlobalUniform.viParams1.y = r_shading.getValue();
+
+    if (m_Data.lightmapType == LightmapType::BSP) {
+        m_GlobalUniform.vflParams2.x = 1.5f;
+    } else {
+        m_GlobalUniform.vflParams2.x = 1.0f;
+    }
     
     m_GlobalUniformBuffer.bind(GL_UNIFORM_BUFFER);
     m_GlobalUniformBuffer.bufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(m_GlobalUniform), &m_GlobalUniform);
@@ -1015,12 +1085,12 @@ void SceneRenderer::setupViewContext() {
 
 void SceneRenderer::bindLightmapBlock() {
     // Bind lightmap block texture
-    if (r_lighting.getValue() == 2) {
+    if (m_Data.lightmapType == LightmapType::BSP) {
         if (m_Data.bspLightmapBlockTex.getId() != 0) {
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex.getId());
         }
-    } else if (r_lighting.getValue() == 3) {
+    } else {
         if (m_Data.customLightmapBlockTex.getId() != 0) {
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, m_Data.customLightmapBlockTex.getId());

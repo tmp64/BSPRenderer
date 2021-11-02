@@ -18,6 +18,5 @@ void main(void) {
 	vsOut.vFragPos = inPosition;
 	vsOut.vNormal = inNormal;
 	vsOut.vTexCoord = inTexCoord;
-	vsOut.vBSPLMTexCoord = inBSPLMTexCoord;
-	vsOut.vCustomLMTexCoord = inCustomLMTexCoord;
+	vsOut.vLMTexCoord = inLMTexCoord;
 }
