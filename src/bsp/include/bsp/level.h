@@ -132,12 +132,6 @@ public:
     int traceLine(glm::vec3 from, glm::vec3 to) const;
 
     /**
-     * Traces a line and returns the hit leaf
-     * @returns leaf index
-     */
-    int traceLineToLeaf(glm::vec3 from, glm::vec3 to) const;
-
-    /**
      * Finds leaf which contains the point.
      * @return  Negative int pointing to the leaf.
      */
@@ -182,7 +176,6 @@ private:
     std::vector<BSPModel> m_Models;
     EntityList m_Entities;
 
-    template <bool returnContents>
     int recursiveTraceLine(int node, const glm::vec3 &from, const glm::vec3 &to) const;
 };
 

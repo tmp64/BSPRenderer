@@ -310,11 +310,7 @@ std::vector<glm::vec3> bsp::Level::getFaceVertices(const bsp::BSPFace &face) con
 }
 
 int bsp::Level::traceLine(glm::vec3 from, glm::vec3 to) const {
-    return recursiveTraceLine<true>(0, from, to);
-}
-
-int bsp::Level::traceLineToLeaf(glm::vec3 from, glm::vec3 to) const {
-    return recursiveTraceLine<false>(0, from, to);
+    return recursiveTraceLine(0, from, to);
 }
 
 int bsp::Level::pointInLeaf(glm::vec3 p) const noexcept {
@@ -389,7 +385,6 @@ const uint8_t *bsp::Level::leafPVS(int leaf, appfw::span<uint8_t> buf) const noe
     return buf.data();
 }
 
-template <bool returnContents>
 int bsp::Level::recursiveTraceLine(int nodeidx, const glm::vec3 &start, const glm::vec3 &stop) const {
     // Based on VDC article:
     // https://developer.valvesoftware.com/wiki/BSP#How_are_BSP_trees_used_for_collision_detection.3F
@@ -397,18 +392,14 @@ int bsp::Level::recursiveTraceLine(int nodeidx, const glm::vec3 &start, const gl
     constexpr float ON_EPSILON = 0.025f;
 
     if (nodeidx < 0) {
-        if constexpr (returnContents) {
-            const BSPLeaf &leaf = getLeaves()[~nodeidx];
+        const BSPLeaf &leaf = getLeaves()[~nodeidx];
 
-            if (leaf.nContents == CONTENTS_SOLID) {
-                return CONTENTS_SOLID;
-            } else if (leaf.nContents == CONTENTS_SKY) {
-                return CONTENTS_SKY;
-            } else {
-                return CONTENTS_EMPTY;
-            }
+        if (leaf.nContents == CONTENTS_SOLID) {
+            return CONTENTS_SOLID;
+        } else if (leaf.nContents == CONTENTS_SKY) {
+            return CONTENTS_SKY;
         } else {
-            return ~nodeidx;
+            return CONTENTS_EMPTY;
         }
     }
 
@@ -437,26 +428,21 @@ int bsp::Level::recursiveTraceLine(int nodeidx, const glm::vec3 &start, const gl
     }
 
     if (front >= -ON_EPSILON && back >= -ON_EPSILON)
-        return recursiveTraceLine<returnContents>(node.iChildren[0], start, stop);
+        return recursiveTraceLine(node.iChildren[0], start, stop);
 
     if (front < ON_EPSILON && back < ON_EPSILON)
-        return recursiveTraceLine<returnContents>(node.iChildren[1], start, stop);
+        return recursiveTraceLine(node.iChildren[1], start, stop);
 
     int side = front < 0;
 
     float frac = front / (front - back);
     glm::vec3 mid = start + (stop - start) * frac;
 
-    int r = recursiveTraceLine<returnContents>(node.iChildren[side], start, mid);
-    if constexpr (returnContents) {
-        if (r != CONTENTS_EMPTY) {
-            return r;
-        }
-    } else {
-        if (getLeaves()[r].nContents != CONTENTS_EMPTY) {
-            return r;
-        }
+    int r = recursiveTraceLine(node.iChildren[side], start, mid);
+
+    if (r != CONTENTS_EMPTY) {
+        return r;
     }
     
-    return recursiveTraceLine<returnContents>(node.iChildren[!side], mid, stop);
+    return recursiveTraceLine(node.iChildren[!side], mid, stop);
 }

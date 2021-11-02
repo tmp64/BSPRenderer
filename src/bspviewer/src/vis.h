@@ -50,7 +50,6 @@ public:
     bool raycastToEntitySurface(const Ray &ray, SurfaceRaycastHit &hit,
                                 float maxDist = MAX_RAYCAST_DIST);
 
-
 private:
     static constexpr int MAX_BOX_LEAFS = 256;
 
