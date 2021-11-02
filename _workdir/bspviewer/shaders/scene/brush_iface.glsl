@@ -6,6 +6,10 @@ IFACE_VF ShaderIface {
 	vec3 vNormal;			// World-space normal vector
 	vec2 vTexCoord;			// Texture coordinates
 	vec2 vLMTexCoord;		// Lightmap texture coordinates
+
+#ifdef SUPPORT_TINTING
+	vec4 vTintColor;		// Surface tint color
+#endif
 } vsOut;
 
 #endif

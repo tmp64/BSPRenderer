@@ -21,7 +21,6 @@ public:
         addUniform(m_uColor, "u_Color");
         addUniform(m_uTexture, "u_Texture");
         addUniform(m_uLMTexture, "u_LMTexture");
-        addUniform(m_uTintColor, "u_TintColor");
     }
 
     void setupUniforms() {
@@ -31,14 +30,11 @@ public:
 
     void setColor(const glm::vec3 &c) { m_uColor.set(c); }
 
-    void setTintColor(const glm::vec4 &c) { m_uTintColor.set(c); }
-
 private:
     UniformBlock m_uGlobalUniform;
     ShaderUniform<glm::vec3> m_uColor;
     ShaderUniform<int> m_uTexture;
     ShaderUniform<int> m_uLMTexture;
-    ShaderUniform<glm::vec4> m_uTintColor;
 };
 
 //----------------------------------------------------------------
@@ -81,7 +77,6 @@ public:
         addUniform(m_uColor, "u_Color");
         addUniform(m_uTexture, "u_Texture");
         addUniform(m_uLMTexture, "u_LMTexture");
-        addUniform(m_uTintColor, "u_TintColor");
         addUniform(m_uRenderMode, "u_iRenderMode");
         addUniform(m_uFxAmount, "u_flFxAmount");
         addUniform(m_uFxColor, "u_vFxColor");
@@ -94,14 +89,11 @@ public:
 
     void setColor(const glm::vec3 &c) { m_uColor.set(c); }
 
-    void setTintColor(const glm::vec4 &c) { m_uTintColor.set(c); }
-
     UniformBlock m_uGlobalUniform;
     ShaderUniform<glm::mat4> m_uModelMat;
     ShaderUniform<glm::vec3> m_uColor;
     ShaderUniform<int> m_uTexture;
     ShaderUniform<int> m_uLMTexture;
-    ShaderUniform<glm::vec4> m_uTintColor;
     ShaderUniform<int> m_uRenderMode;
     ShaderUniform<float> m_uFxAmount;
     ShaderUniform<glm::vec3> m_uFxColor;

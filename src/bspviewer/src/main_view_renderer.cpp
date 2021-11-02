@@ -125,7 +125,6 @@ void MainViewRenderer::setViewportSize(const glm::ivec2 &size) { m_SceneRenderer
 void MainViewRenderer::loadLevel(LevelAssetRef &level) {
     AFW_ASSERT(m_SceneRenderer.getLevel() == nullptr);
     m_SceneRenderer.beginLoading(&level->getLevel(), level->getPath());
-    m_SceneRenderer.clearSurfaceTint();
 }
 
 void MainViewRenderer::unloadLevel() {
@@ -133,6 +132,7 @@ void MainViewRenderer::unloadLevel() {
         InputSystem::get().setGrabInput(false);
     }
 
+    m_iCurSelSurface = -1;
     m_SceneRenderer.unloadLevel();
     m_vPosition = glm::vec3(0, 0, 0);
     m_vRotation = glm::vec3(0, 0, 0);
@@ -203,15 +203,20 @@ void MainViewRenderer::tick() {
                         glm::ivec2 mousePos = glm::ivec2(io.MousePos.x - topLeftScreenPos.x,
                                                          io.MousePos.y - topLeftScreenPos.y);
 
+                        if (m_iCurSelSurface != -1) {
+                            m_SceneRenderer.setSurfaceTint(m_iCurSelSurface, glm::vec4(0, 0, 0, 0));
+                            m_iCurSelSurface = -1;
+                        }
+
                         Ray ray = screenPointToRay(mousePos);
                         SurfaceRaycastHit hit;
                         if (Vis::get().raycastToSurface(ray, hit)) {
                             printi("Raycast hit surface {}, dist {} hu, ({} {} {}), ent {}", hit.surface,
                                    hit.distance, hit.point.x, hit.point.y, hit.point.z, hit.entIndex);
                             m_SceneRenderer.setSurfaceTint(hit.surface, glm::vec4(1, 0, 0, 0.25f));
+                            m_iCurSelSurface = hit.surface;
                         } else {
                             printi("Raycast miss");
-                            m_SceneRenderer.clearSurfaceTint();
                         }
                     }
                 }

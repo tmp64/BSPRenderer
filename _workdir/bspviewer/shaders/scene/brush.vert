@@ -19,4 +19,7 @@ void main(void) {
 	vsOut.vNormal = inNormal;
 	vsOut.vTexCoord = inTexCoord;
 	vsOut.vLMTexCoord = inLMTexCoord;
+#ifdef SUPPORT_TINTING
+	vsOut.vTintColor = inTintColor;
+#endif
 }

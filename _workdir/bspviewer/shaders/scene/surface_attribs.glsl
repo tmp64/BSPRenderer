@@ -13,4 +13,9 @@ layout (location = 2) in vec2 inTexCoord;
 // Lightmap texture coordinates
 layout (location = 3) in vec2 inLMTexCoord;
 
+#ifdef SUPPORT_TINTING
+// Tint color
+layout (location = 4) in vec4 inTintColor;
+#endif
+
 #endif

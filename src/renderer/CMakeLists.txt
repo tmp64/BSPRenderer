@@ -39,6 +39,7 @@ target_include_directories(renderer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_compile_definitions(renderer PUBLIC
 	GLM_FORCE_SILENT_WARNINGS
+	RENDERER_SUPPORT_TINTING
 )
 
 target_link_libraries(renderer

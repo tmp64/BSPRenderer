@@ -79,6 +79,8 @@ private:
     glm::ivec2 m_SavedMousePos = glm::ivec2(0, 0);
     float m_flLastFOV = 1; // last known FOVx in degrees
 
+    int m_iCurSelSurface = -1;
+
     void updateVisibleEnts();
     void refreshFramebuffer();
     void rotateCamera();

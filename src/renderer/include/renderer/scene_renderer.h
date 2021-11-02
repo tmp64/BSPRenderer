@@ -93,13 +93,12 @@ public:
     //! @returns true if entity was added, false if limit reached
     bool addEntity(ClientEntity *pClent);
 
+#ifdef RENDERER_SUPPORT_TINTING
     //! Allows tinting one world or entity surface.
     //! @param  surface The surface index
     //! @param  color   Color in gamma space
     void setSurfaceTint(int surface, glm::vec4 color);
-
-    //! Disables tinting enabled by setSurfaceTint
-    inline void clearSurfaceTint() { m_iTintedSurface = -1; }
+#endif
 
 private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
@@ -186,6 +185,11 @@ private:
         // Brush entity rendering
         std::vector<OptBrushModel> optBrushModels;
 
+#ifdef RENDERER_SUPPORT_TINTING
+        // Tinting
+        GPUBuffer surfTintBuf;
+#endif
+
         // Patches
         uint32_t patchesVerts = 0;
         GLVao patchesVao;
@@ -230,10 +234,6 @@ private:
     std::vector<ClientEntity *> m_TransEntityList;
     std::vector<size_t> m_SortBuffer;
     unsigned m_uVisibleEntCount = 0;
-
-    // Tinting
-    int m_iTintedSurface = -1;
-    glm::vec4 m_TintColor = glm::vec4(0, 0, 0, 0);
 
     // Screen-wide quad
     GLVao m_nQuadVao;

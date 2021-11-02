@@ -9,6 +9,10 @@ ShaderManager::ShaderManager() {
     getVertDefinitions().addDef("IFACE_VF", "out");
     getFragDefinitions().addDef("IFACE_VF", "in");
 
+#ifdef RENDERER_SUPPORT_TINTING
+    getGlobalDefinitions().addDef("SUPPORT_TINTING", 1);
+#endif
+
     registerAllAvailableItems();
     reloadShaders();
 }
