@@ -286,8 +286,36 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
     m_Entities = EntityList(entLump);
 }
 
+std::vector<glm::vec3> bsp::Level::getFaceVertices(const bsp::BSPFace &face) const {
+    std::vector<glm::vec3> verts;
+    auto &lvlVertices = getVertices();
+    auto &lvlSurfEdges = getSurfEdges();
+
+    for (int j = 0; j < face.nEdges; j++) {
+        glm::vec3 vertex;
+        bsp::BSPSurfEdge iEdgeIdx = lvlSurfEdges[(size_t)face.iFirstEdge + j];
+
+        if (iEdgeIdx > 0) {
+            const bsp::BSPEdge &edge = getEdges()[iEdgeIdx];
+            vertex = lvlVertices[edge.iVertex[0]];
+        } else {
+            const bsp::BSPEdge &edge = getEdges()[-iEdgeIdx];
+            vertex = lvlVertices[edge.iVertex[1]];
+        }
+
+        verts.push_back(vertex);
+    }
+
+    return verts;
+}
+
 int bsp::Level::traceLine(glm::vec3 from, glm::vec3 to) const {
-    return recursiveTraceLine(0, from, to); }
+    return recursiveTraceLine<true>(0, from, to);
+}
+
+int bsp::Level::traceLineToLeaf(glm::vec3 from, glm::vec3 to) const {
+    return recursiveTraceLine<false>(0, from, to);
+}
 
 int bsp::Level::pointInLeaf(glm::vec3 p) const noexcept {
     int node = 0;
@@ -361,6 +389,7 @@ const uint8_t *bsp::Level::leafPVS(int leaf, appfw::span<uint8_t> buf) const noe
     return buf.data();
 }
 
+template <bool returnContents>
 int bsp::Level::recursiveTraceLine(int nodeidx, const glm::vec3 &start, const glm::vec3 &stop) const {
     // Based on VDC article:
     // https://developer.valvesoftware.com/wiki/BSP#How_are_BSP_trees_used_for_collision_detection.3F
@@ -368,14 +397,18 @@ int bsp::Level::recursiveTraceLine(int nodeidx, const glm::vec3 &start, const gl
     constexpr float ON_EPSILON = 0.025f;
 
     if (nodeidx < 0) {
-        const BSPLeaf &leaf = getLeaves()[~nodeidx];
+        if constexpr (returnContents) {
+            const BSPLeaf &leaf = getLeaves()[~nodeidx];
 
-        if (leaf.nContents == CONTENTS_SOLID) {
-            return CONTENTS_SOLID;
-        } else if (leaf.nContents == CONTENTS_SKY) {
-            return CONTENTS_SKY;
+            if (leaf.nContents == CONTENTS_SOLID) {
+                return CONTENTS_SOLID;
+            } else if (leaf.nContents == CONTENTS_SKY) {
+                return CONTENTS_SKY;
+            } else {
+                return CONTENTS_EMPTY;
+            }
         } else {
-            return CONTENTS_EMPTY;
+            return ~nodeidx;
         }
     }
 
@@ -404,19 +437,26 @@ int bsp::Level::recursiveTraceLine(int nodeidx, const glm::vec3 &start, const gl
     }
 
     if (front >= -ON_EPSILON && back >= -ON_EPSILON)
-        return recursiveTraceLine(node.iChildren[0], start, stop);
+        return recursiveTraceLine<returnContents>(node.iChildren[0], start, stop);
 
     if (front < ON_EPSILON && back < ON_EPSILON)
-        return recursiveTraceLine(node.iChildren[1], start, stop);
+        return recursiveTraceLine<returnContents>(node.iChildren[1], start, stop);
 
     int side = front < 0;
 
     float frac = front / (front - back);
     glm::vec3 mid = start + (stop - start) * frac;
 
-    int r = recursiveTraceLine(node.iChildren[side], start, mid);
-    if (r != CONTENTS_EMPTY) {
-        return r;
+    int r = recursiveTraceLine<returnContents>(node.iChildren[side], start, mid);
+    if constexpr (returnContents) {
+        if (r != CONTENTS_EMPTY) {
+            return r;
+        }
+    } else {
+        if (getLeaves()[r].nContents != CONTENTS_EMPTY) {
+            return r;
+        }
     }
-    return recursiveTraceLine(node.iChildren[!side], mid, stop);
+    
+    return recursiveTraceLine<returnContents>(node.iChildren[!side], mid, stop);
 }

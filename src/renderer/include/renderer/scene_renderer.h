@@ -13,6 +13,8 @@ class IRendererEngine;
 
 class SceneRenderer : appfw::NoCopy {
 public:
+    struct Shaders;
+
     static constexpr int GLOBAL_UNIFORM_BIND = 0;
 
     SceneRenderer();
@@ -91,6 +93,14 @@ public:
     //! @returns true if entity was added, false if limit reached
     bool addEntity(ClientEntity *pClent);
 
+    //! Allows tinting one world or entity surface.
+    //! @param  surface The surface index
+    //! @param  color   Color in gamma space
+    void setSurfaceTint(int surface, glm::vec4 color);
+
+    //! Disables tinting enabled by setSurfaceTint
+    inline void clearSurfaceTint() { m_iTintedSurface = -1; }
+
 private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
     static constexpr int BSP_LIGHTMAP_BLOCK_SIZE = 1024;
@@ -103,7 +113,6 @@ private:
     class BrushEntityShader;
     class PatchesShader;
     class PostProcessShader;
-    struct Shaders;
 
     struct SurfaceVertex {
         glm::vec3 position;
@@ -206,10 +215,16 @@ private:
     RenderingStats m_Stats;
     LoadingStatus m_LoadingStatus;
     std::unique_ptr<LoadingState> m_pLoadingState;
+
+    // Entities
     std::vector<ClientEntity *> m_SolidEntityList;
     std::vector<ClientEntity *> m_TransEntityList;
     std::vector<size_t> m_SortBuffer;
     unsigned m_uVisibleEntCount = 0;
+
+    // Tinting
+    int m_iTintedSurface = -1;
+    glm::vec4 m_TintColor = glm::vec4(0, 0, 0, 0);
 
     // Screen-wide quad
     GLVao m_nQuadVao;

@@ -6,6 +6,8 @@
 #include <renderer/renderer_engine_interface.h>
 #include "assets/level_asset.h"
 
+struct Ray;
+
 class MainViewRenderer : public IRendererEngine, appfw::NoMove {
 public:
     static inline MainViewRenderer &get() { return *m_spInstance; }
@@ -75,11 +77,15 @@ private:
     glm::vec3 m_vPosition = {0.f, 0.f, 0.f};
     glm::vec3 m_vRotation = {0.f, 0.f, 0.f};
     glm::ivec2 m_SavedMousePos = glm::ivec2(0, 0);
+    float m_flLastFOV = 1; // last known FOVx in degrees
 
     void updateVisibleEnts();
     void refreshFramebuffer();
     void rotateCamera();
     void translateCamera();
+
+    //! @returns direction of ray cast from the view origin int a screen pixel.
+    Ray screenPointToRay(const glm::vec2 &pos);
 
 	static inline MainViewRenderer *m_spInstance = nullptr;
 };

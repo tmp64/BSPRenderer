@@ -8,6 +8,7 @@ out vec4 outColor;
 uniform vec3 u_Color;
 uniform sampler2D u_Texture;
 uniform sampler2D u_LMTexture;
+uniform vec4 u_TintColor;
 
 #ifdef ENTITY_SHADER
 uniform int u_iRenderMode;
@@ -125,4 +126,5 @@ void main(void) {
 	//--------------------------------------------------
 	// Final color
 	outColor = objectColor * vec4(ligtmapColor, 1.0);
+	outColor = vec4(mix(outColor.rgb, u_TintColor.rgb, u_TintColor.a), outColor.a);
 }

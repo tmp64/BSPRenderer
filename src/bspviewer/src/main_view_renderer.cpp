@@ -125,6 +125,7 @@ void MainViewRenderer::setViewportSize(const glm::ivec2 &size) { m_SceneRenderer
 void MainViewRenderer::loadLevel(LevelAssetRef &level) {
     AFW_ASSERT(m_SceneRenderer.getLevel() == nullptr);
     m_SceneRenderer.beginLoading(&level->getLevel(), level->getPath());
+    m_SceneRenderer.clearSurfaceTint();
 }
 
 void MainViewRenderer::unloadLevel() {
@@ -154,6 +155,7 @@ void MainViewRenderer::tick() {
 
         if (WorldState::get()) {
             bool isGrabbed = InputSystem::get().isInputGrabbed();
+            ImVec2 topLeftScreenPos;
 
             // Viewport
             {
@@ -174,6 +176,7 @@ void MainViewRenderer::tick() {
                              ImVec2(0, 1), ImVec2(1, 0));
 
                 ImGui::SetCursorPos(oldCursor);
+                topLeftScreenPos = ImGui::GetCursorScreenPos();
                 ImGui::InvisibleButton("viewport", vSize);
             }
 
@@ -191,6 +194,24 @@ void MainViewRenderer::tick() {
                             SDL_WarpMouseInWindow(MainWindowComponent::get().getWindow(),
                                                   m_SavedMousePos.x, m_SavedMousePos.y);
                             isGrabbed = false;
+                        }
+                    }
+
+                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                        // Get on-screen cursor pos
+                        ImGuiIO &io = ImGui::GetIO();
+                        glm::ivec2 mousePos = glm::ivec2(io.MousePos.x - topLeftScreenPos.x,
+                                                         io.MousePos.y - topLeftScreenPos.y);
+
+                        Ray ray = screenPointToRay(mousePos);
+                        SurfaceRaycastHit hit;
+                        if (Vis::get().raycastToSurface(ray, hit)) {
+                            printi("Raycast hit surface {}, dist {} hu, ({} {} {}), ent {}", hit.surface,
+                                   hit.distance, hit.point.x, hit.point.y, hit.point.z, hit.entIndex);
+                            m_SceneRenderer.setSurfaceTint(hit.surface, glm::vec4(1, 0, 0, 0.25f));
+                        } else {
+                            printi("Raycast miss");
+                            m_SceneRenderer.clearSurfaceTint();
                         }
                     }
                 }
@@ -235,6 +256,8 @@ void MainViewRenderer::renderMainView() {
     float ytan = xtan / DEFAULT_ASPECT;
     xtan = ytan * aspect;
     fovx = glm::degrees(2 * atan(xtan));
+
+    m_flLastFOV = fovx;
 
     m_SceneRenderer.setPerspective(fovx, aspect, 4, 8192);
     m_SceneRenderer.setPerspViewOrigin(m_vPosition, m_vRotation);
@@ -390,4 +413,21 @@ void MainViewRenderer::translateCamera() {
     }
 
     m_vPosition += direction * delta;
+}
+
+Ray MainViewRenderer::screenPointToRay(const glm::vec2 &pos) {
+    glm::vec3 forward, right, up;
+    angleVectors(m_vRotation, &forward, &right, &up);
+
+    glm::vec2 viewportSize = m_vViewportSize;
+    glm::vec2 normPos = pos / viewportSize;
+    normPos = 2.0f * normPos - glm::vec2(1.0f, 1.0f); // normPos[i] is [-1; 1]
+
+    normPos.y *= viewportSize.y / viewportSize.x;
+    float t = 1.0f / tan(glm::radians(m_flLastFOV) / 2.0f);
+
+    Ray ray;
+    ray.origin = m_vPosition;
+    ray.direction = glm::normalize(t * forward + normPos.x * right + (-normPos.y) * up);
+    return ray;
 }

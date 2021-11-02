@@ -322,6 +322,14 @@ bool SceneRenderer::addEntity(ClientEntity *pClent) {
     return true;
 }
 
+void SceneRenderer::setSurfaceTint(int surface, glm::vec4 color) {
+    m_iTintedSurface = surface;
+    m_TintColor.r = pow(color.r, 2.2f);
+    m_TintColor.g = pow(color.g, 2.2f);
+    m_TintColor.b = pow(color.b, 2.2f);
+    m_TintColor.a = color.a;
+}
+
 void SceneRenderer::createScreenQuad() {
     // clang-format off
     const float quadVertices[] = {
@@ -1065,6 +1073,12 @@ void SceneRenderer::drawWorldSurfacesVao() {
                 Shaders::world.setColor(surf.m_Color);
             }
 
+            if (m_iTintedSurface == (int)j) {
+                Shaders::world.setTintColor(m_TintColor);
+            } else {
+                Shaders::world.setTintColor(glm::vec4(0));
+            }
+
             glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
         }
 
@@ -1094,6 +1108,7 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 
     Shaders::world.enable();
     Shaders::world.setupUniforms();
+    Shaders::world.setTintColor(glm::vec4(0));
 
     for (size_t i = 0; i < textureChain.size(); i++) {
         if (textureChainFrames[i] != frame) {
@@ -1131,6 +1146,23 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 
         drawnSurfs += (unsigned)textureChain[i].size();
         m_Stats.uDrawCallCount++;
+    }
+
+    if (m_iTintedSurface != -1) {
+        // Draw tinted surface with polygon offset
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-1, -4);
+        Surface &surf = m_Data.surfaces[m_iTintedSurface];
+        const Material &mat = *surf.m_pMat;
+        mat.bindSurfaceTextures();
+
+        if (r_texture.getValue() == 1) {
+            Shaders::world.setColor(surf.m_Color);
+        }
+
+        Shaders::world.setTintColor(m_TintColor);
+        glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
+        glDisable(GL_POLYGON_OFFSET_FILL);
     }
 
     Shaders::world.disable();

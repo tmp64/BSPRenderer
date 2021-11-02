@@ -1,5 +1,6 @@
 #include <renderer/utils.h>
 #include "vis.h"
+#include "world_state.h"
 
 /*
 ==================
@@ -83,6 +84,130 @@ bool Vis::boxInPvs(const glm::vec3 &origin, const glm::vec3 &mins, const glm::ve
     return isBoxVisible(mins, maxs, vis);
 }
 
+bool Vis::rayIntersectsWithSurface(const Ray &ray, int surfIdx, SurfaceRaycastHit &hit,
+                                   float maxDist) {
+    const bsp::BSPFace &face = m_pLevel->getFaces()[surfIdx];
+    const bsp::BSPPlane &plane = m_pLevel->getPlanes()[face.iPlane];
+    glm::vec3 normal = plane.vNormal;
+    float fDist = plane.fDist;
+
+    if (face.nPlaneSide) {
+        normal *= -1.0f;
+        fDist *= -1;
+    }
+
+    // Check plane side
+    if (glm::dot(ray.origin, normal) - fDist < 0) {
+        return false;
+    }
+
+    // Find intersection with the plane
+    float t = glm::dot(ray.direction, normal);
+
+    if (abs(t) < 0.001) {
+        // Ray is parallel to the plane
+        return false;
+    }
+
+    float d = (fDist - glm::dot(ray.origin, normal)) / t;
+
+    if (d > maxDist || d < 0) {
+        // Too far or behind
+        return false;
+    }
+
+    glm::vec3 point = ray.origin + ray.direction * d;
+
+    // Check if the point is in the face
+    std::vector<glm::vec3> vertices = m_pLevel->getFaceVertices(face);
+    size_t count = vertices.size();
+
+    for (size_t j = 0; j < count; j++) {
+        glm::vec3 a = vertices[j];
+        glm::vec3 b = vertices[(j + 1) % count];
+        glm::vec3 edge = b - a;
+        glm::vec3 p = point - a;
+
+        if (glm::dot(normal, glm::cross(edge, p)) > 0) {
+            return false;
+        }
+    }
+
+    hit.surface = (int)surfIdx;
+    hit.point = point;
+    hit.distance = d;
+    return true;
+}
+
+bool Vis::raycastToSurface(const Ray &ray, SurfaceRaycastHit &hit, float maxDist) {
+    hit = SurfaceRaycastHit();
+    hit.distance = maxDist;
+
+    SurfaceRaycastHit worldHit, entHit;
+    if (raycastToWorldSurface(ray, worldHit, maxDist)) {
+        hit = worldHit;
+    }
+
+    // Entities are not rendered behind the world so raycast can't go further than the world
+    if (raycastToEntitySurface(ray, entHit, worldHit.distance)) {
+        hit = entHit;
+    }
+
+    return hit.surface != -1;
+
+#if 0
+    // Bruteforce is bad, mkay
+    auto &faces = m_pLevel->getFaces();
+
+    for (size_t surfIdx = 0; surfIdx < faces.size(); surfIdx++) {
+        SurfaceRaycastHit testHit;
+        if (rayIntersectsWithSurface(ray, (int)surfIdx, testHit, hit.distance) &&
+            testHit.distance < hit.distance) {
+            hit = testHit;
+        }
+    }
+
+    return hit.surface != -1;
+#endif
+}
+
+bool Vis::raycastToWorldSurface(const Ray &ray, SurfaceRaycastHit &hit, float maxDist) {
+    hit = SurfaceRaycastHit();
+    hit.distance = maxDist;
+    raycastRecursiveWorldNodes(0, ray, hit);
+    return hit.surface != -1;
+}
+
+bool Vis::raycastToEntitySurface(const Ray &inputRay, SurfaceRaycastHit &hit, float maxDist) {
+    hit = SurfaceRaycastHit();
+    hit.distance = maxDist;
+    auto &ents = WorldState::get()->getEntList();
+
+    for (size_t i = 0; i < ents.size(); i++) {
+        BaseEntity *pEnt = ents[i].get();
+
+        if (pEnt->getModel() && pEnt->getModel()->getType() == ModelType::Brush) {
+            BrushModel &model = static_cast<BrushModel &>(*pEnt->getModel());
+
+            SurfaceRaycastHit testHit;
+            testHit.distance = hit.distance; // limit the distance
+
+            Ray ray = inputRay;
+            ray.origin -= pEnt->getOrigin();
+
+            raycastRecursiveWorldNodes(model.m_iHeadnodes[0], ray, testHit);
+
+            if (testHit.surface != -1) {
+                hit = testHit;
+                hit.point += pEnt->getOrigin();
+                hit.entIndex = (int)i;
+            }
+        }
+    }
+
+    return hit.entIndex != -1;
+}
+
 bool Vis::isBoxVisible(const glm::vec3 &mins, const glm::vec3 &maxs, const uint8_t *visbits) {
     short leafList[MAX_BOX_LEAFS];
 
@@ -152,4 +277,34 @@ void Vis::boxLeafNums_r(LeafList &ll, int node) {
             node = pNode->iChildren[1];
         }
     }
+}
+
+void Vis::raycastRecursiveWorldNodes(int nodeIdx, const Ray &ray, SurfaceRaycastHit &hit) {
+    if (nodeIdx < 0) {
+        // Leaf
+        return;
+    }
+
+    const bsp::BSPNode &node = m_pLevel->getNodes()[nodeIdx];
+    const bsp::BSPPlane &plane = m_pLevel->getPlanes()[node.iPlane];
+
+    float dot = planeDiff(ray.origin, plane);
+    int side = (dot >= 0.0f) ? 0 : 1;
+
+    // Front side
+    raycastRecursiveWorldNodes(node.iChildren[side], ray, hit);
+
+    // Check surfaces of current node
+    for (unsigned i = 0; i < node.nFaces; i++) {
+        unsigned surfIdx = node.firstFace + i;
+        SurfaceRaycastHit testHit;
+
+        if (rayIntersectsWithSurface(ray, (int)surfIdx, testHit, hit.distance) &&
+            testHit.distance < hit.distance) {
+            hit = testHit;
+        }
+    }
+
+    // Back side
+    raycastRecursiveWorldNodes(node.iChildren[!side], ray, hit);
 }

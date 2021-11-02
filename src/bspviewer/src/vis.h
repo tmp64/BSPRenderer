@@ -3,6 +3,20 @@
 #include <appfw/utils.h>
 #include <bsp/level.h>
 
+struct Ray {
+    glm::vec3 origin;
+    glm::vec3 direction;
+};
+
+struct SurfaceRaycastHit {
+    int surface = -1;
+    glm::vec3 point = glm::vec3(0, 0, 0);
+    float distance = INFINITY;
+    int entIndex = -1;
+};
+
+static constexpr float MAX_RAYCAST_DIST = 8192;
+
 class Vis : appfw::NoMove {
 public:
     static inline Vis &get() { return *m_spInstance; }
@@ -14,6 +28,28 @@ public:
 
     //! Returns whether AABB (mins, maxs) may be visible from point origin based on PVS data.
     bool boxInPvs(const glm::vec3 &origin, const glm::vec3 &mins, const glm::vec3 &maxs);
+
+    //! Checks if a ray intersects with a surface. All other surfaces are ignored.
+    bool rayIntersectsWithSurface(const Ray &ray, int surfIdx, SurfaceRaycastHit &hit,
+                                  float maxDist);
+
+    //! Casts a ray to a world or entity surface.
+    //! @param  hit     The closest surface hit
+    //! @returns whether hit something or not
+    bool raycastToSurface(const Ray &ray, SurfaceRaycastHit &hit, float maxDist = MAX_RAYCAST_DIST);
+
+    //! Casts a ray to a world surface.
+    //! @param  hit     The closest surface hit
+    //! @returns whether hit something or not
+    bool raycastToWorldSurface(const Ray &ray, SurfaceRaycastHit &hit,
+                               float maxDist = MAX_RAYCAST_DIST);
+
+    //! Casts a ray to a brush entity surface.
+    //! @param  hit     The closest surface hit
+    //! @returns whether hit something or not
+    bool raycastToEntitySurface(const Ray &ray, SurfaceRaycastHit &hit,
+                                float maxDist = MAX_RAYCAST_DIST);
+
 
 private:
     static constexpr int MAX_BOX_LEAFS = 256;
@@ -37,6 +73,8 @@ private:
     //! @returns number of list items
     int boxLeafNums(const glm::vec3 &mins, const glm::vec3 &maxs, appfw::span<short> list);
     void boxLeafNums_r(LeafList &ll, int node);
+
+    void raycastRecursiveWorldNodes(int node, const Ray &ray, SurfaceRaycastHit &hit);
 
     static inline Vis *m_spInstance = nullptr;
 };
