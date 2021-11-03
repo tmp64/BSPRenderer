@@ -6,7 +6,7 @@
 
 static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
 static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
-static ConVar<float> v_fov("v_fov", 110.f, "Horizontal field of view");
+static ConfigItem<float> v_fov("main_view_fov", 110.f, "Horizontal field of view");
 static KeyBind grabToggleBind("Toggle main view mouse grab", KeyCode::Z);
 
 static ConCommand cmd_getpos("getpos", "", [](const CmdString &) {
