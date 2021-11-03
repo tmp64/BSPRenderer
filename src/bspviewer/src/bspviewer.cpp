@@ -13,6 +13,31 @@
 
 #include "bspviewer.h"
 
+extern ConVar<bool> dev_console;
+extern ConVar<bool> prof_ui;
+extern ConVar<bool> gpu_ui;
+extern ConVar<bool> mat_ui;
+
+static ConfigItem<bool> cfg_window_console("windows_console", false, "Window: Developer console",
+                                           [](const bool &val) { dev_console.setValue(val); });
+static ConfigItem<bool> cfg_window_prof("windows_profiler", false, "Window: Profiler",
+                                        [](const bool &val) { prof_ui.setValue(val); });
+static ConfigItem<bool> cfg_window_gpu("windows_gpu", false, "Window: GPU Stats",
+                                       [](const bool &val) { gpu_ui.setValue(val); });
+static ConfigItem<bool> cfg_window_mat("windows_mat", false, "Window: Material Stats",
+                                       [](const bool &val) { mat_ui.setValue(val); });
+
+static bool CfgMenuItem(const char *text, ConfigItem<bool> &cfg) {
+    bool val = cfg.getValue();
+
+    if (ImGui::MenuItem(text, nullptr, &val)) {
+        cfg.setValue(val);
+        return true;
+    }
+
+    return false;
+}
+
 static ConCommand cmd_map("map", "Loads a map", [](const CmdString &cmd) {
     if (cmd.size() != 2) {
         printi("Usage: map <map name>");
@@ -125,8 +150,12 @@ void BSPViewer::showDockSpace() {
 void BSPViewer::showMainMenuBar() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("Quit")) {
+                quit();
+            }
             ImGui::EndMenu();
         }
+
         if (ImGui::BeginMenu("Edit")) {
             if (ImGui::MenuItem("Undo", "CTRL+Z")) {
             }
@@ -139,6 +168,14 @@ void BSPViewer::showMainMenuBar() {
             }
             if (ImGui::MenuItem("Paste", "CTRL+V")) {
             }
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Windows")) {
+            CfgMenuItem("Developer console", cfg_window_console);
+            CfgMenuItem("Profile", cfg_window_prof);
+            CfgMenuItem("GPU stats", cfg_window_gpu);
+            CfgMenuItem("Maerial stats", cfg_window_mat);
             ImGui::EndMenu();
         }
 
