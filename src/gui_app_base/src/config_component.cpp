@@ -1,9 +1,18 @@
+#include <SDL.h>
 #include <app_base/app_base.h>
 #include <gui_app_base/config_component.h>
 
 ConfigComponent::ConfigComponent(const std::string &configPath) {
     m_ConfigPath = configPath;
     setTickEnabled(true);
+}
+
+ConfigComponent::~ConfigComponent() {
+    try {
+        saveConfig();
+    } catch (const std::exception &e) {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Config save failed", e.what(), nullptr);
+    }
 }
 
 void ConfigComponent::resetConfig() {

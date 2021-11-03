@@ -9,6 +9,7 @@ public:
 
     //! @param  configPath  Virtual path to the config.
     ConfigComponent(const std::string &configPath);
+    ~ConfigComponent();
 
     //! Returns the list of all components
     inline const std::list<ConfigItemBase *> getItemList() { return ConfigItemBase::getList(); }
