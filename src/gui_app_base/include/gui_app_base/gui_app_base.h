@@ -5,6 +5,7 @@
 #include <app_base/app_base.h>
 #include <gui_app_base/gui_components.h>
 #include <gui_app_base/opengl_context.h>
+#include <gui_app_base/config_component.h>
 #include <input/input_system.h>
 #include <input/key_bind.h>
 #include <renderer/gpu_resource_manager.h>
@@ -17,6 +18,8 @@ class ProfilerDialog;
 //! Base class for apps that use OpenGL and ImGui
 class GuiAppBase : public AppBase {
 public:
+    static constexpr char CONFIG_FILE_PATH[] = "config:config.yaml";
+
     //! Returns the instance of GuiAppBase.
     static inline GuiAppBase &getBaseInstance() { return static_cast<GuiAppBase &>(AppBase::getBaseInstance()); }
 
@@ -62,6 +65,7 @@ private:
     };
 
     SDLComponent m_SDL;
+    ConfigComponent m_Config;
     MainWindowComponent m_MainWindow;
     OpenGLContext m_GLContext;
     GraphicsSubSystem m_Graphics;

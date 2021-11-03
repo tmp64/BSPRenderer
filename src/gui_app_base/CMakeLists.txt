@@ -1,6 +1,8 @@
 set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/base_view.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/base_view_2d.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/config_component.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/config_item.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/gui_app_base.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/gui_components.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/imgui_controls.h
@@ -8,6 +10,8 @@ set(SOURCE_FILES
 
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view_2d.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/config_component.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/config_item.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/gui_app_base.cpp

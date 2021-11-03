@@ -7,7 +7,8 @@ ConVar<bool> app_vsync("app_vsync", true, "Enable vertical synchronization");
 ConVar<bool> app_vsync_finish("app_vsync_finish", true,
                               "Wait for image to be fully displayed before rendering");
 
-GuiAppBase::GuiAppBase() {
+GuiAppBase::GuiAppBase()
+    : m_Config(CONFIG_FILE_PATH) {
     m_pDevConsole = std::make_unique<DevConsoleDialog>();
     m_pProfilerUI = std::make_unique<ProfilerDialog>();
 
