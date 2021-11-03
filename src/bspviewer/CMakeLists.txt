@@ -12,12 +12,21 @@ set(SOURCE_FILES
 	src/assets/wad_material_asset.cpp
 	src/assets/wad_material_asset.h
 
+	src/surface_editor/surface_edit_mode.cpp
+	src/surface_editor/surface_edit_mode.h
+	src/surface_editor/surface_select_tool.cpp
+	src/surface_editor/surface_select_tool.h
+
 	src/base_entity.cpp
 	src/base_entity.h
 	src/brush_model.cpp
 	src/brush_model.h
 	src/bspviewer.cpp
 	src/bspviewer.h
+	src/editor_mode.cpp
+	src/editor_mode.h
+	src/editor_tool.cpp
+	src/editor_tool.h
 	src/level_loader.cpp
 	src/level_loader.h
 	src/main_view_renderer.cpp

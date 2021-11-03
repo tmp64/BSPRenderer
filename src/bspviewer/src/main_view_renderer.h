@@ -15,8 +15,20 @@ public:
 	MainViewRenderer();
     ~MainViewRenderer();
 
-    //! Sets size of the viewport.
-    void setViewportSize(const glm::ivec2 &size);
+    //! @returns whether world surface are rendered
+    bool isWorldRenderingEnabled();
+
+    //! @returns whether entities are rendered
+    bool isEntityRenderingEnabled();
+
+    //! @returns direction of ray cast from the view origin into a screen pixel.
+    //! @param  pos     Screen position in pixels, origin - top left corner.
+    Ray screenPointToRay(const glm::vec2 &pos);
+
+    //! Allows tinting world or entity surfaces.
+    //! @param  surface The surface index
+    //! @param  color   Color in gamma space
+    void setSurfaceTint(int surface, glm::vec4 color);
 
     //! Loads the level, path is passed to scene renderer to load custom lightmaps
     void loadLevel(LevelAssetRef &level);
@@ -85,9 +97,6 @@ private:
     void refreshFramebuffer();
     void rotateCamera();
     void translateCamera();
-
-    //! @returns direction of ray cast from the view origin int a screen pixel.
-    Ray screenPointToRay(const glm::vec2 &pos);
 
 	static inline MainViewRenderer *m_spInstance = nullptr;
 };

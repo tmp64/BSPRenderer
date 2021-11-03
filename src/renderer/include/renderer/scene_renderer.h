@@ -94,7 +94,7 @@ public:
     bool addEntity(ClientEntity *pClent);
 
 #ifdef RENDERER_SUPPORT_TINTING
-    //! Allows tinting one world or entity surface.
+    //! Allows tinting world or entity surfaces.
     //! @param  surface The surface index
     //! @param  color   Color in gamma space
     void setSurfaceTint(int surface, glm::vec4 color);

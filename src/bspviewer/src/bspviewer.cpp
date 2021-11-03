@@ -63,6 +63,8 @@ BSPViewer::BSPViewer() {
     m_sSingleton = this;
 
     setAutoClearEnabled(true);
+    registerMode(&m_SurfaceEditor);
+    activateMode(&m_SurfaceEditor);
 }
 
 BSPViewer::~BSPViewer() {
@@ -87,12 +89,16 @@ void BSPViewer::beginTick() {
 void BSPViewer::tick() {
     BaseClass::tick();
     ImGui::ShowDemoWindow();
+    showModeSelection();
+    showToolSelection();
     MainViewRenderer::get().tick();
 
     if (m_pLevelLoader) {
         // Level is loading
         AFW_ASSERT(!m_pWorldState);
         loadingTick();
+    } else if (m_pWorldState) {
+        tickModes();
     }
 }
 
@@ -137,6 +143,10 @@ void BSPViewer::unloadLevel() {
     }
 
     if (m_pWorldState) {
+        for (EditorMode *mode : m_EditorModes) {
+            mode->onLevelUnloaded();
+        }
+
         m_pWorldState = nullptr;
         return;
     }
@@ -173,7 +183,7 @@ void BSPViewer::showMainMenuBar() {
 
         if (ImGui::BeginMenu("Windows")) {
             CfgMenuItem("Developer console", cfg_window_console);
-            CfgMenuItem("Profile", cfg_window_prof);
+            CfgMenuItem("Profiler", cfg_window_prof);
             CfgMenuItem("GPU stats", cfg_window_gpu);
             CfgMenuItem("Maerial stats", cfg_window_mat);
             ImGui::EndMenu();
@@ -190,10 +200,64 @@ void BSPViewer::loadingTick() {
             LevelAssetRef level = m_pLevelLoader->getLevel();
             m_pLevelLoader = nullptr;
             m_pWorldState = std::make_unique<WorldState>(level);
+
+            for (EditorMode *mode : m_EditorModes) {
+                mode->onLevelLoaded();
+            }
         }
     } catch (const std::exception &e) {
         printe("Failed to load the map: {}", e.what());
         m_pLevelLoader = nullptr;
         m_pWorldState = nullptr;
     }
+}
+
+void BSPViewer::registerMode(EditorMode *mode) {
+    m_EditorModes.push_back(mode);
+}
+
+void BSPViewer::activateMode(EditorMode *mode) {
+    if (m_pActiveMode) {
+        m_pActiveMode->onDeactivated();
+    }
+
+    m_pActiveMode = mode;
+
+    if (m_pActiveMode) {
+        mode->onActivated();
+    }
+}
+
+void BSPViewer::tickModes() {
+    for (EditorMode *mode : m_EditorModes) {
+        AFW_ASSERT(mode->isActive() ? mode == m_pActiveMode : mode != m_pActiveMode);
+        if (mode->isActive() || mode->isAlwaysTickEnabled()) {
+            mode->tick();
+        }
+    }
+}
+
+void BSPViewer::showModeSelection() {
+    if (ImGui::Begin("Mode Selection")) {
+        for (size_t i = 0; i < m_EditorModes.size(); i++) {
+            if (i > 0)
+                ImGui::SameLine();
+            if (ImGui::RadioButton(m_EditorModes[i]->getName(),
+                                   m_EditorModes[i] == m_pActiveMode)) {
+                activateMode(m_EditorModes[i]);
+            }
+        }
+    }
+
+    ImGui::End();
+}
+
+void BSPViewer::showToolSelection() {
+    if (ImGui::Begin("Tool Selection")) {
+        if (m_pActiveMode) {
+            m_pActiveMode->showToolSelection();
+        }
+    }
+
+    ImGui::End();
 }

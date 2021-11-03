@@ -4,6 +4,9 @@
 #include "bspviewer.h"
 #include "assets/asset_manager.h"
 
+extern ConVar<bool> r_drawworld;
+extern ConVar<bool> r_drawents;
+
 static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
 static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
 static ConfigItem<float> v_fov("main_view_fov", 110.f, "Horizontal field of view");
@@ -120,7 +123,18 @@ MainViewRenderer::~MainViewRenderer() {
     m_spInstance = nullptr;
 }
 
-void MainViewRenderer::setViewportSize(const glm::ivec2 &size) { m_SceneRenderer.setViewportSize(size); }
+bool MainViewRenderer::isWorldRenderingEnabled() {
+    return r_drawworld.getValue();
+}
+
+bool MainViewRenderer::isEntityRenderingEnabled() {
+    return r_drawents.getValue();
+}
+
+void MainViewRenderer::setSurfaceTint(int surface, glm::vec4 color) {
+    AFW_ASSERT(WorldState::get());
+    m_SceneRenderer.setSurfaceTint(surface, color);
+}
 
 void MainViewRenderer::loadLevel(LevelAssetRef &level) {
     AFW_ASSERT(m_SceneRenderer.getLevel() == nullptr);
@@ -203,20 +217,12 @@ void MainViewRenderer::tick() {
                         glm::ivec2 mousePos = glm::ivec2(io.MousePos.x - topLeftScreenPos.x,
                                                          io.MousePos.y - topLeftScreenPos.y);
 
-                        if (m_iCurSelSurface != -1) {
-                            m_SceneRenderer.setSurfaceTint(m_iCurSelSurface, glm::vec4(0, 0, 0, 0));
-                            m_iCurSelSurface = -1;
-                        }
-
-                        Ray ray = screenPointToRay(mousePos);
-                        SurfaceRaycastHit hit;
-                        if (Vis::get().raycastToSurface(ray, hit)) {
-                            printi("Raycast hit surface {}, dist {} hu, ({} {} {}), ent {}", hit.surface,
-                                   hit.distance, hit.point.x, hit.point.y, hit.point.z, hit.entIndex);
-                            m_SceneRenderer.setSurfaceTint(hit.surface, glm::vec4(1, 0, 0, 0.25f));
-                            m_iCurSelSurface = hit.surface;
-                        } else {
-                            printi("Raycast miss");
+                        EditorMode *editor = BSPViewer::get().getActiveEditor();
+                        if (editor) {
+                            EditorTool *tool = editor->getActiveTool();
+                            if (tool) {
+                                tool->onMainViewClicked(mousePos);
+                            }
                         }
                     }
                 }
