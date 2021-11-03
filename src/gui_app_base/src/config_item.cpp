@@ -48,7 +48,10 @@ void ConfigItem<T>::setCallback(const Callback &callback) {
 
 template <typename T>
 void ConfigItem<T>::setCallback(const CallbackJustVal &callback) {
-    setCallback([this, callback](const T &, const T &newVal) { return callback(newVal); });
+    setCallback([this, callback](const T &, const T &newVal) {
+        callback(newVal);
+        return true;
+    });
 }
 
 template <typename T>

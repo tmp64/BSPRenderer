@@ -38,7 +38,7 @@ template <typename T>
 class ConfigItem : public ConfigItemBase {
 public:
     using Callback = std::function<bool(const T &oldVal, const T &newVal)>;
-    using CallbackJustVal = std::function<bool(const T &newVal)>;
+    using CallbackJustVal = std::function<void(const T &newVal)>;
 
     ConfigItem(std::string_view name, const T &defValue, std::string_view descr,
                Callback cb = Callback());
