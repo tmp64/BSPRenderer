@@ -46,12 +46,9 @@ void InputSystem::beginTick() {
     memset(m_KeyboardStateThisFrame, 0, sizeof(m_KeyboardStateThisFrame));
 
     // See if ImGui wants keyboard input
-    ImGuiIO &imio = ImGui::GetIO();
-    bool imguiKeyboardControl = imio.ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard;
-    bool passKeyboardToImGui = imguiKeyboardControl ? imio.WantTextInput : imio.WantCaptureKeyboard;
-    m_bImGuiWantsInput = passKeyboardToImGui;
+    m_bImGuiWantsInput = ImGui::GetIO().WantTextInput;
 
-    if (passKeyboardToImGui || m_bGrabInput) {
+    if (m_bImGuiWantsInput || m_bGrabInput) {
         // Release all keys
         m_pKeyboardState = s_ReleasedKeyArray;
         m_KeyboardMods = 0;
@@ -84,6 +81,7 @@ bool InputSystem::handleSDLEvent(const SDL_Event &event) {
         // Let ImGui handle everything
         return ImGui_ImplSDL2_ProcessEvent(&event);
     } else {
+        bool handled = false;
         // Update keys
         m_KeyboardMods = SDL_GetModState() & SUPPORTED_KMOD;
 
@@ -91,16 +89,17 @@ bool InputSystem::handleSDLEvent(const SDL_Event &event) {
         switch (event.type) {
         case SDL_KEYDOWN: {
             m_KeyboardStateThisFrame[event.key.keysym.scancode] = true;
-            return true;
+            handled = true;
+            break;
         }
-        case SDL_TEXTINPUT:
+        case SDL_TEXTINPUT: {
             // Ignore
-            return false;
-        default: {
-            // Pass to ImGui
-            return ImGui_ImplSDL2_ProcessEvent(&event);
+            handled = false;
+            break;
         }
         }
+
+        return ImGui_ImplSDL2_ProcessEvent(&event) || handled;
     }
 }
 
