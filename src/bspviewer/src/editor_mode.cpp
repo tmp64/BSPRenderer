@@ -52,6 +52,8 @@ void EditorMode::showToolSelection() {
     }
 }
 
+void EditorMode::showInspector() {}
+
 void EditorMode::setAlwaysTickEnabled(bool state) {
     m_bAlwaysTick = state;
 }

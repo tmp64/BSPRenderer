@@ -7,6 +7,7 @@ class SurfaceEditMode : public EditorMode {
 public:
     SurfaceEditMode();
     const char *getName() override;
+    void showInspector() override;
 
 private:
     SurfaceSelectTool m_SelectTool;

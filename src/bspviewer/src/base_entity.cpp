@@ -4,6 +4,13 @@
 BaseEntity::BaseEntity() {}
 
 void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) {
+    if (item.hasValue("classname")) {
+        m_ClassName = item.getValue<std::string>("classname");
+    } else {
+        printe("Entity {}: no classname set", idx);
+        m_ClassName = "< none >";
+    }
+
     if (item.hasValue("model")) {
         std::string model = item.getValue<std::string>("model");
         if (model[0] == '*') {
@@ -57,7 +64,7 @@ void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) 
         m_vFxColor = color;
     }
 
-    if (item.getValue<std::string>("classname").substr(0, 8) == "trigger_") {
+    if (m_ClassName.substr(0, 8) == "trigger_" || m_ClassName == "func_ladder") {
         m_iRenderMode = kRenderTransTexture;
         m_iFxAmount = 127;
     }

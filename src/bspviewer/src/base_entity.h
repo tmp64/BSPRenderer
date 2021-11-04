@@ -10,6 +10,7 @@ public:
 
     void loadKeyValues(const bsp::Level::EntityListItem &item, int idx = -1);
 
+    inline const std::string &getClassName() { return m_ClassName; }
     inline const glm::vec3 &getOrigin() { return m_vOrigin; }
     inline const glm::vec3 &getAngles() { return m_vAngles; }
     inline Model *getModel() { return m_pModel; }
@@ -19,6 +20,7 @@ public:
     inline const glm::ivec3 &getFxColor() { return m_vFxColor; }
 
 private:
+    std::string m_ClassName;
     glm::vec3 m_vOrigin = glm::vec3(0, 0, 0);
     glm::vec3 m_vAngles = glm::vec3(0, 0, 0);
     Model *m_pModel = nullptr;

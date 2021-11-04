@@ -92,6 +92,7 @@ void BSPViewer::tick() {
     showModeSelection();
     showToolSelection();
     MainViewRenderer::get().tick();
+    showInspector();
 
     if (m_pLevelLoader) {
         // Level is loading
@@ -256,6 +257,16 @@ void BSPViewer::showToolSelection() {
     if (ImGui::Begin("Tool Selection")) {
         if (m_pActiveMode) {
             m_pActiveMode->showToolSelection();
+        }
+    }
+
+    ImGui::End();
+}
+
+void BSPViewer::showInspector() {
+    if (ImGui::Begin("Inspector")) {
+        if (m_pActiveMode) {
+            m_pActiveMode->showInspector();
         }
     }
 

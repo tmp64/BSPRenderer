@@ -42,6 +42,9 @@ public:
     //! Called to show the list of tools. Called from inside ImGui window context.
     virtual void showToolSelection();
 
+    //! Called to show the inspector contents. Called from inside ImGui window context.
+    virtual void showInspector();
+
 protected:
     //! Enables/disables always tick
     virtual void setAlwaysTickEnabled(bool state);

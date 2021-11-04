@@ -63,6 +63,7 @@ private:
 
     void showModeSelection();
     void showToolSelection();
+    void showInspector();
 
     static inline BSPViewer *m_sSingleton = nullptr;
 };
