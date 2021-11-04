@@ -5,6 +5,14 @@
 #include <gui_app_base/gui_app_base.h>
 #include <gui_app_base/opengl_context.h>
 
+static constexpr int WIN_POS_UNDEFINED = std::numeric_limits<int>::min();
+static ConfigItem<int> cfg_window_width("window_width", 640, "Width of the main window.");
+static ConfigItem<int> cfg_window_height("window_height", 480, "Height of the main window.");
+static ConfigItem<int> cfg_window_x("window_x", WIN_POS_UNDEFINED,
+                                    "Position X of the main window.");
+static ConfigItem<int> cfg_window_y("window_y", WIN_POS_UNDEFINED,
+                                    "Position Y of the main window.");
+
 SDLComponent::SDLComponent() {
     SDL_Init(SDL_INIT_EVERYTHING);
 }
@@ -20,10 +28,13 @@ MainWindowComponent::MainWindowComponent() {
     OpenGLContext::setupWindowAttributes();
 
     // Create window
+    int wide = cfg.get<int>("win_width");
+    int tall = cfg.get<int>("win_height");
+    cfg_window_width.setDefaultValue(wide);
+    cfg_window_height.setDefaultValue(tall);
     Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
     m_pWindow = SDL_CreateWindow(cfg.get<std::string>("win_title").c_str(), SDL_WINDOWPOS_CENTERED,
-                                 SDL_WINDOWPOS_CENTERED, cfg.get<int>("win_width"),
-                                 cfg.get<int>("win_height"), flags);
+                                 SDL_WINDOWPOS_CENTERED, wide, tall, flags);
 
     if (!m_pWindow) {
         app_fatalError("Failed to create window: {}", SDL_GetError());
@@ -33,6 +44,55 @@ MainWindowComponent::MainWindowComponent() {
 MainWindowComponent::~MainWindowComponent() {
     SDL_DestroyWindow(m_pWindow);
     m_pWindow = nullptr;
+}
+
+void MainWindowComponent::lateInit() {
+    int wide = std::clamp(cfg_window_width.getValue(), 1, 16384);
+    int tall = std::clamp(cfg_window_height.getValue(), 1, 16384);
+
+    SDL_SetWindowSize(m_pWindow, wide, tall);
+
+    int x, y;
+
+    if (cfg_window_x.getValue() == WIN_POS_UNDEFINED) {
+        x = SDL_WINDOWPOS_CENTERED;
+    } else {
+        x = std::clamp(cfg_window_x.getValue(), -65536, 65535);
+    }
+
+    if (cfg_window_y.getValue() == WIN_POS_UNDEFINED) {
+        y = SDL_WINDOWPOS_CENTERED;
+    } else {
+        y = std::clamp(cfg_window_y.getValue(), -65536, 65535);
+    }
+
+    SDL_SetWindowPosition(m_pWindow, x, y);
+}
+
+void MainWindowComponent::saveWindowSize() {
+    int wide, tall;
+    SDL_GetWindowSize(m_pWindow, &wide, &tall);
+
+    if (cfg_window_width.getValue() != wide) {
+        cfg_window_width.setValue(wide);
+    }
+
+    if (cfg_window_height.getValue() != tall) {
+        cfg_window_height.setValue(tall);
+    }
+}
+
+void MainWindowComponent::saveWindowPos() {
+    int x, y;
+    SDL_GetWindowPosition(m_pWindow, &x, &y);
+
+    if (cfg_window_x.getValue() != x) {
+        cfg_window_x.setValue(x);
+    }
+
+    if (cfg_window_y.getValue() != y) {
+        cfg_window_y.setValue(y);
+    }
 }
 
 ImGuiComponent::ImGuiComponent() {

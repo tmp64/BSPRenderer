@@ -97,15 +97,18 @@ void GuiAppBase::drawForeground() {
 }
 
 bool GuiAppBase::handleSDLEvent(const SDL_Event &event) {
-    if (InputSystem::get().handleSDLEvent(event)) {
-        return true;
-    }
+    InputSystem::get().handleSDLEvent(event);
 
     switch (event.type) {
     case SDL_WINDOWEVENT: {
         if (event.window.windowID == SDL_GetWindowID(m_MainWindow.getWindow())) {
             switch (event.window.event) {
+            case SDL_WINDOWEVENT_MOVED: {
+                m_MainWindow.saveWindowPos();
+                return true;
+            }
             case SDL_WINDOWEVENT_RESIZED: {
+                m_MainWindow.saveWindowSize();
                 onWindowSizeChange(event.window.data1, event.window.data2);
                 return true;
             }

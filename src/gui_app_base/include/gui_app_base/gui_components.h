@@ -16,6 +16,9 @@ class MainWindowComponent : public AppComponentBase<MainWindowComponent> {
 public:
     MainWindowComponent();
     ~MainWindowComponent();
+    void lateInit() override;
+    void saveWindowSize();
+    void saveWindowPos();
 
     inline SDL_Window *getWindow() { return m_pWindow; }
 

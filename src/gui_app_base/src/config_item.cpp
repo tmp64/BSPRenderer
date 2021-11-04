@@ -42,6 +42,11 @@ bool ConfigItem<T>::setValue(const T &newVal) {
 }
 
 template <typename T>
+void ConfigItem<T>::setDefaultValue(const T &newVal) {
+    m_DefVal = newVal;
+}
+
+template <typename T>
 void ConfigItem<T>::setCallback(const Callback &callback) {
     m_Callback = callback;
 }

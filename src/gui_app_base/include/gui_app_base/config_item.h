@@ -47,7 +47,6 @@ public:
 
     //! Returns the value of the convar.
     inline const T &getValue() { return m_Value; }
-
     
     //! Returns the default value of the convar.
     inline const T &getDefaultValue() { return m_DefVal; }
@@ -55,6 +54,11 @@ public:
     //! Sets a new value of the cvar.
     //! @return Whether or not new value was applied.
     bool setValue(const T &newVal);
+
+    //! Sets a new default value of the cvar. Can be called before lateInit. Doesn't change actual
+    //! value.
+    //! @return Whether or not new value was applied.
+    void setDefaultValue(const T &newVal);
 
     //! Sets the value changed callback.
     void setCallback(const Callback &callback);
