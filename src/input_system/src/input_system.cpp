@@ -15,6 +15,8 @@ static KeyBind testBinds[] = {
 };
 #endif
 
+ConVar<bool> in_debug_ui("in_debug_ui", false, "Show input debug dialog");
+
 static uint8_t s_ReleasedKeyArray[SDL_NUM_SCANCODES] = {0};
 
 InputSystem::InputSystem() {
@@ -103,24 +105,31 @@ bool InputSystem::handleSDLEvent(const SDL_Event &event) {
 }
 
 void InputSystem::tick() {
-    ImGui::Begin("Input");
-    ImGui::Text("ImGui takes keyboard: %d", (int)m_bImGuiWantsInput);
+    bool showDialog = in_debug_ui.getValue();
+    if (showDialog) {
+        if (ImGui::Begin("Input", &showDialog)) {
+            ImGui::Text("ImGui takes keyboard: %d", (int)m_bImGuiWantsInput);
 
 #if DEBUG_BINDS
-    for (int i = 0; i < std::size(testBinds); i++) {
-        KeyBind &bind = testBinds[i];
+            for (int i = 0; i < std::size(testBinds); i++) {
+                KeyBind &bind = testBinds[i];
 
-        if (bind.isPressed()) {
-            printd("Pressed: {}", bind.getShortcut());
+                if (bind.isPressed()) {
+                    printd("Pressed: {}", bind.getShortcut());
+                }
+
+                if (bind.isHeldDown()) {
+                    ImGui::Text("Bind %s", bind.getShortcut());
+                }
+            }
+#endif
         }
+        ImGui::End();
 
-        if (bind.isHeldDown()) {
-            ImGui::Text("Bind %s", bind.getShortcut());
+        if (showDialog != in_debug_ui.getValue()) {
+            in_debug_ui.setValue(showDialog);
         }
     }
-#endif
-
-    ImGui::End();
 }
 
 void InputSystem::setGrabInput(bool state) {
