@@ -63,6 +63,19 @@ std::vector<glm::vec3> getFaceVertices(const bsp::Level &level, const bsp::BSPFa
     return verts;
 }
 
+constexpr glm::vec2 MINS_INIT = {16384, 16384};
+constexpr glm::vec2 MAXS_INIT = {-16384, -16384};
+
+inline void updateMins2D(glm::vec2 &mins, const glm::vec2 &value) {
+    mins.x = std::min(mins.x, value.x);
+    mins.y = std::min(mins.y, value.y);
+}
+
+inline void updateMaxs2D(glm::vec2 &maxs, const glm::vec2 &value) {
+    maxs.x = std::max(maxs.x, value.x);
+    maxs.y = std::max(maxs.y, value.y);
+}
+
 } // namespace
 
 void rad::Plane::load(RadSimImpl &radSim, const bsp::BSPPlane &bspPlane) {
@@ -95,6 +108,12 @@ void rad::Plane::load(RadSimImpl &radSim, const bsp::BSPPlane &bspPlane) {
     }
 
     vJ = glm::normalize(projectVectorOnPlane(*this, unprojJ));
+    vI = glm::cross(vJ, vNormal);
+
+    // Calculate world origin
+    glm::vec3 origin = projectPointOnPlane(*this, {0, 0, 0});
+    glm::vec2 originOnPlane = worldToPlane(origin, vI, vJ);
+    vWorldOrigin = origin - originOnPlane.x * vI - originOnPlane.y * vJ;
 }
 
 void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
@@ -116,85 +135,43 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
         vNormal = pPlane->vNormal;
     }
 
-    vJ = pPlane->vJ;
-    vI = glm::cross(vJ, vNormal);
-    AFW_ASSERT(floatEquals(glm::length(vI), 1));
-    AFW_ASSERT(floatEquals(glm::length(vJ), 1));
+    // Use texture coordinates for face axis
+    const bsp::BSPTextureInfo &texInfo = radSim.m_pLevel->getTexInfo().at(bspFace.iTextureInfo);
+    vI = glm::normalize(worldToPlane(texInfo.vS, pPlane->vI, pPlane->vJ));
+    vJ = glm::normalize(worldToPlane(texInfo.vT, pPlane->vI, pPlane->vJ));
 
-    // Vertices
-    {
-        auto verts = getFaceVertices(*radSim.m_pLevel, bspFace);
+    // Flags
+    const bsp::BSPMipTex &mipTex = radSim.m_pLevel->getTextures().at(texInfo.iMiptex);
 
-        for (glm::vec3 worldPos : verts) {
-            Face::Vertex v;
-            v.vWorldPos = worldPos;
-
-            // Calculate plane coords
-            v.vPlanePos.x = glm::dot(v.vWorldPos, vI);
-            v.vPlanePos.y = glm::dot(v.vWorldPos, vJ);
-
-            vertices.push_back(v);
-        }
-
-        vertices.shrink_to_fit();
+    if (!strncmp(mipTex.szName, "SKY", 3) || !strncmp(mipTex.szName, "sky", 3)) {
+        iFlags |= FACE_SKY;
     }
 
-    // Normalize plane pos
-    {
-        float minX = 999999, minY = 999999;
+    // Process vertices
+    auto rawVerts = getFaceVertices(*radSim.m_pLevel, bspFace);
+    vertices.reserve(rawVerts.size());
+    glm::vec2 planeMins = MINS_INIT;
+    glm::vec2 planeMaxs = MAXS_INIT;
+    glm::vec2 faceMins = MINS_INIT;
+    glm::vec2 faceMaxs = MAXS_INIT;
+    vPlaneCenter = {0, 0};
 
-        for (Face::Vertex &v : vertices) {
-            minX = std::min(minX, v.vPlanePos.x);
-            minY = std::min(minY, v.vPlanePos.y);
-        }
+    for (glm::vec3 worldPos : rawVerts) {
+        Face::Vertex v;
+        v.vWorldPos = worldPos;
+        v.vPlanePos = worldToPlane(worldPos, pPlane->vI, pPlane->vJ);
+        v.vFacePos = planeToFace(v.vPlanePos, vI, vJ);
 
-        for (Face::Vertex &v : vertices) {
-            v.vPlanePos.x -= minX;
-            v.vPlanePos.y -= minY;
-        }
+        updateMins2D(planeMins, v.vPlanePos);
+        updateMaxs2D(planeMaxs, v.vPlanePos);
+        updateMins2D(faceMins, v.vFacePos);
+        updateMaxs2D(faceMaxs, v.vFacePos);
 
-        vPlaneOriginInPlaneCoords = {minX, minY};
-        vPlaneOrigin =
-            vertices[0].vWorldPos - vI * vertices[0].vPlanePos.x - vJ * vertices[0].vPlanePos.y;
+        vPlaneCenter += v.vPlanePos;
+        vertices.push_back(v);
     }
 
-    // Calculate plane bounds and center
-    {
-        float minX = 999999, minY = 999999;
-        float maxX = -999999, maxY = -999999;
-        planeCenterPoint = glm::vec2(0, 0);
-
-        for (Face::Vertex &v : vertices) {
-            minX = std::min(minX, v.vPlanePos.x);
-            minY = std::min(minY, v.vPlanePos.y);
-
-            maxX = std::max(maxX, v.vPlanePos.x);
-            maxY = std::max(maxY, v.vPlanePos.y);
-
-            planeCenterPoint += v.vPlanePos;
-        }
-
-        planeCenterPoint /= (float)vertices.size();
-
-        planeMinBounds.x = minX;
-        planeMinBounds.y = minY;
-
-        planeMaxBounds.x = maxX;
-        planeMaxBounds.y = maxY;
-
-        AFW_ASSERT(floatEquals(minX, 0));
-        AFW_ASSERT(floatEquals(minY, 0));
-    }
+    vPlaneCenter /= (float)rawVerts.size();
 
     flPatchSize = (float)radSim.m_Profile.iBasePatchSize;
-
-    // Check for sky
-    {
-        const bsp::BSPTextureInfo &texInfo = radSim.m_pLevel->getTexInfo().at(bspFace.iTextureInfo);
-        const bsp::BSPMipTex &mipTex = radSim.m_pLevel->getTextures().at(texInfo.iMiptex);
-
-        if (!strncmp(mipTex.szName, "SKY", 3) || !strncmp(mipTex.szName, "sky", 3)) {
-            iFlags |= FACE_SKY;
-        }
-    }
 }

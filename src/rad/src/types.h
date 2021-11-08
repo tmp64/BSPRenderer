@@ -1,6 +1,7 @@
 #ifndef RAD_TYPES_H
 #define RAD_TYPES_H
 #include <bsp/bsp_types.h>
+#include "coords.h"
 
 namespace rad {
 
@@ -30,11 +31,8 @@ enum FaceFlags : unsigned {
 };
 
 struct Plane : public bsp::BSPPlane {
-    /**
-     * Y axis for lightmap and patches.
-     * X is calculated as cross(j, n)
-     */
-    glm::vec3 vJ;
+    glm::vec3 vWorldOrigin;
+    glm::vec3 vI, vJ;
 
     //! List of faces that are in this plane
     std::vector<unsigned> faces;
@@ -44,12 +42,9 @@ struct Plane : public bsp::BSPPlane {
 
 struct Face : public bsp::BSPFace {
     struct Vertex {
-        //! Position of vertex in world space.
-        glm::vec3 vWorldPos;
-
-        //! Normalized position of vertex in its plane (based on vI and vJ).
-        //! Normalized means that there are vertices with X or Y = 0.
-        glm::vec2 vPlanePos;
+        glm::vec3 vWorldPos; //!< Position in world space.
+        glm::vec2 vPlanePos; //!< Position in plane space.
+        glm::vec2 vFacePos;  //!< Position in face space.
     };
 
     //! Plane in which face is located.
@@ -58,27 +53,11 @@ struct Face : public bsp::BSPFace {
     //! Flags (see FACE_ constants).
     unsigned iFlags = 0;
 
-    //! Normal vector. +/- pPlane->vNormal
-    glm::vec3 vNormal;
-
-    //! X axis for lightmap and patches.
-    glm::vec3 vI;
-
-    //! Y axis for lightmap and patches.
-    glm::vec3 vJ;
-
-    //! World position of (0, 0) plane coord.
-    glm::vec3 vPlaneOrigin;
-
-    //! Offset of (0, 0) to get to plane coords
-    glm::vec2 vPlaneOriginInPlaneCoords;
-
-    //! Bounds of the face in plane coords.
-    //! Min bounds should be {0, 0}.
-    glm::vec2 planeMinBounds, planeMaxBounds;
-
-    //! Center point of the face
-    glm::vec2 planeCenterPoint;
+    glm::vec3 vNormal;                //! World normal vector. +/- pPlane->vNormal
+    glm::vec2 vI, vJ;                 //!< Axis in plane coords.
+    glm::vec2 vPlaneMins, vPlaneMaxs; //!< Bounds in the plane coords.
+    glm::vec2 vPlaneCenter;           //!< Center point in plane coords
+    glm::vec2 vFaceMins, vFaceMaxs;   //!< Bounds in the face coords.
 
     //! List of vertices.
     std::vector<Vertex> vertices;

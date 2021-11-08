@@ -7,6 +7,7 @@ set(SOURCE_FILES
 	src/anorms.h
 	src/bouncer.cpp
 	src/bouncer.h
+	src/coords.h
 	src/level_config.cpp
 	src/lightmap_writer.cpp
 	src/lightmap_writer.h
