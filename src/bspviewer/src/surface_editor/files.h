@@ -51,6 +51,45 @@ struct SurfacePropsFile {
 
         return true;
     }
+
+    inline void loadFromYaml(const YAML::Node &node) {
+        if (node["lightmap_scale"]) {
+            flLightmapScale = node["lightmap_scale"].as<float>();
+        }
+
+        if (node["light_intensity_scale"]) {
+            flLightIntensityScale = node["light_intensity_scale"].as<float>();
+        }
+
+        if (node["light_color"]) {
+            bOverrideLight = true;
+            vLightColor = node["light_color"].as<glm::vec3>() / 255.0f;
+        }
+
+        if (node["light_intensity"]) {
+            bOverrideLight = true;
+            flLightIntensity = node["light_intensity"].as<float>();
+        }
+
+        if (node["reflectivity"]) {
+            bHasReflectivity = true;
+            flReflectivity = node["reflectivity"].as<float>();
+        }
+    }
+
+    inline void saveToYaml(YAML::Node &node) {
+        node["lightmap_scale"] = flLightmapScale;
+        node["light_intensity_scale"] = flLightIntensityScale;
+
+        if (bOverrideLight) {
+            node["light_color"] = vLightColor * 255.0f;
+            node["light_intensity"] = flLightIntensity;
+        }
+
+        if (bHasReflectivity) {
+            node["reflectivity"] = flReflectivity;
+        }
+    }
 };
 
 struct MaterialPropsFile {

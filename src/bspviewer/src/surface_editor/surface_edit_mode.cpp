@@ -2,6 +2,7 @@
 #include "surface_edit_mode.h"
 #include "../world_state.h"
 #include "../main_view_renderer.h"
+#include "../bspviewer.h"
 
 static constexpr float TEXTURE_PREVIEW_SIZE = 96.0f;
 
@@ -16,15 +17,11 @@ SurfaceEditMode::SurfaceData::SurfaceData(SurfaceEditMode *editor, int surfIdx)
     auto &matload = WorldState::get()->getMaterialLoader();
     Material *material = m_pMaterial = MainViewRenderer::get().getSurfaceMaterial(surfIdx);
 
-    // Load global material
     loadMaterial(matload.getWadYamlPath(material->getName(), material->getWadName()), m_Wad,
                  m_OrigWad);
-
-    // Load base material
     loadBaseMaterial(false);
-
-    // Load map material
     loadMaterial(matload.getMapYamlPath(material->getName()), m_Map, m_OrigMap);
+    loadSurfaceProps();
 }
 
 SurfaceEditMode::SurfaceData::~SurfaceData() {
@@ -40,6 +37,7 @@ void SurfaceEditMode::SurfaceData::saveChanges() {
         m_OrigWad);
     saveFile<BaseMaterialPropsFile, false>(matload.getBaseYamlPath(getBaseMaterialName()), m_Base,
                                            m_OrigBase);
+    saveSurfaceProps();
 }
 
 void SurfaceEditMode::SurfaceData::showSurfaceProps() {
@@ -108,6 +106,10 @@ std::string SurfaceEditMode::SurfaceData::getBaseMaterialName() {
     return baseMatName;
 }
 
+std::string SurfaceEditMode::SurfaceData::getSurfaceYamlPath() {
+    return fmt::format("assets:mapsrc/{}.rad.surf.yaml", BSPViewer::get().getMapName());
+}
+
 void SurfaceEditMode::SurfaceData::loadMaterial(const std::string &vpath, MaterialPropsFile &mat,
                                                 MaterialPropsFile &origMat) {
     try {
@@ -152,6 +154,26 @@ void SurfaceEditMode::SurfaceData::loadBaseMaterial(bool silenceNotFound) {
     }
 }
 
+void SurfaceEditMode::SurfaceData::loadSurfaceProps() {
+    std::string vpath = getSurfaceYamlPath();
+    fs::path path = getFileSystem().findExistingFile(vpath, std::nothrow);
+
+    if (!path.empty()) {
+        try {
+            std::ifstream file(path);
+            m_SurfaceYaml = YAML::Load(file);
+            std::string idx = std::to_string(m_iIdx);
+            
+            if (m_SurfaceYaml[idx]) {
+                m_OrigSurf.loadFromYaml(m_SurfaceYaml[idx]);
+                m_Surf = m_OrigSurf;
+            }
+        } catch (const std::exception &e) {
+            printe("Failed to load {}: {}", vpath, e.what());
+        }
+    }
+}
+
 template <typename T, bool bAllowRemove>
 void SurfaceEditMode::SurfaceData::saveFile(const std::string &vpath, T &data, T &origData) {
     if (data.isIdentical(origData)) {
@@ -179,6 +201,35 @@ void SurfaceEditMode::SurfaceData::saveFile(const std::string &vpath, T &data, T
         YAML::Node node;
         data.saveToYaml(node);
         file << node << "\n";
+    } catch (const std::exception &e) {
+        printe("Failed to save {}: {}", vpath, e.what());
+    }
+}
+
+void SurfaceEditMode::SurfaceData::saveSurfaceProps() {
+    if (m_Surf.isIdentical(m_OrigSurf)) {
+        return;
+    }
+
+    std::string vpath = getSurfaceYamlPath();
+    fs::path path = getFileSystem().getFilePath(vpath);
+    std::string idx = std::to_string(m_iIdx);
+
+    if (m_SurfaceYaml[idx]) {
+        YAML::Node node = m_SurfaceYaml[idx];
+        m_Surf.saveToYaml(node);
+    } else {
+        YAML::Node newNode;
+        m_Surf.saveToYaml(newNode);
+        m_SurfaceYaml[idx] = newNode;
+    }
+
+    try {
+        fs::create_directories(path.parent_path());
+        std::ofstream file;
+        file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+        file.open(path);
+        file << m_SurfaceYaml << "\n";
     } catch (const std::exception &e) {
         printe("Failed to save {}: {}", vpath, e.what());
     }

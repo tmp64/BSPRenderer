@@ -29,6 +29,7 @@ private:
         SurfaceEditMode *m_pEditor = nullptr;
         int m_iIdx = -1;
         Material *m_pMaterial = nullptr;
+        YAML::Node m_SurfaceYaml;
         bool m_bCurrentBaseNotFound = false;
 
         SurfacePropsFile m_Surf;
@@ -44,11 +45,14 @@ private:
         void showMatProps(MaterialPropsFile &mat);
 
         std::string getBaseMaterialName();
+        std::string getSurfaceYamlPath();
         void loadMaterial(const std::string &vpath, MaterialPropsFile &mat, MaterialPropsFile &origMat);
         void loadBaseMaterial(bool silenceNotFound);
+        void loadSurfaceProps();
 
         template <typename T, bool bAllowRemove>
         void saveFile(const std::string &vpath, T &data, T &origData);
+        void saveSurfaceProps();
     };
 
     SurfaceSelectTool m_SelectTool;
