@@ -109,7 +109,8 @@ void rad::PatchTree::createPatches(RadSimImpl *pRadSim, Face &face,
     m_pFace = &face;
 
     // Calculate base size of patch grid (wide x tall patches of flPatchSize)
-    glm::vec2 baseGridSizeFloat = face.planeMaxBounds / face.flPatchSize;
+    glm::vec2 faceSize = face.vFaceMaxs - face.vFaceMins;
+    glm::vec2 baseGridSizeFloat = faceSize / face.flPatchSize;
     glm::ivec2 baseGridSize;
     baseGridSize.x = texFloatToInt(baseGridSizeFloat.x);
     baseGridSize.y = texFloatToInt(baseGridSizeFloat.y);
@@ -130,7 +131,7 @@ void rad::PatchTree::createPatches(RadSimImpl *pRadSim, Face &face,
         for (int x = 0; x < baseGridSize.x; x++) {
             MiniPatch patch;
             patch.flSize = face.flPatchSize;
-            patch.vFaceOrigin = glm::vec2(x, y) / baseGridSizeFloat * face.planeMaxBounds;
+            patch.vFaceOrigin = m_pFace->vFaceMins + glm::vec2(x, y) / baseGridSizeFloat * faceSize;
 
             MiniPatch *subdNewFirstPatch = nullptr;
             MiniPatch *subdNewLastPatch = nullptr;
@@ -168,12 +169,11 @@ rad::PatchIndex rad::PatchTree::copyPatchesToTheList(PatchIndex offset, appfw::S
         glm::vec2 faceOrg = p->vFaceOrigin + glm::vec2(p->flSize / 2.0f);
         patch.getSize() = p->flSize;
         patch.getFaceOrigin() = faceOrg;
-        patch.getOrigin() =
-            m_pFace->vPlaneOrigin + m_pFace->vI * faceOrg.x + m_pFace->vJ * faceOrg.y;
+        patch.getOrigin() = m_pFace->faceToWorld(faceOrg);
         patch.getNormal() = m_pFace->vNormal;
         patch.getPlane() = m_pFace->pPlane;
 
-        // Add origin and plane to hash
+        // Add origin and normal to hash
         hash.update(reinterpret_cast<uint8_t *>(&patch.getOrigin()), sizeof(glm::vec3));
         hash.update(reinterpret_cast<uint8_t *>(&patch.getNormal()), sizeof(glm::vec3));
 
@@ -191,10 +191,11 @@ rad::PatchIndex rad::PatchTree::copyPatchesToTheList(PatchIndex offset, appfw::S
 
 void rad::PatchTree::buildTree() {
     // Set up root node
+    glm::vec2 faceSize = m_pFace->vFaceMaxs - m_pFace->vFaceMins;
     float squareSize = std::max(m_pRadSim->m_Profile.flLuxelSize, m_pFace->flPatchSize);
-    float size = std::max(m_pFace->planeMaxBounds.x, m_pFace->planeMaxBounds.y);
+    float size = std::max(faceSize.x, faceSize.y);
     m_RootNode.flSize = size + 4.0f * squareSize;
-    m_RootNode.vOrigin = m_pFace->planeCenterPoint;
+    m_RootNode.vOrigin = m_pFace->planeToFace(m_pFace->vPlaneCenter);
 
 #ifndef DISABLE_TREE
     PatchIndex patchCount = m_pFace->iNumPatches; 
@@ -441,7 +442,7 @@ rad::PatchTree::PatchPos rad::PatchTree::checkPatchPos(MiniPatch *patch) noexcep
         // See if the face is inside the patch
         size_t verts = m_pFace->vertices.size();
         for (size_t i = 0; i < verts; i++) {
-            if (pointIntersectsWithRect(m_pFace->vertices[i].vPlanePos, patch->vFaceOrigin,
+            if (pointIntersectsWithRect(m_pFace->vertices[i].vFacePos, patch->vFaceOrigin,
                                         patch->flSize)) {
                 return PatchPos::PartiallyInside;
             }
@@ -453,17 +454,19 @@ rad::PatchTree::PatchPos rad::PatchTree::checkPatchPos(MiniPatch *patch) noexcep
     }
 }
 
-bool rad::PatchTree::isInFace(glm::vec2 point) noexcept {
+bool rad::PatchTree::isInFace(glm::vec2 point2d) noexcept {
+    // TODO: 3D when it can be done in 2D
+    // Doesn't seem slow though...
     size_t count = m_pFace->vertices.size();
+    glm::vec3 point = m_pFace->faceToWorld(point2d);
 
     for (size_t i = 0; i < count; i++) {
-        glm::vec2 a = m_pFace->vertices[i].vPlanePos;
-        glm::vec2 b = m_pFace->vertices[(i + 1) % count].vPlanePos;
-        glm::vec2 seg = b - a;
-        glm::vec2 p = point - a;
-        float cossign = seg.x * p.y - seg.y * p.x;
+        glm::vec3 a = m_pFace->faceToWorld(m_pFace->vertices[i].vFacePos);
+        glm::vec3 b = m_pFace->faceToWorld(m_pFace->vertices[(i + 1) % count].vFacePos);
+        glm::vec3 edge = b - a;
+        glm::vec3 p = point - a;
 
-        if (cossign > 0) {
+        if (glm::dot(m_pFace->vNormal, glm::cross(edge, p)) > 0) {
             return false;
         }
     }

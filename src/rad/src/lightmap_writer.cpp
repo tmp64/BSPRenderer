@@ -35,21 +35,22 @@ void rad::LightmapWriter::processFace(size_t faceIdx) {
     FaceLightmap lm;
 
     // Calculate lightmap size
-    lm.vSize.x = (int)(face.planeMaxBounds.x / m_flLuxelSize) + 1 + 2 * m_iOversampleSize;
-    lm.vSize.y = (int)(face.planeMaxBounds.y / m_flLuxelSize) + 1 + 2 * m_iOversampleSize;
+    glm::vec2 faceRealSize = face.vFaceMaxs - face.vFaceMins;
+    lm.vSize.x = (int)(faceRealSize.x / m_flLuxelSize) + 1 + 2 * m_iOversampleSize;
+    lm.vSize.y = (int)(faceRealSize.y / m_flLuxelSize) + 1 + 2 * m_iOversampleSize;
 
     // Calculate tex coords
     glm::vec2 lmSize = lm.vSize;
-    glm::vec2 faceSize = face.planeMaxBounds / glm::vec2(m_flLuxelSize); //!< Face size in luxels
+    glm::vec2 faceSize = faceRealSize / glm::vec2(m_flLuxelSize); //!< Face size in luxels
     glm::vec2 texOffset = (lmSize - faceSize) / 2.0f;
-    lm.vPlaneOffset = face.planeMinBounds - texOffset * m_flLuxelSize;
+    lm.vFaceOffset = face.vFaceMins - texOffset * m_flLuxelSize;
     lm.vTexCoords.resize(face.vertices.size());
 
     for (size_t i = 0; i < face.vertices.size(); i++) {
         const Face::Vertex &v = face.vertices[i];
         glm::vec2 &uv = lm.vTexCoords[i];
 
-        uv = v.vPlanePos / glm::vec2(m_flLuxelSize);
+        uv = (v.vFacePos - face.vFaceMins) / glm::vec2(m_flLuxelSize);
         uv += texOffset;
     }
 
@@ -74,7 +75,7 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
             glm::vec3 &luxel = lmrow[lmx];
 #if 1
             glm::vec2 luxelPos =
-                lm.vPlaneOffset + (glm::vec2(lmx, lmy) + glm::vec2(0.5f)) * m_flLuxelSize;
+                lm.vFaceOffset + (glm::vec2(lmx, lmy) + glm::vec2(0.5f)) * m_flLuxelSize;
             glm::vec3 output = glm::vec3(0, 0, 0);
             float weightSum = 0;
 
@@ -86,6 +87,8 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
             // Sample from face
             patchTrees[faceIdx].sampleLight(luxelPos, radius, filterk, output, weightSum);
 
+            // FIXME: This won't work with new coord systems
+            /*
             if (bSampleNeighbours) {
                 // Sample from neighbours
                 int normalDir = !!face.nPlaneSide;
@@ -103,6 +106,7 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
                     }
                 }
             }
+            */
 
             if (weightSum != 0) {
                 luxel = output / weightSum;
@@ -177,12 +181,16 @@ void rad::LightmapWriter::writeLightmapFile() {
     for (size_t i = 0; i < faceCount; i++) {
         const Face &face = m_RadSim.m_Faces[i];
         size_t vertCount = face.vertices.size();
-        file.writeUInt32((uint32_t)vertCount);         // Vertex count
-        file.writeVec(face.vI);                        // vI
-        file.writeVec(face.vJ);                        // vJ
-        file.writeVec(face.vPlaneOrigin);              // World position of (0, 0) plane coord.
-        file.writeVec(face.vPlaneOriginInPlaneCoords); // Offset of (0, 0) to get to plane coords
-        file.writeVec(face.planeMaxBounds);            // Face size
+        file.writeUInt32((uint32_t)vertCount);          // Vertex count
+
+        glm::vec3 vi = face.vFaceI.x * face.vPlaneI + face.vFaceI.y * face.vPlaneJ;
+        glm::vec3 vj = face.vFaceJ.x * face.vPlaneI + face.vFaceJ.y * face.vPlaneJ;
+
+        file.writeVec(vi);                              // vI
+        file.writeVec(vj);                              // vJ
+        file.writeVec(face.vWorldOrigin);               // World position of (0, 0) plane coord.
+        file.writeVec(glm::vec2(0.0f, 0.0f));           // Offset of (0, 0) to get to plane coords
+        file.writeVec(face.vFaceMaxs - face.vFaceMins); // Face size
 
         if (face.hasLightmap()) {
             const FaceLightmap &lm = m_Lightmaps[m_LightmapIdx[i]];

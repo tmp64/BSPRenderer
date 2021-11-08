@@ -5,7 +5,7 @@
 namespace rad {
 
 /*
-Coordinate systems:
+Coordinate systems documentation
 hu - hammer (the level editor) unit, roughly 1 inch
 
 WORLD COORDINATES:
@@ -18,11 +18,14 @@ PLANE COORDINATES:
     vWorldOrigin:vec3 is the world origin of point (0,0).
     vI:vec3 (vJ:vec3) is a 3D vector of the plane's X (Y) axis in world space.
 
+TEXTURE COORDINATES:
+    2D coordinates on a BSP face. Have different scale. Used for textures.
+    Face coordinates use same axises as texture coords but have different scale.
+
 FACE COORDINATS:
     2D coordinates on a BSP face. 1 u = 1 hu.
     Used for patches (they are axis-aligned squares in this coord system).
 
-    //vPlaneOrigin:vec2 is the plane origin of face point (0,0).
     vI:vec2 (vJ:vec2) is a 2D vector of the face's X (Y) axis in plane space.
 
 COORDINATE SYSTEM CONVERSION:
@@ -38,7 +41,6 @@ COORDINATE SYSTEM CONVERSION:
         y = dot(plane, vJ);
 
     face -> plane:
-        //plane = vPlaneOrigin + x * vI + y * vJ;
         plane = x * vI + y * vJ;
 */
 

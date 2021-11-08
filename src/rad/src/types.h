@@ -54,7 +54,9 @@ struct Face : public bsp::BSPFace {
     unsigned iFlags = 0;
 
     glm::vec3 vNormal;                //! World normal vector. +/- pPlane->vNormal
-    glm::vec2 vI, vJ;                 //!< Axis in plane coords.
+    glm::vec3 vWorldOrigin;           //!< Origin of plane/face coord system.
+    glm::vec3 vPlaneI, vPlaneJ;       //!< Plane X/Y in world coords.
+    glm::vec2 vFaceI, vFaceJ;         //!< Face axis in plane coords.
     glm::vec2 vPlaneMins, vPlaneMaxs; //!< Bounds in the plane coords.
     glm::vec2 vPlaneCenter;           //!< Center point in plane coords
     glm::vec2 vFaceMins, vFaceMaxs;   //!< Bounds in the face coords.
@@ -78,6 +80,14 @@ struct Face : public bsp::BSPFace {
         // Skies don't have lightmaps
         return !(iFlags & FACE_SKY);
     }
+
+    inline glm::vec3 faceToWorld(glm::vec2 c) const {
+        return rad::planeToWorld(rad::faceToPlane(c, vFaceI, vFaceJ), vWorldOrigin, vPlaneI,
+                                 vPlaneJ);
+    }
+
+    inline glm::vec2 planeToFace(glm::vec2 c) const { return rad::planeToFace(c, vFaceI, vFaceJ); }
+    inline glm::vec2 faceToPlane(glm::vec2 c) const { return rad::faceToPlane(c, vFaceI, vFaceJ); }
 };
 
 /**

@@ -135,10 +135,14 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
         vNormal = pPlane->vNormal;
     }
 
+    vWorldOrigin = pPlane->vWorldOrigin;
+    vPlaneI = pPlane->vI;
+    vPlaneJ = pPlane->vJ;
+
     // Use texture coordinates for face axis
     const bsp::BSPTextureInfo &texInfo = radSim.m_pLevel->getTexInfo().at(bspFace.iTextureInfo);
-    vI = glm::normalize(worldToPlane(texInfo.vS, pPlane->vI, pPlane->vJ));
-    vJ = glm::normalize(worldToPlane(texInfo.vT, pPlane->vI, pPlane->vJ));
+    vFaceI = glm::normalize(worldToPlane(texInfo.vS, vPlaneI, vPlaneJ));
+    vFaceJ = glm::normalize(worldToPlane(texInfo.vT, vPlaneI, vPlaneJ));
 
     // Flags
     const bsp::BSPMipTex &mipTex = radSim.m_pLevel->getTextures().at(texInfo.iMiptex);
@@ -150,22 +154,27 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
     // Process vertices
     auto rawVerts = getFaceVertices(*radSim.m_pLevel, bspFace);
     vertices.reserve(rawVerts.size());
-    glm::vec2 planeMins = MINS_INIT;
-    glm::vec2 planeMaxs = MAXS_INIT;
-    glm::vec2 faceMins = MINS_INIT;
-    glm::vec2 faceMaxs = MAXS_INIT;
+    vPlaneMins = MINS_INIT;
+    vPlaneMaxs = MAXS_INIT;
+    vFaceMins = MINS_INIT;
+    vFaceMaxs = MAXS_INIT;
     vPlaneCenter = {0, 0};
 
     for (glm::vec3 worldPos : rawVerts) {
         Face::Vertex v;
         v.vWorldPos = worldPos;
         v.vPlanePos = worldToPlane(worldPos, pPlane->vI, pPlane->vJ);
-        v.vFacePos = planeToFace(v.vPlanePos, vI, vJ);
+        v.vFacePos = planeToFace(v.vPlanePos);
 
-        updateMins2D(planeMins, v.vPlanePos);
-        updateMaxs2D(planeMaxs, v.vPlanePos);
-        updateMins2D(faceMins, v.vFacePos);
-        updateMaxs2D(faceMaxs, v.vFacePos);
+        // FIXME: This error is HUGE
+        glm::vec3 asd = faceToWorld(v.vFacePos);
+        glm::vec3 delta = asd - v.vWorldPos;
+        AFW_ASSERT(abs(delta.x) < 10.f && abs(delta.y) < 10.f && abs(delta.z) < 10.f);
+
+        updateMins2D(vPlaneMins, v.vPlanePos);
+        updateMaxs2D(vPlaneMaxs, v.vPlanePos);
+        updateMins2D(vFaceMins, v.vFacePos);
+        updateMaxs2D(vFaceMaxs, v.vFacePos);
 
         vPlaneCenter += v.vPlanePos;
         vertices.push_back(v);

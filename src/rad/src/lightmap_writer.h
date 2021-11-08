@@ -24,7 +24,7 @@ private:
         std::vector<glm::vec2> vTexCoords;
         std::vector<glm::vec3> lightmapData;
         glm::ivec2 vBlockOffset;
-        glm::vec2 vPlaneOffset; //< Face plane pos of lightmap (0;0)
+        glm::vec2 vFaceOffset; //< Face plane pos of lightmap (0;0)
     };
 
     RadSimImpl &m_RadSim;
