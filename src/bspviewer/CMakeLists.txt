@@ -11,7 +11,8 @@ set(SOURCE_FILES
 	src/assets/wad_asset.h
 	src/assets/wad_material_asset.cpp
 	src/assets/wad_material_asset.h
-
+	
+	src/surface_editor/files.h
 	src/surface_editor/surface_edit_mode.cpp
 	src/surface_editor/surface_edit_mode.h
 	src/surface_editor/surface_select_tool.cpp
@@ -51,6 +52,7 @@ target_include_directories(bspviewer PRIVATE
 target_link_libraries(bspviewer
 	gui_app_base
 	app_gui_launcher
+	material_props
 )
 
 appfw_get_std_pch(PCH_STD_HEADERS)

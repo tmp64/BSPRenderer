@@ -32,6 +32,15 @@ public:
     //! Returns name of the material.
     inline const std::string &getName() const { return m_Name; }
 
+    //! Returns name of the WAD file.
+    inline const std::string &getWadName() const { return m_WadName; }
+
+    //! Sets the name of the WAD file.
+    inline void setWadName(const std::string &s) { m_WadName = s; }
+
+    //! @returns the id of the color texture.
+    inline GLuint getColorTextureId() const { return m_Texture.getId(); }
+
     //! Binds the color texture to GL_TEXTURE0.
     inline void bindSurfaceTextures() const {
         AFW_ASSERT(m_Type == Type::Surface);
@@ -57,6 +66,7 @@ public:
 private:
     std::list<Material>::iterator m_Iter; 
     std::string m_Name;
+    std::string m_WadName;
     GPUTexture m_Texture;
     Type m_Type = Type::None;
     int m_iWide = 0;

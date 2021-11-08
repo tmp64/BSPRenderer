@@ -127,6 +127,7 @@ void BSPViewer::loadLevel(const std::string &name) {
     printi("Loading map {}", path);
 
     try {
+        m_MapName = name;
         m_pLevelLoader = std::make_unique<LevelLoader>(path);
     } catch (const std::exception &e) {
         printe("Failed to load the map: {}", e.what());
@@ -265,7 +266,7 @@ void BSPViewer::showToolSelection() {
 
 void BSPViewer::showInspector() {
     if (ImGui::Begin("Inspector")) {
-        if (m_pActiveMode) {
+        if (m_pWorldState && m_pActiveMode) {
             m_pActiveMode->showInspector();
         }
     }

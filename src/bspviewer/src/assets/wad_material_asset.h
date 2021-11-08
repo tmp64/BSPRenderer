@@ -18,7 +18,8 @@ public:
 private:
     Material *m_pMaterial = nullptr;
 
-    UploadTask init(std::string_view name, int wide, int tall, bool isRgba, std::vector<uint8_t> &&data);
+    UploadTask init(std::string_view name, std::string_view wadName, int wide, int tall, bool isRgba,
+                    std::vector<uint8_t> &&data);
 
     friend class WADAsset;
 };

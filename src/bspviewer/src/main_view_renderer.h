@@ -30,6 +30,11 @@ public:
     //! @param  color   Color in gamma space
     void setSurfaceTint(int surface, glm::vec4 color);
 
+    //! @returns the material used by the surface.
+    inline Material *getSurfaceMaterial(int surface) {
+        return m_SceneRenderer.getSurfaceMaterial(surface);
+    }
+
     //! Loads the level, path is passed to scene renderer to load custom lightmaps
     void loadLevel(LevelAssetRef &level);
 

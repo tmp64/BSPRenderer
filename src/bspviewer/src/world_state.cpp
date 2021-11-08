@@ -1,5 +1,6 @@
 #include "world_state.h"
 #include "main_view_renderer.h"
+#include "bspviewer.h"
 
 WorldState::WorldState(LevelAssetRef level) {
     AFW_ASSERT(!m_spInstance);
@@ -12,6 +13,8 @@ WorldState::WorldState(LevelAssetRef level) {
     loadEntities();
     optimizeBrushModels();
     m_Vis.setLevel(m_pLevel);
+    m_MaterialLoader.init(BSPViewer::get().getMapName(), "assets:sound/materials.txt",
+                          "assets:materials");
 }
 
 WorldState::~WorldState() {

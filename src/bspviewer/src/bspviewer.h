@@ -36,11 +36,15 @@ public:
     //! @returns the currently active edit mode or nullptr.
     inline EditorMode *getActiveEditor() { return m_pActiveMode; }
 
+    //! @returns the map name (without maps/ and .bsp).
+    inline const std::string &getMapName() { return m_MapName; }
+
 private:
     AssetManager m_AssetManager;
     MainViewRenderer m_Renderer;
     std::unique_ptr<LevelLoader> m_pLevelLoader;
     std::unique_ptr<WorldState> m_pWorldState;
+    std::string m_MapName;
 
     // Editor mode support
     std::vector<EditorMode *> m_EditorModes;

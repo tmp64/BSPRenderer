@@ -4,6 +4,7 @@
 #include <memory>
 #include <appfw/utils.h>
 #include <bsp/level.h>
+#include <material_props/material_prop_loader.h>
 #include "assets/level_asset.h"
 #include "base_entity.h"
 #include "brush_model.h"
@@ -25,6 +26,9 @@ public:
     //! Returns the list of all entities.
     inline auto &getEntList() { return m_EntityList; }
 
+    //! @returns the material properties loader.
+    inline MaterialPropLoader &getMaterialLoader() { return m_MaterialLoader; }
+
 private:
     // Level info
     LevelAssetRef m_pLevelAsset;
@@ -32,6 +36,7 @@ private:
     std::vector<std::unique_ptr<BaseEntity>> m_EntityList;
     std::vector<BrushModel> m_BrushModels;
     Vis m_Vis;
+    MaterialPropLoader m_MaterialLoader;
 
     // Level loading
     void loadBrushModels();

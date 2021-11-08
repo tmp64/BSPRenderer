@@ -348,6 +348,10 @@ bool SceneRenderer::addEntity(ClientEntity *pClent) {
     return true;
 }
 
+Material *SceneRenderer::getSurfaceMaterial(int surface) {
+    return m_Data.surfaces[surface].m_pMat;
+}
+
 #ifdef RENDERER_SUPPORT_TINTING
 void SceneRenderer::setSurfaceTint(int surface, glm::vec4 color) {
     Surface &surf = m_Data.surfaces[surface];

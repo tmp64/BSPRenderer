@@ -1,3 +1,4 @@
+#include <appfw/str_utils.h>
 #include "wad_asset.h"
 #include "asset_manager.h"
 
@@ -50,14 +51,14 @@ WADAsset::loadMaterialInWorker(const char *name) {
         tex->getRGB(data);
     }
 
-    auto task = mat->init(tex->getName(), tex->getWide(), tex->getTall(), isRgba, std::move(data));
+    auto task = mat->init(tex->getName(), m_WADName, tex->getWide(), tex->getTall(), isRgba, std::move(data));
     return {mat, std::move(task)};
 }
 
 const bsp::WADTexture *WADAsset::findTexture(const char *name) {
     auto &list = m_File.getTextures();
     auto it = std::find_if(list.begin(), list.end(), [name](const bsp::WADTexture &tex) {
-        return !strcmp(tex.getName(), name);
+        return !appfw::strcasecmp(tex.getName(), name);
     });
 
     if (it == list.end()) {
@@ -83,6 +84,7 @@ void WADAsset::loadFromFile(AssetManager &assMgr, std::string_view path) {
     size_t pos = path.find_first_of(':');
     AFW_ASSERT(pos != path.npos);
     m_WADName = path.substr(pos + 1);
+    appfw::strToLower(m_WADName.begin(), m_WADName.end());
 
     assMgr.fakeDelay();
 

@@ -93,6 +93,9 @@ public:
     //! @returns true if entity was added, false if limit reached
     bool addEntity(ClientEntity *pClent);
 
+    //! @returns the material used by the surface.
+    Material *getSurfaceMaterial(int surface);
+
 #ifdef RENDERER_SUPPORT_TINTING
     //! Allows tinting world or entity surfaces.
     //! @param  surface The surface index

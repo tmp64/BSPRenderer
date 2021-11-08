@@ -1,3 +1,4 @@
+#include <appfw/str_utils.h>
 #include <renderer/utils.h>
 #include "main_view_renderer.h"
 #include "world_state.h"
@@ -282,7 +283,10 @@ void MainViewRenderer::optimizeBrushModel(Model *model) {
 }
 
 Material *MainViewRenderer::getMaterial(const bsp::BSPMipTex &tex) {
-    WADMaterialAssetRef mat = AssetManager::get().findMaterialByName(tex.szName);
+    char szName[bsp::MAX_TEXTURE_NAME];
+    appfw::strToLower(tex.szName, tex.szName + bsp::MAX_TEXTURE_NAME, szName);
+
+    WADMaterialAssetRef mat = AssetManager::get().findMaterialByName(szName);
     if (mat) {
         return mat->getMaterial();
     } else {
