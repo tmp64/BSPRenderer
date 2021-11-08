@@ -10,14 +10,15 @@ class SurfaceEditMode : public EditorMode {
 public:
     SurfaceEditMode();
     const char *getName() override;
+    void onLevelUnloaded() override;
     void showInspector() override;
 
 private:
     class SurfaceData {
     public:
-        SurfaceData();
+        SurfaceData(SurfaceEditMode *editor, int surfIdx);
+        ~SurfaceData();
         inline int getIdx() { return m_iIdx; } //!< @returns the index or -1
-        void load(SurfaceEditMode *editor, int surfIdx);
         void saveChanges();
         void showSurfaceProps();
         void showMapMatProps();
@@ -43,6 +44,7 @@ private:
         void showMatProps(MaterialPropsFile &mat);
 
         std::string getBaseMaterialName();
+        void loadMaterial(const std::string &vpath, MaterialPropsFile &mat, MaterialPropsFile &origMat);
         void loadBaseMaterial(bool silenceNotFound);
 
         template <typename T, bool bAllowRemove>
@@ -50,7 +52,7 @@ private:
     };
 
     SurfaceSelectTool m_SelectTool;
-    SurfaceData m_SurfaceData;
+    std::unique_ptr<SurfaceData> m_pSurfaceData;
 };
 
 #endif

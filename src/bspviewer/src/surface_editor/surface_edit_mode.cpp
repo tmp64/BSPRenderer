@@ -5,22 +5,11 @@
 
 static constexpr float TEXTURE_PREVIEW_SIZE = 96.0f;
 
-SurfaceEditMode::SurfaceData::SurfaceData()
+SurfaceEditMode::SurfaceData::SurfaceData(SurfaceEditMode *editor, int surfIdx)
     : m_Wad(true)
     , m_OrigWad(true)
     , m_Map(false)
-    , m_OrigMap(false) {}
-
-void SurfaceEditMode::SurfaceData::load(SurfaceEditMode *editor, int surfIdx) {
-    if (m_iIdx != -1) {
-        saveChanges();
-        m_iIdx = -1;
-        m_Surf = m_OrigSurf = SurfacePropsFile();
-        m_Map = m_OrigMap = m_Map.getDefault();
-        m_Wad = m_OrigWad = m_Wad.getDefault();
-        m_Base = m_OrigBase = m_Base.getDefault();
-    }
-
+    , m_OrigMap(false) {
     m_pEditor = editor;
     m_iIdx = surfIdx;
 
@@ -28,37 +17,18 @@ void SurfaceEditMode::SurfaceData::load(SurfaceEditMode *editor, int surfIdx) {
     Material *material = m_pMaterial = MainViewRenderer::get().getSurfaceMaterial(surfIdx);
 
     // Load global material
-    std::string wadMatVPath = matload.getWadYamlPath(material->getName(), material->getWadName());
-    try {
-        fs::path wadMatPath = getFileSystem().findExistingFile(wadMatVPath, std::nothrow);
-
-        if (!wadMatPath.empty()) {
-            std::ifstream file(wadMatPath);
-            YAML::Node yaml = YAML::Load(file);
-            m_OrigWad.loadFromYaml(yaml);
-            m_Wad = m_OrigWad;
-        }
-    } catch (const std::exception &e) {
-        printe("Failed to load {}: {}", wadMatVPath, e.what());
-    }
+    loadMaterial(matload.getWadYamlPath(material->getName(), material->getWadName()), m_Wad,
+                 m_OrigWad);
 
     // Load base material
     loadBaseMaterial(false);
 
     // Load map material
-    std::string mapMatVPath = matload.getMapYamlPath(material->getName());
-    try {
-        fs::path mapMatPath = getFileSystem().findExistingFile(mapMatVPath, std::nothrow);
+    loadMaterial(matload.getMapYamlPath(material->getName()), m_Map, m_OrigMap);
+}
 
-        if (!mapMatPath.empty()) {
-            std::ifstream file(mapMatPath);
-            YAML::Node yaml = YAML::Load(file);
-            m_OrigMap.loadFromYaml(yaml);
-            m_Map = m_OrigMap;
-        }
-    } catch (const std::exception &e) {
-        printe("Failed to load {}: {}", mapMatVPath, e.what());
-    }
+SurfaceEditMode::SurfaceData::~SurfaceData() {
+    saveChanges();
 }
 
 void SurfaceEditMode::SurfaceData::saveChanges() {
@@ -138,6 +108,22 @@ std::string SurfaceEditMode::SurfaceData::getBaseMaterialName() {
     return baseMatName;
 }
 
+void SurfaceEditMode::SurfaceData::loadMaterial(const std::string &vpath, MaterialPropsFile &mat,
+                                                MaterialPropsFile &origMat) {
+    try {
+        fs::path path = getFileSystem().findExistingFile(vpath, std::nothrow);
+
+        if (!path.empty()) {
+            std::ifstream file(path);
+            YAML::Node yaml = YAML::Load(file);
+            origMat.loadFromYaml(yaml);
+            mat = origMat;
+        }
+    } catch (const std::exception &e) {
+        printe("Failed to load {}: {}", vpath, e.what());
+    }
+}
+
 void SurfaceEditMode::SurfaceData::loadBaseMaterial(bool silenceNotFound) {
     m_bCurrentBaseNotFound = false;
     auto &matload = WorldState::get()->getMaterialLoader();
@@ -208,19 +194,23 @@ const char *SurfaceEditMode::getName() {
     return "Surface";
 }
 
+void SurfaceEditMode::onLevelUnloaded() {
+    m_pSurfaceData = nullptr;
+}
+
 void SurfaceEditMode::showInspector() {
     int surfIdx = m_SelectTool.getSurfaceIndex();
     int entIdx = m_SelectTool.getEntityIndex();
 
-    if (m_SurfaceData.getIdx() != surfIdx) {
-        if (surfIdx != -1) {
-            m_SurfaceData.load(this, surfIdx);
+    if (surfIdx != -1) {
+        if (m_pSurfaceData && m_pSurfaceData->getIdx() != surfIdx) {
+            m_pSurfaceData = nullptr;
         }
-    }
 
-    if (surfIdx == -1) {
-        ImGui::Text("No surface selected.");
-    } else {
+        if (!m_pSurfaceData) {
+            m_pSurfaceData = std::make_unique<SurfaceData>(this, surfIdx);
+        }
+
         // Surface info
         ImGui::PushID("surface info");
         if (ImGui::BeginTable("table", 2, ImGuiTableFlags_SizingFixedFit)) {
@@ -260,29 +250,35 @@ void SurfaceEditMode::showInspector() {
         // Surface
         ImGui::PushID("Surface");
         if (ImGui::CollapsingHeader("Surface", ImGuiTreeNodeFlags_DefaultOpen)) {
-            m_SurfaceData.showSurfaceProps();
+            m_pSurfaceData->showSurfaceProps();
         }
         ImGui::PopID();
 
         // Map Material
         ImGui::PushID("Map Material");
         if (ImGui::CollapsingHeader("Map material", ImGuiTreeNodeFlags_DefaultOpen)) {
-            m_SurfaceData.showMapMatProps();
+            m_pSurfaceData->showMapMatProps();
         }
         ImGui::PopID();
-        
+
         // Global Material
         ImGui::PushID("Global Material");
         if (ImGui::CollapsingHeader("Global material", ImGuiTreeNodeFlags_DefaultOpen)) {
-            m_SurfaceData.showWadMatProps();
+            m_pSurfaceData->showWadMatProps();
         }
         ImGui::PopID();
 
         // Base Material
         ImGui::PushID("Base Material");
         if (ImGui::CollapsingHeader("Base material", ImGuiTreeNodeFlags_DefaultOpen)) {
-            m_SurfaceData.showBaseMatProps();
+            m_pSurfaceData->showBaseMatProps();
         }
         ImGui::PopID();
+    } else {
+        if (m_pSurfaceData) {
+            m_pSurfaceData = nullptr;
+        }
+
+        ImGui::Text("No surface selected.");
     }
 }
