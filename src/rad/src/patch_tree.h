@@ -79,6 +79,7 @@ private:
 
     static void getCorners(glm::vec2 point, float size, glm::vec2 corners[4]);
     static bool pointIntersectsWithRect(glm::vec2 point, glm::vec2 origin, float size);
+    static bool intersectAABB(const glm::vec2 b1[2], const glm::vec2 b2[2]);
 };
 
 }

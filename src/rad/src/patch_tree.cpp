@@ -236,26 +236,13 @@ void rad::PatchTree::buildTree() {
 
 void rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, float filterk, glm::vec3 &out,
                                  float &weightSum) {
-    // Check if pos intersects with root node
+    // Check if pos intersects with the face
     glm::vec2 corners[4];
     getCorners(pos, radius * 2.0f, corners);
-    glm::vec2 nodeCorners[4];
-    getCorners(m_RootNode.vOrigin, m_RootNode.flSize, nodeCorners);
-    bool needToCheck = false;
+    glm::vec2 faceAABB[] = {m_pFace->vFaceMins, m_pFace->vFaceMaxs};
+    glm::vec2 luxelAABB[] = {corners[0], corners[3]};
 
-    for (int j = 0; j < 4; j++) {
-        if (pointIntersectsWithRect(corners[j], m_RootNode.vOrigin, m_RootNode.flSize)) {
-            needToCheck = true;
-            break;
-        }
-
-        if (pointIntersectsWithRect(nodeCorners[j], pos, radius * 2.0f)) {
-            needToCheck = true;
-            break;
-        }
-    }
-
-    if (!needToCheck) {
+    if (!intersectAABB(faceAABB, luxelAABB)) {
         return;
     }
 
@@ -486,6 +473,16 @@ bool rad::PatchTree::pointIntersectsWithRect(glm::vec2 point, glm::vec2 origin, 
     size /= 2.0f;
     return (point.x >= origin.x - size && point.x <= origin.x + size) &&
            (point.y >= origin.y - size && point.y <= origin.y + size);
+}
+
+bool rad::PatchTree::intersectAABB(const glm::vec2 b1[2], const glm::vec2 b2[2]) {
+    glm::vec2 pos1 = (b1[0] + b1[1]) / 2.0f;
+    glm::vec2 pos2 = (b2[0] + b2[1]) / 2.0f;
+    glm::vec2 half1 = b1[1] - pos1;
+    glm::vec2 half2 = b2[1] - pos2;
+    glm::vec2 d = pos2 - pos1;
+    return half1.x + half2.x >= std::abs(d.x)
+        && half1.y + half2.y >= std::abs(d.y);
 }
 
 int rad::PatchTree::Node::getChildForPatch(PatchRef &p) {

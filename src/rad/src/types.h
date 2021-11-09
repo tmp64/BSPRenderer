@@ -75,11 +75,11 @@ struct Face : public bsp::BSPFace {
         return !(iFlags & FACE_SKY);
     }
 
-    inline glm::vec3 faceToWorld(glm::vec2 face) const {
+    inline glm::vec3 faceToWorld(const glm::vec2 &face) const {
         return rad::faceToWorld(face, vWorldOrigin, vFaceI, vFaceJ);
     }
 
-    inline glm::vec2 worldToFace(glm::vec3 world) const {
+    inline glm::vec2 worldToFace(const glm::vec3 &world) const {
         return rad::worldToFace(world, vFaceI, vFaceJ);
     }
 };
