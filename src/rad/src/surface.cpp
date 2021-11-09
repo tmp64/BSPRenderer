@@ -87,34 +87,6 @@ void rad::Plane::load(RadSimImpl &radSim, const bsp::BSPPlane &bspPlane) {
     vNormal = glm::normalize(bspPlane.vNormal);
     fDist = bspPlane.fDist;
     nType = bspPlane.nType;
-
-    // Calculate j
-    glm::dvec3 unprojJ;
-
-    switch (nType) {
-    case bsp::PlaneType::PlaneX:
-    case bsp::PlaneType::PlaneAnyX:
-        unprojJ = {0, 0, 1};
-        break;
-    case bsp::PlaneType::PlaneY:
-    case bsp::PlaneType::PlaneAnyY:
-        unprojJ = {0, 0, 1};
-        break;
-    case bsp::PlaneType::PlaneZ:
-    case bsp::PlaneType::PlaneAnyZ:
-        unprojJ = {0, 1, 0};
-        break;
-    default:
-        throw std::runtime_error("Map design error: invalid plane type");
-    }
-
-    vJ = glm::normalize(projectVectorOnPlane(*this, unprojJ));
-    vI = glm::cross(vJ, glm::dvec3(vNormal));
-
-    // Calculate world origin
-    glm::dvec3 origin = projectPointOnPlane(*this, {0, 0, 0});
-    glm::dvec2 originOnPlane = worldToPlane(origin, vI, vJ);
-    vWorldOrigin = origin - originOnPlane.x * vI - originOnPlane.y * vJ;
 }
 
 void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
@@ -136,14 +108,41 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
         vNormal = pPlane->vNormal;
     }
 
-    vWorldOrigin = pPlane->vWorldOrigin;
-    vPlaneI = pPlane->vI;
-    vPlaneJ = pPlane->vJ;
-
     // Use texture coordinates for face axis
     const bsp::BSPTextureInfo &texInfo = radSim.m_pLevel->getTexInfo().at(bspFace.iTextureInfo);
-    vFaceI = glm::normalize(worldToPlane(glm::dvec3(texInfo.vS), vPlaneI, vPlaneJ));
-    vFaceJ = glm::normalize(worldToPlane(glm::dvec3(texInfo.vT), vPlaneI, vPlaneJ));
+    vFaceI = glm::normalize(projectVectorOnPlane(*pPlane, texInfo.vS));
+    vFaceJ = glm::cross(vFaceI, glm::dvec3(vNormal));
+
+#if 0
+    // This code will derive vFaceI and vFaceJ from the plane instead of texture coordinates.
+    // Left here for debugging purposes.
+    // Calculate j
+    glm::dvec3 unprojJ;
+
+    switch (pPlane->nType) {
+    case bsp::PlaneType::PlaneX:
+    case bsp::PlaneType::PlaneAnyX:
+        unprojJ = {0, 0, 1};
+        break;
+    case bsp::PlaneType::PlaneY:
+    case bsp::PlaneType::PlaneAnyY:
+        unprojJ = {0, 0, 1};
+        break;
+    case bsp::PlaneType::PlaneZ:
+    case bsp::PlaneType::PlaneAnyZ:
+        unprojJ = {0, 1, 0};
+        break;
+    default:
+        throw std::runtime_error("Map design error: invalid plane type");
+    }
+
+    vFaceJ = glm::normalize(projectVectorOnPlane(*pPlane, unprojJ));
+    vFaceI = glm::cross(vFaceJ, glm::dvec3(vNormal));
+#endif
+
+    glm::dvec3 origin = projectPointOnPlane(*pPlane, {0, 0, 0});
+    glm::dvec2 originOnFace = rad::worldToFace(origin, vFaceI, vFaceJ);
+    vWorldOrigin = origin - originOnFace.x * vFaceI - originOnFace.y * vFaceJ;
 
     // Flags
     const bsp::BSPMipTex &mipTex = radSim.m_pLevel->getTextures().at(texInfo.iMiptex);
@@ -155,33 +154,34 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
     // Process vertices
     auto rawVerts = getFaceVertices(*radSim.m_pLevel, bspFace);
     vertices.reserve(rawVerts.size());
-    vPlaneMins = MINS_INIT;
-    vPlaneMaxs = MAXS_INIT;
     vFaceMins = MINS_INIT;
     vFaceMaxs = MAXS_INIT;
-    vPlaneCenter = {0, 0};
+    vFaceCenter = {0, 0};
 
     for (glm::vec3 worldPos : rawVerts) {
         Face::Vertex v;
         v.vWorldPos = worldPos;
-        v.vPlanePos = worldToPlane(worldPos, pPlane->vI, pPlane->vJ);
-        v.vFacePos = planeToFace(v.vPlanePos);
+        v.vFacePos = worldToFace(worldPos);
 
-        // FIXME: This error is HUGE
-        glm::vec3 asd = faceToWorld(v.vFacePos);
-        glm::vec3 delta = asd - v.vWorldPos;
-        AFW_ASSERT(abs(delta.x) < 1.f && abs(delta.y) < 1.f && abs(delta.z) < 1.f);
+        constexpr float MAX_ERROR = 0.01f;
+        glm::vec3 transformedWorldPos = faceToWorld(v.vFacePos);
+        glm::vec3 delta = transformedWorldPos - v.vWorldPos;
+        delta = glm::abs(delta);
+        
+        if (!(delta.x < MAX_ERROR && delta.y < MAX_ERROR && delta.z < MAX_ERROR)) {
+            float maxDelta = std::max({delta.x, delta.y, delta.z});
+            printw("Surface {}, faceToWorld error {} > {} (bad texture coords?)", maxDelta, MAX_ERROR);
+            AFW_ASSERT(false);
+        }
 
-        updateMins2D(vPlaneMins, v.vPlanePos);
-        updateMaxs2D(vPlaneMaxs, v.vPlanePos);
         updateMins2D(vFaceMins, v.vFacePos);
         updateMaxs2D(vFaceMaxs, v.vFacePos);
 
-        vPlaneCenter += v.vPlanePos;
+        vFaceCenter += v.vFacePos;
         vertices.push_back(v);
     }
 
-    vPlaneCenter /= (float)rawVerts.size();
+    vFaceCenter /= (float)rawVerts.size();
 
     flPatchSize = (float)radSim.m_Profile.iBasePatchSize;
 }

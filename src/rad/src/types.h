@@ -31,9 +31,6 @@ enum FaceFlags : unsigned {
 };
 
 struct Plane : public bsp::BSPPlane {
-    glm::dvec3 vWorldOrigin;
-    glm::dvec3 vI, vJ;
-
     //! List of faces that are in this plane
     std::vector<unsigned> faces;
 
@@ -43,7 +40,6 @@ struct Plane : public bsp::BSPPlane {
 struct Face : public bsp::BSPFace {
     struct Vertex {
         glm::vec3 vWorldPos; //!< Position in world space.
-        glm::vec2 vPlanePos; //!< Position in plane space.
         glm::vec2 vFacePos;  //!< Position in face space.
     };
 
@@ -54,11 +50,9 @@ struct Face : public bsp::BSPFace {
     unsigned iFlags = 0;
 
     glm::vec3 vNormal;                //! World normal vector. +/- pPlane->vNormal
-    glm::dvec3 vWorldOrigin;           //!< Origin of plane/face coord system.
-    glm::dvec3 vPlaneI, vPlaneJ;       //!< Plane X/Y in world coords.
-    glm::dvec2 vFaceI, vFaceJ;         //!< Face axis in plane coords.
-    glm::vec2 vPlaneMins, vPlaneMaxs; //!< Bounds in the plane coords.
-    glm::vec2 vPlaneCenter;           //!< Center point in plane coords
+    glm::dvec3 vWorldOrigin;          //!< Origin of face coord system.
+    glm::dvec3 vFaceI, vFaceJ;        //!< Face axis in world coords.
+    glm::vec2 vFaceCenter;            //!< Center point in face coords
     glm::vec2 vFaceMins, vFaceMaxs;   //!< Bounds in the face coords.
 
     //! List of vertices.
@@ -81,13 +75,13 @@ struct Face : public bsp::BSPFace {
         return !(iFlags & FACE_SKY);
     }
 
-    inline glm::vec3 faceToWorld(glm::vec2 c) const {
-        return rad::planeToWorld(rad::faceToPlane(c, vFaceI, vFaceJ), vWorldOrigin, vPlaneI,
-                                 vPlaneJ);
+    inline glm::vec3 faceToWorld(glm::vec2 face) const {
+        return rad::faceToWorld(face, vWorldOrigin, vFaceI, vFaceJ);
     }
 
-    inline glm::vec2 planeToFace(glm::vec2 c) const { return rad::planeToFace(c, vFaceI, vFaceJ); }
-    inline glm::vec2 faceToPlane(glm::vec2 c) const { return rad::faceToPlane(c, vFaceI, vFaceJ); }
+    inline glm::vec2 worldToFace(glm::vec3 world) const {
+        return rad::worldToFace(world, vFaceI, vFaceJ);
+    }
 };
 
 /**

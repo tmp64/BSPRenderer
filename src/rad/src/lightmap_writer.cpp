@@ -182,13 +182,9 @@ void rad::LightmapWriter::writeLightmapFile() {
         const Face &face = m_RadSim.m_Faces[i];
         size_t vertCount = face.vertices.size();
         file.writeUInt32((uint32_t)vertCount);          // Vertex count
-
-        glm::vec3 vi = face.vFaceI.x * face.vPlaneI + face.vFaceI.y * face.vPlaneJ;
-        glm::vec3 vj = face.vFaceJ.x * face.vPlaneI + face.vFaceJ.y * face.vPlaneJ;
-
-        file.writeVec(vi);                              // vI
-        file.writeVec(vj);                              // vJ
-        file.writeVec(face.vWorldOrigin);               // World position of (0, 0) plane coord.
+        file.writeVec(glm::vec3(face.vFaceI));          // vI
+        file.writeVec(glm::vec3(face.vFaceJ));          // vJ
+        file.writeVec(glm::vec3(face.vWorldOrigin));    // World position of (0, 0) plane coord.
         file.writeVec(glm::vec2(0.0f, 0.0f));           // Offset of (0, 0) to get to plane coords
         file.writeVec(face.vFaceMaxs - face.vFaceMins); // Face size
 

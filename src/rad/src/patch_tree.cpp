@@ -195,7 +195,7 @@ void rad::PatchTree::buildTree() {
     float squareSize = std::max(m_pRadSim->m_Profile.flLuxelSize, m_pFace->flPatchSize);
     float size = std::max(faceSize.x, faceSize.y);
     m_RootNode.flSize = size + 4.0f * squareSize;
-    m_RootNode.vOrigin = m_pFace->planeToFace(m_pFace->vPlaneCenter);
+    m_RootNode.vOrigin = m_pFace->vFaceCenter;
 
 #ifndef DISABLE_TREE
     PatchIndex patchCount = m_pFace->iNumPatches; 
