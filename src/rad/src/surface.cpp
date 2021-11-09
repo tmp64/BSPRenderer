@@ -170,7 +170,7 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
         
         if (!(delta.x < MAX_ERROR && delta.y < MAX_ERROR && delta.z < MAX_ERROR)) {
             float maxDelta = std::max({delta.x, delta.y, delta.z});
-            printw("Surface {}, faceToWorld error {} > {} (bad texture coords?)", maxDelta, MAX_ERROR);
+            printw("Surface faceToWorld error {} > {} (bad texture coords?)", maxDelta, MAX_ERROR);
             AFW_ASSERT(false);
         }
 
