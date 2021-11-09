@@ -87,26 +87,23 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
             // Sample from face
             patchTrees[faceIdx].sampleLight(luxelPos, radius, filterk, output, weightSum);
 
-            // FIXME: This won't work with new coord systems
-            /*
             if (bSampleNeighbours) {
                 // Sample from neighbours
                 int normalDir = !!face.nPlaneSide;
                 auto &neighbours = m_RadSim.m_Planes[face.iPlane].faces;
-                glm::vec2 luxelPos2 = luxelPos + face.vPlaneOriginInPlaneCoords;
+                glm::vec3 luxelWorldPos = face.faceToWorld(luxelPos);
 
                 for (unsigned neighbourIdx : neighbours) {
                     Face &neighbour = m_RadSim.m_Faces[neighbourIdx];
 
                     if (neighbourIdx != faceIdx && neighbour.hasLightmap() &&
                         normalDir == !!neighbour.nPlaneSide) {
-                        patchTrees[neighbourIdx].sampleLight(
-                            luxelPos2 - neighbour.vPlaneOriginInPlaneCoords, radius, filterk, output,
-                            weightSum);
+                        glm::vec2 luxelPosHere = neighbour.worldToFace(luxelWorldPos);
+                        patchTrees[neighbourIdx].sampleLight(luxelPosHere, radius, filterk, output,
+                                                             weightSum);
                     }
                 }
             }
-            */
 
             if (weightSum != 0) {
                 luxel = output / weightSum;
