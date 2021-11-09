@@ -26,17 +26,18 @@ inline glm::vec3 getZPointOnPlane(const bsp::BSPPlane &plane) {
 /**
  * Returns a projection of a point onto a plane.
  */
-inline glm::vec3 projectPointOnPlane(const bsp::BSPPlane &plane, glm::vec3 point) {
-    float h = glm::dot(plane.vNormal, point) - plane.fDist;
-    return point - plane.vNormal * h;
+inline glm::dvec3 projectPointOnPlane(const bsp::BSPPlane &plane, glm::dvec3 point) {
+    glm::dvec3 normal = glm::dvec3(plane.vNormal);
+    double h = glm::dot(normal, point) - plane.fDist;
+    return point - normal * h;
 }
 
 /**
  * Returns a projection of a vector onto a plane. Length is not normalized.
  */
-inline glm::vec3 projectVectorOnPlane(const bsp::BSPPlane &plane, glm::vec3 vec) {
-    glm::vec3 a = projectPointOnPlane(plane, {0.f, 0.f, 0.f});
-    glm::vec3 b = projectPointOnPlane(plane, vec);
+inline glm::dvec3 projectVectorOnPlane(const bsp::BSPPlane &plane, glm::dvec3 vec) {
+    glm::dvec3 a = projectPointOnPlane(plane, {0.f, 0.f, 0.f});
+    glm::dvec3 b = projectPointOnPlane(plane, vec);
     return b - a;
 }
 
@@ -88,7 +89,7 @@ void rad::Plane::load(RadSimImpl &radSim, const bsp::BSPPlane &bspPlane) {
     nType = bspPlane.nType;
 
     // Calculate j
-    glm::vec3 unprojJ;
+    glm::dvec3 unprojJ;
 
     switch (nType) {
     case bsp::PlaneType::PlaneX:
@@ -108,11 +109,11 @@ void rad::Plane::load(RadSimImpl &radSim, const bsp::BSPPlane &bspPlane) {
     }
 
     vJ = glm::normalize(projectVectorOnPlane(*this, unprojJ));
-    vI = glm::cross(vJ, vNormal);
+    vI = glm::cross(vJ, glm::dvec3(vNormal));
 
     // Calculate world origin
-    glm::vec3 origin = projectPointOnPlane(*this, {0, 0, 0});
-    glm::vec2 originOnPlane = worldToPlane(origin, vI, vJ);
+    glm::dvec3 origin = projectPointOnPlane(*this, {0, 0, 0});
+    glm::dvec2 originOnPlane = worldToPlane(origin, vI, vJ);
     vWorldOrigin = origin - originOnPlane.x * vI - originOnPlane.y * vJ;
 }
 
@@ -141,8 +142,8 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
 
     // Use texture coordinates for face axis
     const bsp::BSPTextureInfo &texInfo = radSim.m_pLevel->getTexInfo().at(bspFace.iTextureInfo);
-    vFaceI = glm::normalize(worldToPlane(texInfo.vS, vPlaneI, vPlaneJ));
-    vFaceJ = glm::normalize(worldToPlane(texInfo.vT, vPlaneI, vPlaneJ));
+    vFaceI = glm::normalize(worldToPlane(glm::dvec3(texInfo.vS), vPlaneI, vPlaneJ));
+    vFaceJ = glm::normalize(worldToPlane(glm::dvec3(texInfo.vT), vPlaneI, vPlaneJ));
 
     // Flags
     const bsp::BSPMipTex &mipTex = radSim.m_pLevel->getTextures().at(texInfo.iMiptex);
@@ -169,7 +170,7 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
         // FIXME: This error is HUGE
         glm::vec3 asd = faceToWorld(v.vFacePos);
         glm::vec3 delta = asd - v.vWorldPos;
-        AFW_ASSERT(abs(delta.x) < 10.f && abs(delta.y) < 10.f && abs(delta.z) < 10.f);
+        AFW_ASSERT(abs(delta.x) < 1.f && abs(delta.y) < 1.f && abs(delta.z) < 1.f);
 
         updateMins2D(vPlaneMins, v.vPlanePos);
         updateMaxs2D(vPlaneMaxs, v.vPlanePos);

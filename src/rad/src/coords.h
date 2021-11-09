@@ -45,24 +45,25 @@ COORDINATE SYSTEM CONVERSION:
 */
 
 //! Converts world coords to plane coords.
-inline glm::vec2 worldToPlane(const glm::vec3 &world, const glm::vec3 &vI, const glm::vec3 &vJ) {
-    return glm::vec2(glm::dot(world, vI), glm::dot(world, vJ));
+inline glm::dvec2 worldToPlane(const glm::dvec3 &world, const glm::dvec3 &vI,
+                               const glm::dvec3 &vJ) {
+    return glm::dvec2(glm::dot(world, vI), glm::dot(world, vJ));
 }
 
 //! Converts plane coords to world coords
-inline glm::vec3 planeToWorld(const glm::vec2 &plane, const glm::vec3 &vWorldOrigin,
-                              const glm::vec3 &vI, const glm::vec3 &vJ) {
-    return vWorldOrigin + plane.x * vI + plane.y * vJ;
+inline glm::dvec3 planeToWorld(const glm::dvec2 &plane, const glm::dvec3 &vWorldOrigin,
+                              const glm::dvec3 &vI, const glm::dvec3 &vJ) {
+    return vWorldOrigin + (double)plane.x * vI + (double)plane.y * vJ;
 }
 
 //! Converts plane coords to face coords.
-inline glm::vec2 planeToFace(const glm::vec2 &plane, const glm::vec2 &vI, const glm::vec2 &vJ) {
-    return glm::vec2(glm::dot(plane, vI), glm::dot(plane, vJ));
+inline glm::dvec2 planeToFace(const glm::dvec2 &plane, const glm::dvec2 &vI, const glm::dvec2 &vJ) {
+    return glm::dvec2(glm::dot(plane, vI), glm::dot(plane, vJ));
 }
 
 //! Converts face coords to plane coords.
-inline glm::vec2 faceToPlane(const glm::vec2 &face, const glm::vec2 &vI, const glm::vec2 &vJ) {
-    return face.x * vI + face.y * vJ;
+inline glm::dvec2 faceToPlane(const glm::dvec2 &face, const glm::dvec2 &vI, const glm::dvec2 &vJ) {
+    return (double)face.x * vI + (double)face.y * vJ;
 }
 
 } // namespace rad
