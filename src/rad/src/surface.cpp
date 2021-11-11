@@ -103,8 +103,10 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
     pPlane = &radSim.m_Planes.at(iPlane);
 
     if (nPlaneSide) {
+        flPlaneDist = -pPlane->fDist;
         vNormal = -pPlane->vNormal;
     } else {
+        flPlaneDist = pPlane->fDist;
         vNormal = pPlane->vNormal;
     }
 

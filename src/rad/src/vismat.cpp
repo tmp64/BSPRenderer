@@ -124,7 +124,6 @@ size_t rad::VisMat::calculateOffsets(std::vector<size_t> &offsets) {
 }
 
 void rad::VisMat::buildVisLeaves(size_t i) {
-    int lface, facenum;
     uint8_t pvs[(bsp::MAX_MAP_LEAFS + 7) / 8];
 
     auto &leaves = m_RadSim.m_pLevel->getLeaves();
@@ -140,7 +139,7 @@ void rad::VisMat::buildVisLeaves(size_t i) {
     const bsp::BSPLeaf *srcleaf = &leaves[i];
 
     if (srcleaf->nVisOffset == -1) {
-        // Skip leaves wothout vis data
+        // Skip leaves without vis data
         return;
     }
 
@@ -152,8 +151,8 @@ void rad::VisMat::buildVisLeaves(size_t i) {
     // leaf, and process the patches that
     // actually have origins inside
     //
-    for (lface = 0; lface < srcleaf->nMarkSurfaces; lface++) {
-        facenum = marksurfaces[srcleaf->iFirstMarkSurface + lface];
+    for (int lface = 0; lface < srcleaf->nMarkSurfaces; lface++) {
+        int facenum = marksurfaces[srcleaf->iFirstMarkSurface + lface];
         Face &face = m_RadSim.m_Faces[facenum];
 
         for (PatchIndex patchIdx = 0; patchIdx < face.iNumPatches; patchIdx++) {
@@ -214,10 +213,16 @@ void rad::VisMat::buildVisRow(PatchIndex patchnum, uint8_t *pvs, size_t bitpos, 
 }
 
 void rad::VisMat::testPatchToFace(PatchIndex patchnum, int facenum, size_t bitpos) {
+    const auto &face = m_RadSim.m_Faces[facenum];
     PatchRef patch(m_RadSim.m_Patches, patchnum);
 
+    if (glm::dot(patch.getOrigin(), face.vNormal) - face.flPlaneDist < 0) {
+        // Patch behind the plane
+        return;
+    }
+
     for (PatchIndex i = 0; i < m_RadSim.m_Faces[facenum].iNumPatches; i++) {
-        PatchIndex m = m_RadSim.m_Faces[facenum].iFirstPatch + i;
+        PatchIndex m = face.iFirstPatch + i;
         PatchRef patch2(m_RadSim.m_Patches, m);
 
         // check vis between patch and patch2

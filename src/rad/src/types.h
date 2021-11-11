@@ -49,6 +49,7 @@ struct Face : public bsp::BSPFace {
     //! Flags (see FACE_ constants).
     unsigned iFlags = 0;
 
+    float flPlaneDist;
     glm::vec3 vNormal;                //! World normal vector. +/- pPlane->vNormal
     glm::dvec3 vWorldOrigin;          //!< Origin of face coord system.
     glm::dvec3 vFaceI, vFaceJ;        //!< Face axis in world coords.
