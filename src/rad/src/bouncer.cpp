@@ -173,7 +173,7 @@ void rad::Bouncer::addDiffuseSkylight(PatchRef &patch, const glm::vec3 &vSkyColo
     for (size_t i = 0; i < std::size(AVER_TEX_NORMALS); i++) {
         const glm::vec3 &anorm = AVER_TEX_NORMALS[i];
 
-        float cosangle = -glm::dot(normal, anorm);
+        float cosangle = glm::dot(normal, anorm);
 
         if (cosangle < 0.001f) {
             continue;
