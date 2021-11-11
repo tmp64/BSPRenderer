@@ -96,6 +96,10 @@ public:
     //! @returns the material used by the surface.
     Material *getSurfaceMaterial(int surface);
 
+    //! Reloads the custom lightmap file synchronously.
+    //! Can't be called during loading.
+    void reloadCustomLightmaps();
+
 #ifdef RENDERER_SUPPORT_TINTING
     //! Allows tinting world or entity surfaces.
     //! @param  surface The surface index

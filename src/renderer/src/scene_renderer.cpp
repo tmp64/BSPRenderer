@@ -322,6 +322,10 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
             ImGui::EndCombo();
         }
 
+        if (ImGui::Button("Reload lightmaps")) {
+            reloadCustomLightmaps();
+        }
+
         ImGui::End();
     }
 }
@@ -350,6 +354,14 @@ bool SceneRenderer::addEntity(ClientEntity *pClent) {
 
 Material *SceneRenderer::getSurfaceMaterial(int surface) {
     return m_Data.surfaces[surface].m_pMat;
+}
+
+void SceneRenderer::reloadCustomLightmaps() {
+    AFW_ASSERT_REL(!m_pLoadingState);
+    m_pLoadingState = std::make_unique<LoadingState>();
+    asyncLoadCustomLightmaps();
+    finishLoadCustomLightmaps();
+    m_pLoadingState = nullptr;
 }
 
 #ifdef RENDERER_SUPPORT_TINTING
