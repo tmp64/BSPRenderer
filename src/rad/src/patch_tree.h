@@ -17,9 +17,11 @@ public:
 
     //! Samples light from patches in the square of size radius and center at pos
     //! @returns true if light was sampled (there are patches in that radius)
-    void sampleLight(const glm::vec2 &pos, float radius, float filterk, glm::vec3 &out, float &weightSum);
+    void sampleLight(const glm::vec2 &pos, float radius, float filterk, glm::vec3 &out, float &weightSum, bool checkTrace);
 
 private:
+    static constexpr float TRACE_OFFSET = 0.1f;
+
     enum class PatchPos
     {
         Inside,          //!< Patch is completely inside the face

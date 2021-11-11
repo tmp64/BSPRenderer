@@ -85,7 +85,7 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
             float radius = FILTER_RADIUS * maxPixelSize;
 
             // Sample from face
-            patchTrees[faceIdx].sampleLight(luxelPos, radius, filterk, output, weightSum);
+            patchTrees[faceIdx].sampleLight(luxelPos, radius, filterk, output, weightSum, false);
 
             if (bSampleNeighbours) {
                 // Sample from neighbours
@@ -100,7 +100,7 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
                         normalDir == !!neighbour.nPlaneSide) {
                         glm::vec2 luxelPosHere = neighbour.worldToFace(luxelWorldPos);
                         patchTrees[neighbourIdx].sampleLight(luxelPosHere, radius, filterk, output,
-                                                             weightSum);
+                                                             weightSum, true);
                     }
                 }
             }

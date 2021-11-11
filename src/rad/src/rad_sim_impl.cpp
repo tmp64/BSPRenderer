@@ -317,6 +317,10 @@ void rad::RadSimImpl::updateProgress(double progress) {
     }
 }
 
+int rad::RadSimImpl::traceLine(glm::vec3 from, glm::vec3 to) {
+    return m_pLevel->traceLine(from, to);
+}
+
 std::string rad::RadSimImpl::getBuildDirPath() {
     return fmt::format("assets:mapsrc/build/{}", m_LevelName);
 }

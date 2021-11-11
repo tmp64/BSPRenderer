@@ -102,6 +102,10 @@ public:
     //! Calls the progress callback with specified progress.
     void updateProgress(double progress);
 
+    //! Checks if there is a clear path between two points.
+    //! @returns (CONTENTS_SOLID or CONTENTS_SKY) or CONTENTS_EMPTY if didn't hit.
+    int traceLine(glm::vec3 from, glm::vec3 to);
+
     std::string getBuildDirPath();
     std::string getLevelConfigPath();
     std::string getVisMatPath();

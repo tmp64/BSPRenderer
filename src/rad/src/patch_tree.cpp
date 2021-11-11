@@ -235,7 +235,7 @@ void rad::PatchTree::buildTree() {
 }
 
 void rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, float filterk, glm::vec3 &out,
-                                 float &weightSum) {
+                                 float &weightSum, bool checkTrace) {
     // Check if pos intersects with the face
     glm::vec2 corners[4];
     getCorners(pos, radius * 2.0f, corners);
@@ -252,13 +252,17 @@ void rad::PatchTree::sampleLight(const glm::vec2 &pos, float radius, float filte
 
 #else
     PatchIndex count = m_pFace->iNumPatches;
+    glm::vec3 tracePos = m_pFace->faceToWorld(pos) + m_pFace->vNormal * TRACE_OFFSET;
+    // TODO: tracePos should be clamped to face's edge
 
     for (PatchIndex i = 0; i < count; i++) {
         PatchRef patch(m_pRadSim->m_Patches, m_pFace->iFirstPatch + i);
 
         glm::vec2 d = patch.getFaceOrigin() - pos;
+        glm::vec3 patchTracePos = patch.getOrigin() + patch.getNormal() * TRACE_OFFSET;
 
-        if (std::abs(d.x) <= radius && std::abs(d.y) <= radius) {
+        if (std::abs(d.x) <= radius && std::abs(d.y) <= radius &&
+            (!checkTrace || m_pRadSim->traceLine(tracePos, patchTracePos) == bsp::CONTENTS_EMPTY)) {
             float weight = lightmapFilter(d.x * filterk) * lightmapFilter(d.y * filterk);
             out += weight * patch.getFinalColor();
             weightSum += weight;

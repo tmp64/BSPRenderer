@@ -230,8 +230,7 @@ void rad::VisMat::testPatchToFace(PatchIndex patchnum, int facenum, size_t bitpo
         // and p2 is visible from p1
         glm::vec3 org1 = patch.getOrigin();
         glm::vec3 org2 = patch2.getOrigin();
-        if (m > patchnum && m_RadSim.m_pLevel->traceLine(org1, org2) == bsp::CONTENTS_EMPTY) {
-
+        if (m > patchnum && m_RadSim.traceLine(org1, org2) == bsp::CONTENTS_EMPTY) {
             // patchnum can see patch m
             size_t bitset = bitpos + m;
 
