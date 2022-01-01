@@ -10,9 +10,7 @@ class PatchRef;
 
 class PatchTree {
 public:
-    void createPatches(RadSimImpl *pRadSim, Face &face, std::atomic<PatchIndex> &globalPatchCount,
-                       float flMinPatchSize);
-    PatchIndex copyPatchesToTheList(PatchIndex offset, appfw::SHA256 &hash);
+    void init(RadSimImpl *pRadSim, Face &face);
     void buildTree();
 
     //! Samples light from patches in the square of size radius and center at pos
@@ -21,21 +19,6 @@ public:
 
 private:
     static constexpr float TRACE_OFFSET = 0.1f;
-
-    enum class PatchPos
-    {
-        Inside,          //!< Patch is completely inside the face
-        PartiallyInside, //!< Patch is partially inside and outside
-        Outside          //!< Patch is completely outside the face
-    };
-
-    struct MiniPatch {
-        MiniPatch *pNext = nullptr;
-        float flSize = 0;
-
-        //! Face coords of the lower corner of the patch (not the center!)
-        glm::vec2 vFaceOrigin;
-    };
 
     struct Node {
         //! Size of the node
@@ -64,20 +47,10 @@ private:
 
     RadSimImpl *m_pRadSim = nullptr;
     Face *m_pFace = nullptr;
-    MiniPatch *m_pPatches = nullptr;
     Node m_RootNode;
-
-    //! Divides the patch
-    //! @return number of created patches
-    PatchIndex subdividePatch(MiniPatch *patch, MiniPatch *&newFirstPatch, MiniPatch *&newLastPatch,
-                        bool &keepPatch, float flMinPatchSize) noexcept;
 
     void recursiveSample(Node *node, const glm::vec2 &pos, float radius, glm::vec3 &out,
                          glm::vec2 corners[4], float &weightSum);
-
-    PatchPos checkPatchPos(MiniPatch *patch) noexcept;
-
-    bool isInFace(glm::vec2 point) noexcept;
 
     static void getCorners(glm::vec2 point, float size, glm::vec2 corners[4]);
     static bool pointIntersectsWithRect(glm::vec2 point, glm::vec2 origin, float size);

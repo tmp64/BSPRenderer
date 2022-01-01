@@ -16,7 +16,11 @@ static_assert(std::atomic<PatchIndex>::is_always_lock_free, "PatchIndex atomic i
  */
 constexpr PatchIndex MAX_PATCH_COUNT = std::numeric_limits<PatchIndex>::max();
 
-//! Min patch size if face is too small (less than a base patch in X or Y)
+//! Size of a "small" face in units.
+constexpr float SMALL_FACE_SIZE = 12.0f;
+
+//! Min patch size if face is too small. The actual size may be down to a half of this value
+//! (depends on original size before subdivision).
 constexpr float MIN_PATCH_SIZE_FOR_SMALL_FACES = 0.51f;
 
 /**

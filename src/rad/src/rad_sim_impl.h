@@ -73,6 +73,9 @@ public:
     //! etc). Valid after loadLevelConfig.
     inline appfw::SHA256::Digest getPatchHash() { return m_PatchHash; }
 
+    //! Returns minimum allowed patch size
+    inline float getMinPatchSize() { return m_Profile.flMinPatchSize; }
+
     //! Returns whether a valid visibility matrix is loaded.
     //! If false, call loadVisMat.
     bool isVisMatValid();
@@ -120,9 +123,6 @@ public:
     static inline tf::Executor m_Executor;
 
 private:
-
-    //! Returns minimum allowed patch size
-    inline float getMinPatchSize() { return m_Profile.flMinPatchSize; }
 
     void loadLevelConfig();
     void loadBuildProfile(const std::string &profileName);

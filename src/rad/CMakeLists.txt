@@ -11,6 +11,8 @@ set(SOURCE_FILES
 	src/level_config.cpp
 	src/lightmap_writer.cpp
 	src/lightmap_writer.h
+	src/patch_divider.cpp
+	src/patch_divider.h
 	src/patch_list.cpp
 	src/patch_list.h
 	src/patch_tree.cpp

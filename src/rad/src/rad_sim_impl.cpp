@@ -5,6 +5,7 @@
 #include <appfw/timer.h>
 #include <fstream>
 #include "lightmap_writer.h"
+#include "patch_divider.h"
 
 rad::RadSimImpl::RadSimImpl()
     : m_VisMat(*this)
@@ -192,7 +193,8 @@ void rad::RadSimImpl::createPatches(appfw::SHA256 &hash) {
     timer.start();
     m_PatchTrees.resize(m_Faces.size());
 
-    std::atomic<PatchIndex> totalPatchCount;
+    PatchDivider divider;
+    uint64_t totalPatchCount = 0;
 
     for (size_t i = 0; i < m_Faces.size(); i++) {
         Face &face = m_Faces[i];
@@ -201,14 +203,17 @@ void rad::RadSimImpl::createPatches(appfw::SHA256 &hash) {
             continue;
         }
 
-        // This can be running in multiple threads
-        // (but it takes less than a second so it's fine)
-        PatchTree &tree = m_PatchTrees[i];
-        tree.createPatches(this, face, totalPatchCount, getMinPatchSize());
+        m_PatchTrees[i].init(this, face);
+        totalPatchCount += divider.createPatches(this, face, (PatchIndex)totalPatchCount);
+
+        if (totalPatchCount > MAX_PATCH_COUNT) {
+            throw std::runtime_error(
+                fmt::format("Error: Patch limit reached ({})", MAX_PATCH_COUNT));
+        }
     }
 
     //-------------------------------------------------------------------------
-    PatchIndex patchCount = totalPatchCount.load();
+    PatchIndex patchCount = (PatchIndex)totalPatchCount;
     m_Patches.allocate(patchCount);
     printi("Patch count: {}", patchCount);
     printi("Memory used by patches: {:.3} MiB",
@@ -227,21 +232,9 @@ void rad::RadSimImpl::createPatches(appfw::SHA256 &hash) {
 
     //-------------------------------------------------------------------------
     printn("Transferring patches into the list");
-
-    PatchIndex offset = 0;
-    for (size_t i = 0; i < m_Faces.size(); i++) {
-        Face &face = m_Faces[i];
-
-        if (!face.hasLightmap()) {
-            continue;
-        }
-
-        face.iFirstPatch = offset;
-        face.iNumPatches = m_PatchTrees[i].copyPatchesToTheList(offset, hash);
-        offset += face.iNumPatches;
-    }
-
-    AFW_ASSERT(offset == m_Patches.size());
+    [[maybe_unused]] PatchIndex transferPatchesCount = 0;
+    transferPatchesCount = divider.transferPatches(this, hash);
+    AFW_ASSERT_REL(transferPatchesCount == m_Patches.size());
 
     //-------------------------------------------------------------------------
     printn("Building quadtrees");
