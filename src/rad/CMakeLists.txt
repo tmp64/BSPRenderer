@@ -8,6 +8,7 @@ set(SOURCE_FILES
 	src/bouncer.cpp
 	src/bouncer.h
 	src/coords.h
+	src/filters.h
 	src/level_config.cpp
 	src/lightmap_writer.cpp
 	src/lightmap_writer.h
@@ -15,8 +16,6 @@ set(SOURCE_FILES
 	src/patch_divider.h
 	src/patch_list.cpp
 	src/patch_list.h
-	src/patch_tree.cpp
-	src/patch_tree.h
 	src/rad_config.cpp
 	src/rad_sim.cpp
 	src/rad_sim_impl.cpp

@@ -17,6 +17,7 @@ public:
     void saveLightmap();
 
 private:
+    static constexpr float TRACE_OFFSET = 0.1f;
     static constexpr float FILTER_RADIUS = 2.0f;
 
     struct FaceLightmap {
@@ -40,8 +41,13 @@ private:
 
     void processFace(size_t faceIdx);
     void sampleLightmap(FaceLightmap &lm, size_t faceIdx);
+    void sampleFace(const Face &face, glm::vec2 luxelPos, float radius, glm::vec2 filterk,
+                    glm::vec3 &out, float &weightSum, bool checkTrace);
     void createBlock();
     void writeLightmapFile();
+
+    static void getCorners(glm::vec2 point, float size, glm::vec2 corners[4]);
+    static bool intersectAABB(const glm::vec2 b1[2], const glm::vec2 b2[2]);
 };
 
 } // namespace rad

@@ -191,7 +191,6 @@ void rad::RadSimImpl::createPatches(appfw::SHA256 &hash) {
     printn("Creating patches...");
     appfw::Timer timer;
     timer.start();
-    m_PatchTrees.resize(m_Faces.size());
 
     PatchDivider divider;
     uint64_t totalPatchCount = 0;
@@ -203,7 +202,6 @@ void rad::RadSimImpl::createPatches(appfw::SHA256 &hash) {
             continue;
         }
 
-        m_PatchTrees[i].init(this, face);
         totalPatchCount += divider.createPatches(this, face, (PatchIndex)totalPatchCount);
 
         if (totalPatchCount > MAX_PATCH_COUNT) {
@@ -235,19 +233,6 @@ void rad::RadSimImpl::createPatches(appfw::SHA256 &hash) {
     [[maybe_unused]] PatchIndex transferPatchesCount = 0;
     transferPatchesCount = divider.transferPatches(this, hash);
     AFW_ASSERT_REL(transferPatchesCount == m_Patches.size());
-
-    //-------------------------------------------------------------------------
-    printn("Building quadtrees");
-
-    for (size_t i = 0; i < m_Faces.size(); i++) {
-        Face &face = m_Faces[i];
-
-        if (!face.hasLightmap()) {
-            continue;
-        }
-
-        m_PatchTrees[i].buildTree();
-    }
 
     timer.stop();
     printi("Create patches: {:.3} s", timer.dseconds());

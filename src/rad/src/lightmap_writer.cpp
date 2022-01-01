@@ -1,6 +1,11 @@
 #include <appfw/timer.h>
 #include <app_base/lightmap.h>
 #include "lightmap_writer.h"
+#include "filters.h"
+
+static float lightmapFilter(float x) {
+    return rad::filters::bspline(x);
+}
 
 void rad::LightmapWriter::saveLightmap() {
     printn("Sampling lightmaps...");
@@ -64,7 +69,6 @@ void rad::LightmapWriter::processFace(size_t faceIdx) {
 
 void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
     glm::ivec2 lmSize = lm.vSize;
-    auto &patchTrees = m_RadSim.m_PatchTrees;
     bool bSampleNeighbours = m_RadSim.m_Profile.bSampleNeighbours;
     const Face &face = m_RadSim.m_Faces[faceIdx];
 
@@ -85,7 +89,7 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
             float radius = FILTER_RADIUS * maxPixelSize;
 
             // Sample from face
-            patchTrees[faceIdx].sampleLight(luxelPos, radius, filterk, output, weightSum, false);
+            sampleFace(face, luxelPos, radius, glm::vec2(filterk), output, weightSum, false);
 
             if (bSampleNeighbours) {
                 // Sample from neighbours
@@ -99,8 +103,8 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
                     if (neighbourIdx != faceIdx && neighbour.hasLightmap() &&
                         normalDir == !!neighbour.nPlaneSide) {
                         glm::vec2 luxelPosHere = neighbour.worldToFace(luxelWorldPos);
-                        patchTrees[neighbourIdx].sampleLight(luxelPosHere, radius, filterk, output,
-                                                             weightSum, true);
+                        sampleFace(face, luxelPosHere, radius, glm::vec2(filterk), output,
+                                   weightSum, true);
                     }
                 }
             }
@@ -117,6 +121,45 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
             luxel.g = (rand() % 255) / 255.0f;
             luxel.b = (rand() % 255) / 255.0f;
 #endif
+        }
+    }
+}
+
+//! @param  face        The face
+//! @param  luxelPos    Position of the center in face coords
+//! @param  radius      Half-size of the square
+//! @param  filterk     Filter coefficient
+//! @param  out         Output sum of colors
+//! @prarm  weightSum   Sum of weights
+//! @param  checkTrace  Whether to check if there is visibility from luxelPos to sampled patch
+void rad::LightmapWriter::sampleFace(const Face &face, glm::vec2 luxelPos, float radius,
+                                     glm::vec2 filterk, glm::vec3 &out, float &weightSum,
+                                     bool checkTrace) {
+    // Check if pos intersects with the face
+    glm::vec2 corners[4];
+    getCorners(luxelPos, radius * 2.0f, corners);
+    glm::vec2 faceAABB[] = {face.vFaceMins, face.vFaceMaxs};
+    glm::vec2 luxelAABB[] = {corners[0], corners[3]};
+
+    if (!intersectAABB(faceAABB, luxelAABB)) {
+        return;
+    }
+
+    PatchIndex count = face.iNumPatches;
+    glm::vec3 tracePos = face.faceToWorld(luxelPos) + face.vNormal * TRACE_OFFSET;
+    // TODO: tracePos should be clamped to face's edge
+
+    for (PatchIndex i = 0; i < count; i++) {
+        PatchRef patch(m_RadSim.m_Patches, face.iFirstPatch + i);
+
+        glm::vec2 d = patch.getFaceOrigin() - luxelPos;
+        glm::vec3 patchTracePos = patch.getOrigin() + patch.getNormal() * TRACE_OFFSET;
+
+        if (std::abs(d.x) <= radius && std::abs(d.y) <= radius &&
+            (!checkTrace || m_RadSim.traceLine(tracePos, patchTracePos) == bsp::CONTENTS_EMPTY)) {
+            float weight = lightmapFilter(d.x * filterk.x) * lightmapFilter(d.y * filterk.y);
+            out += weight * patch.getFinalColor();
+            weightSum += weight;
         }
     }
 }
@@ -210,4 +253,22 @@ void rad::LightmapWriter::writeLightmapFile() {
     }
 
     printi("Write lightmap file: {:.3} s", timer.dseconds());
+}
+
+void rad::LightmapWriter::getCorners(glm::vec2 point, float size, glm::vec2 corners[4]) {
+    size = size / 2.0f;
+    corners[0] = point + glm::vec2(-size, -size);
+    corners[1] = point + glm::vec2(size, -size);
+    corners[2] = point + glm::vec2(-size, size);
+    corners[3] = point + glm::vec2(size, size);
+}
+
+bool rad::LightmapWriter::intersectAABB(const glm::vec2 b1[2], const glm::vec2 b2[2]) {
+    glm::vec2 pos1 = (b1[0] + b1[1]) / 2.0f;
+    glm::vec2 pos2 = (b2[0] + b2[1]) / 2.0f;
+    glm::vec2 half1 = b1[1] - pos1;
+    glm::vec2 half2 = b2[1] - pos2;
+    glm::vec2 d = pos2 - pos1;
+    return half1.x + half2.x >= std::abs(d.x)
+        && half1.y + half2.y >= std::abs(d.y);
 }

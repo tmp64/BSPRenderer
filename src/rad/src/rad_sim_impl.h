@@ -11,7 +11,6 @@
 
 #include "types.h"
 #include "patch_list.h"
-#include "patch_tree.h"
 #include "vismat.h"
 #include "sparse_vismat.h"
 #include "vflist.h"
@@ -37,7 +36,6 @@ public:
     BuildProfile m_Profile;
     std::vector<Plane> m_Planes;
     std::vector<Face> m_Faces;
-    std::vector<PatchTree> m_PatchTrees;
     PatchList m_Patches;
     VisMat m_VisMat;
     SparseVisMat m_SVisMat;
