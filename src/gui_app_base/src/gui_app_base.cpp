@@ -57,6 +57,11 @@ void GuiAppBase::beginTick() {
 }
 
 void GuiAppBase::tick() {
+    if (AppExtconComponent::get().isHostFocusRequested()) {
+        SDL_Window *mainWindow = MainWindowComponent::get().getWindow();
+        SDL_RaiseWindow(mainWindow);
+    }
+
     m_pDevConsole->tick();
     m_pProfilerUI->tick();
 }

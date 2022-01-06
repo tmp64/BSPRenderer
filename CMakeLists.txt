@@ -37,6 +37,8 @@ set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(yaml_cpp_fetch)
 
 set(APPFW_ENABLE_GLM ON)
+set(APPFW_ENABLE_NETWORK ON)
+set(APPFW_ENABLE_EXTCON ON)
 add_subdirectory(external/appfw)
 add_subdirectory(external/glad_debug)
 add_subdirectory(external/imgui)

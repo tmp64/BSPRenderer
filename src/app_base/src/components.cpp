@@ -26,3 +26,30 @@ AppConfigComponent::AppConfigComponent() {
     m_Config.mountFilesystem();
     m_Config.executeCommands();
 }
+
+AppExtconComponent::AppExtconComponent() {
+    int port = getCommandLine().getArgInt("--extcon-port", 0);
+
+    if (port > 0 && port <= 65535) {
+        setTickEnabled(true);
+        appfw::getConsole().addConsoleReceiver(&m_Host);
+        m_Host.enable(appfw::ADDR4_LOOPBACK, (uint16_t)port);
+    }
+}
+
+AppExtconComponent::~AppExtconComponent() {
+    if (m_Host.isEnabled()) {
+        m_Host.disable();
+        appfw::getConsole().removeConsoleReceiver(&m_Host);
+    }
+}
+
+void AppExtconComponent::tick() {
+    AFW_ASSERT(m_Host.isEnabled());
+    m_Host.tick();
+    m_bFocusRequested = m_Host.isHostFocusRequested();
+}
+
+void AppExtconComponent::requestClientFocus() {
+    m_Host.requestCientFocus();
+}

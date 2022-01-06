@@ -99,6 +99,7 @@ private:
     appfw::ProfData m_ProfData;
 
     ComponentSubsystem m_Components;
+    AppExtconComponent m_Extcon;
     AppFilesystemComponent m_FileSystem;
     AppConfigComponent m_Config;
 

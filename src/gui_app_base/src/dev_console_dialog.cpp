@@ -39,10 +39,17 @@ DevConsoleDialog::~DevConsoleDialog() {
 }
 
 void DevConsoleDialog::tick() {
+    auto &extcon = AppExtconComponent::get();
+    bool extconEnabled = extcon.isExtconEnabled();
+
+    if (extconEnabled && consoleKeyBind.isPressed()) {
+        extcon.requestClientFocus();
+    }
+
     if (dev_console.getValue()) {
         showDialog();
     } else {
-        if (consoleKeyBind.isPressed()) {
+        if (!extconEnabled && consoleKeyBind.isPressed()) {
             dev_console.setValue(true);
         }
     }
