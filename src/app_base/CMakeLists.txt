@@ -32,12 +32,8 @@ target_link_libraries(app_base
 	yaml-cpp
 )
 
-appfw_get_std_pch(PCH_STD_HEADERS)
-appfw_get_pch(PCH_APPFW_HEADERS)
 target_precompile_headers(app_base PRIVATE
-    ${PCH_STD_HEADERS}
-    ${PCH_APPFW_HEADERS}
-	<taskflow/taskflow.hpp>
+    ${PCH_APP_BASE_HEADERS}
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})

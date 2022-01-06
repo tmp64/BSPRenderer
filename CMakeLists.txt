@@ -45,6 +45,21 @@ add_subdirectory(external/imgui)
 add_subdirectory(external/taskflow)
 message(STATUS ">>>>>> Dependencies end")
 
+# PCH
+appfw_get_std_pch(PCH_STD_HEADERS)
+appfw_get_pch(PCH_APPFW_HEADERS)
+
+set(PCH_APP_BASE_HEADERS
+	${PCH_STD_HEADERS}
+    ${PCH_APPFW_HEADERS}
+	<app_base/app_base.h>
+)
+
+set(PCH_GUI_APP_BASE_HEADERS
+	${PCH_APP_BASE_HEADERS}
+	<gui_app_base/gui_app_base.h>
+)
+
 # Libraries
 add_subdirectory(src/stb)
 add_subdirectory(src/app_base)

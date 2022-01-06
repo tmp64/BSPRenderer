@@ -46,11 +46,8 @@ target_link_libraries(rad
 	yaml-cpp
 )
 
-appfw_get_std_pch(PCH_STD_HEADERS)
-appfw_get_pch(PCH_APPFW_HEADERS)
 target_precompile_headers(rad PRIVATE
-    ${PCH_STD_HEADERS}
-    ${PCH_APPFW_HEADERS}
+    ${PCH_APP_BASE_HEADERS}
 	[["rad_sim_impl.h"]]
 )
 

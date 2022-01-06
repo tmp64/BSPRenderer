@@ -52,11 +52,8 @@ target_link_libraries(renderer
 	stb
 )
 
-appfw_get_std_pch(PCH_STD_HEADERS)
-appfw_get_pch(PCH_APPFW_HEADERS)
 target_precompile_headers(renderer PRIVATE
-    ${PCH_STD_HEADERS}
-    ${PCH_APPFW_HEADERS}
+    ${PCH_GUI_APP_BASE_HEADERS}
 )
 
 # TextureBlock is extremely slow without optiomizations

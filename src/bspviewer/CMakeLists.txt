@@ -55,11 +55,8 @@ target_link_libraries(bspviewer
 	material_props
 )
 
-appfw_get_std_pch(PCH_STD_HEADERS)
-appfw_get_pch(PCH_APPFW_HEADERS)
 target_precompile_headers(bspviewer PRIVATE
-    ${PCH_STD_HEADERS}
-    ${PCH_APPFW_HEADERS}
+    ${PCH_GUI_APP_BASE_HEADERS}
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})

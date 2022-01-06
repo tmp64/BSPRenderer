@@ -42,11 +42,8 @@ target_link_libraries(gui_app_base
 	SDL2::SDL2main
 )
 
-appfw_get_std_pch(PCH_STD_HEADERS)
-appfw_get_pch(PCH_APPFW_HEADERS)
 target_precompile_headers(gui_app_base PRIVATE
-    ${PCH_STD_HEADERS}
-    ${PCH_APPFW_HEADERS}
+    ${PCH_GUI_APP_BASE_HEADERS}
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})
