@@ -7,6 +7,8 @@
 #include <appfw/sha256.h>
 #include <appfw/utils.h>
 #include <bsp/level.h>
+#include <bsp/wad_file.h>
+#include <material_props/material_prop_loader.h>
 #include <rad/rad_sim.h>
 
 #include "types.h"
@@ -15,7 +17,7 @@
 #include "sparse_vismat.h"
 #include "vflist.h"
 #include "bouncer.h"
-
+#include "material.h"
 
 namespace rad {
 
@@ -33,7 +35,11 @@ public:
     const bsp::Level *m_pLevel = nullptr;
     std::string m_LevelName;
     LevelConfig m_LevelConfig;
+    YAML::Node m_SurfaceConfig;
     BuildProfile m_Profile;
+    std::map<std::string, bsp::WADFile> m_Wads;
+    MaterialPropLoader m_MatPropLoader;
+    std::vector<Material> m_Materials;
     std::vector<Plane> m_Planes;
     std::vector<Face> m_Faces;
     PatchList m_Patches;
@@ -109,6 +115,7 @@ public:
 
     std::string getBuildDirPath();
     std::string getLevelConfigPath();
+    std::string getSurfaceConfigPath();
     std::string getVisMatPath();
     std::string getVFListPath();
     std::string getLightmapPath();
@@ -124,6 +131,8 @@ private:
 
     void loadLevelConfig();
     void loadBuildProfile(const std::string &profileName);
+    void loadWADs();
+    void loadMaterials();
 
     //! Loads planes from the BSP.
     void loadPlanes();

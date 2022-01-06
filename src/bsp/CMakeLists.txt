@@ -1,6 +1,7 @@
 set(BSP_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/bsp_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/level.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/utils.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/wad_file.h
 )
 

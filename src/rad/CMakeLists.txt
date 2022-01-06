@@ -12,6 +12,8 @@ set(SOURCE_FILES
 	src/level_config.cpp
 	src/lightmap_writer.cpp
 	src/lightmap_writer.h
+	src/material.cpp
+	src/material.h
 	src/patch_divider.cpp
 	src/patch_divider.h
 	src/patch_list.cpp
@@ -42,6 +44,7 @@ target_link_libraries(rad
 	appfw
 	app_base
 	bsp
+	material_props
 	taskflow
 	yaml-cpp
 )

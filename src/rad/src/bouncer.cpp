@@ -32,6 +32,10 @@ static glm::vec3 getVecFromAngles(float pitch, float yaw) {
     return glm::normalize(dir);
 }
 
+static bool isNullVector(glm::vec3 v) {
+    return v.x == 0 && v.y == 0 && v.z == 0;
+}
+
 void rad::Bouncer::setup(int bounceCount) {
     m_iBounceCount = bounceCount;
     m_uPatchCount = m_RadSim.m_Patches.size();
@@ -53,8 +57,6 @@ void rad::Bouncer::addPatchLight(PatchIndex patch, const glm::vec3 &light) {
 }
 
 void rad::Bouncer::bounceLight() {
-    float refl = m_RadSim.m_Config.flBaseRefl * m_RadSim.m_LevelConfig.flRefl;
-
     // Copy bounce 0 into the lightmap
     for (PatchIndex i = 0; i < m_uPatchCount; i++) {
         PatchRef patch(m_RadSim.m_Patches, i);
@@ -87,7 +89,7 @@ void rad::Bouncer::bounceLight() {
             // Write it
             PatchRef patch(m_RadSim.m_Patches, i);
             AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
-            getPatchBounce(i, bounce) = m_PatchSum[i] * refl;
+            getPatchBounce(i, bounce) = m_PatchSum[i] * patch.getReflectivity();
             patch.getFinalColor() += getPatchBounce(i, bounce);
         }
     }
@@ -136,10 +138,10 @@ void rad::Bouncer::addTexLights() {
         const bsp::BSPTextureInfo &texinfo = m_RadSim.m_pLevel->getTexInfo()[face.iTextureInfo];
         const bsp::BSPMipTex &miptex = m_RadSim.m_pLevel->getTextures()[texinfo.iMiptex];
 
-        // TODO: Actual texinfo
-        if (miptex.szName[0] == '~') {
+        if (!isNullVector(face.vLightColor)) {
+            glm::vec3 light = face.vLightColor;
             for (PatchIndex p = face.iFirstPatch; p < face.iFirstPatch + face.iNumPatches; p++) {
-                addPatchLight(p, glm::vec3(1, 1, 1) * 50.f);
+                addPatchLight(p, light);
             }
         }
     }

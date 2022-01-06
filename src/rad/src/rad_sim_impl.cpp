@@ -1,9 +1,11 @@
 #include "rad_sim_impl.h"
 #include <algorithm>
+#include <fstream>
 #include <app_base/yaml.h>
 #include <appfw/binary_file.h>
 #include <appfw/timer.h>
-#include <fstream>
+#include <appfw/str_utils.h>
+#include <bsp/utils.h>
 #include "lightmap_writer.h"
 #include "patch_divider.h"
 
@@ -32,6 +34,8 @@ void rad::RadSimImpl::setLevel(const bsp::Level *pLevel, const std::string &name
 
     loadLevelConfig();
     loadBuildProfile(profileName);
+    loadWADs();
+    loadMaterials();
     loadPlanes();
     loadFaces();
     createPatches(hash);
@@ -116,9 +120,14 @@ void rad::RadSimImpl::loadLevelConfig() {
     m_LevelConfig.loadDefaults(m_Config);
 
     fs::path cfgPath = getFileSystem().findExistingFile(getLevelConfigPath(), std::nothrow);
-
     if (!cfgPath.empty()) {
         m_LevelConfig.loadLevelConfig(cfgPath);
+    }
+
+    fs::path surfPath = getFileSystem().findExistingFile(getSurfaceConfigPath(), std::nothrow);
+    if (!surfPath.empty()) {
+        std::ifstream file(surfPath);
+        m_SurfaceConfig = YAML::Load(file);
     }
 }
 
@@ -160,6 +169,70 @@ void rad::RadSimImpl::loadBuildProfile(const std::string &profileName) {
     m_Profile.finalize();
 }
 
+void rad::RadSimImpl::loadWADs() {
+    auto &ws = m_pLevel->getEntities().getWorldspawn();
+    std::string wads = ws.getValue<std::string>("wad", "");
+    std::vector<std::string> wadList = bsp::parseWadListString(wads);
+
+    for (const std::string &wadName : wadList) {
+        fs::path path = getFileSystem().findExistingFile("assets:" + wadName, std::nothrow);
+
+        if (path.empty()) {
+            printe("WAD file {} not found", wadName);
+            continue;
+        }
+
+        bsp::WADFile &wadFile = m_Wads[wadName];
+        wadFile.loadFromFile(path);
+    }
+
+    printi("Loaded {} WAD files", m_Wads.size());
+}
+
+void rad::RadSimImpl::loadMaterials() {
+    m_MatPropLoader.init(m_LevelName, "assets:sound/materials.txt", "assets:materials");
+    auto &textures = m_pLevel->getTextures();
+    m_Materials.resize(textures.size());
+
+    for (size_t i = 0; i < textures.size(); i++) {
+        Material &material = m_Materials[i];
+        const bsp::BSPMipTex &tex = textures[i];
+        const bsp::WADTexture *pWadTex = nullptr;
+        std::string wadName;
+
+        // Find the texture in WADs
+        for (auto &[name, wad] : m_Wads) {
+            auto &wadTextures = wad.getTextures();
+
+            for (const bsp::WADTexture &wadTex : wadTextures) {
+                if (!appfw::strcasecmp(wadTex.getName(), tex.szName)) {
+                    // Found the texture
+                    pWadTex = &wadTex;
+                    wadName = name;
+                    break;
+                }
+            }
+
+            if (pWadTex) {
+                break;
+            }
+        }
+
+        std::string texName = tex.szName;
+        appfw::strToLower(texName.begin(), texName.end());
+
+        if (pWadTex) {
+            // Texture is in the WAD
+            material.loadProps(m_MatPropLoader, texName, wadName);
+        } else {
+            // Texture is in the level
+            material.loadProps(m_MatPropLoader, texName, m_LevelName + ".bsp");
+        }
+    }
+
+    printi("Loaded {} materials", m_Materials.size());
+}
+
 void rad::RadSimImpl::loadPlanes() {
     m_Planes.resize(m_pLevel->getPlanes().size());
 
@@ -174,7 +247,7 @@ void rad::RadSimImpl::loadFaces() {
     size_t lightmapCount = 0;
 
     for (size_t i = 0; i < m_pLevel->getFaces().size(); i++) {
-        m_Faces[i].load(*this, m_pLevel->getFaces()[i]);
+        m_Faces[i].load(*this, m_pLevel->getFaces()[i], (int)i);
 
         // Add to plane
         m_Planes[m_Faces[i].iPlane].faces.push_back((unsigned)i);
@@ -305,6 +378,10 @@ std::string rad::RadSimImpl::getBuildDirPath() {
 
 std::string rad::RadSimImpl::getLevelConfigPath() {
     return fmt::format("assets:mapsrc/{}.rad.yaml", m_LevelName);
+}
+
+std::string rad::RadSimImpl::getSurfaceConfigPath() {
+    return fmt::format("assets:mapsrc/{}.rad.surf.yaml", m_LevelName);
 }
 
 std::string rad::RadSimImpl::getVisMatPath() {

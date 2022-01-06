@@ -89,7 +89,7 @@ void rad::Plane::load(RadSimImpl &radSim, const bsp::BSPPlane &bspPlane) {
     nType = bspPlane.nType;
 }
 
-void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
+void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace, int faceIndex) {
     // Copy BSPFace
     iPlane = bspFace.iPlane;
     nPlaneSide = bspFace.nPlaneSide;
@@ -185,5 +185,54 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace) {
 
     vFaceCenter /= (float)rawVerts.size();
 
-    flPatchSize = (float)radSim.m_Profile.iBasePatchSize;
+    // Properties
+    struct Props {
+        float flLightmapScale = 1.0f;
+        float flLightIntensityScale = 1.0f;
+        glm::vec3 vLightColor = glm::vec3(0, 0, 0); //!< In gamma space
+        float flLightIntensity = 0.0f;
+        float flReflectivity = 0.5f;
+    };
+
+    Props props;
+
+    // Load material props
+    Material &material = radSim.m_Materials.at(texInfo.iMiptex);
+    const MaterialProps &matProps = material.getProps();
+    props.flLightIntensityScale *= matProps.flLightIntensityScale;
+    props.vLightColor = matProps.vLightColor;
+    props.flLightIntensity = matProps.flLightIntensity;
+    props.flReflectivity = matProps.flReflectivity;
+
+    // Load surface props
+    YAML::Node surfNode = radSim.m_SurfaceConfig[std::to_string(faceIndex)];
+    if (surfNode) {
+        if (surfNode["lightmap_scale"]) {
+            props.flLightmapScale = surfNode["lightmap_scale"].as<float>();
+        }
+
+        if (surfNode["light_intensity_scale"]) {
+            props.flLightIntensityScale *= surfNode["light_intensity_scale"].as<float>();
+        }
+
+        if (surfNode["light_color"]) {
+            props.vLightColor = surfNode["light_color"].as<glm::vec3>() / 255.0f;
+        }
+
+        if (surfNode["light_intensity"]) {
+            props.flLightIntensity = surfNode["light_intensity"].as<float>();
+        }
+
+        if (surfNode["reflectivity"]) {
+            props.flReflectivity = surfNode["reflectivity"].as<float>();
+        }
+    }
+
+    // Convert the props
+    float textureLightDivisor = glm::length(texInfo.vS) * glm::length(texInfo.vT); // Intensity is brightness per square texel
+    vLightColor = radSim.gammaToLinear(props.vLightColor) *
+                  (props.flLightIntensity * props.flLightIntensityScale / textureLightDivisor);
+
+    flPatchSize = (float)radSim.m_Profile.iBasePatchSize / props.flLightmapScale;
+    flBaseReflectivity = props.flReflectivity;
 }

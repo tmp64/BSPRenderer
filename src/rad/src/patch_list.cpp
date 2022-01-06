@@ -8,6 +8,7 @@ void rad::PatchList::allocate(PatchIndex size) {
     m_vOrigin.resize(size);
     m_vNormal.resize(size);
     m_pPlane.resize(size);
+    m_Reflectivity.resize(size);
     m_FinalColor.resize(size);
 }
 
@@ -18,6 +19,7 @@ void rad::PatchList::clear() {
     m_vFaceOrigin.clear();
     m_vNormal.clear();
     m_pPlane.clear();
+    m_Reflectivity.clear();
     m_FinalColor.clear();
 }
 

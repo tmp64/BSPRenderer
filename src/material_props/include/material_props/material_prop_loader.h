@@ -1,6 +1,7 @@
 #ifndef MATERIAL_PROPS_MATERIAL_PROP_LOADER_H
 #define MATERIAL_PROPS_MATERIAL_PROP_LOADER_H
 #include <material_props/sound_materials.h>
+#include <material_props/material_props.h>
 
 //! Loads material props from base material, wad material and map material.
 //! Base material is taken from wad material file or (if not set) from sound materials list.
@@ -24,6 +25,15 @@ public:
 
     //! @returns SoundMaterials instance.
     inline SoundMaterials &getSoundMaterials() { return m_SndMats; }
+
+    //! Loads properties for specified material texture name.
+    MaterialProps loadProperties(std::string_view texName, std::string_view wadName);
+
+    //! Loads a YAML file.
+    //! @param  node    Node to load into
+    //! @param  path    Virtual path
+    //! @return whether the file exists or not
+    static bool loadYaml(YAML::Node &node, std::string_view path);
 
 private:
     SoundMaterials m_SndMats;

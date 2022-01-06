@@ -76,7 +76,7 @@ public:
         };
 
         return fn(m_flSize) + fn(m_vFaceOrigin) + fn(m_vOrigin) + fn(m_vNormal) + fn(m_pPlane) +
-               fn(m_FinalColor);
+               fn(m_Reflectivity) + fn(m_FinalColor);
     }
 
 private:
@@ -87,6 +87,7 @@ private:
     std::vector<glm::vec3> m_vOrigin;
     std::vector<glm::vec3> m_vNormal;
     std::vector<const Plane *> m_pPlane;
+    std::vector<glm::vec3> m_Reflectivity;
     std::vector<glm::vec3> m_FinalColor;
 
     friend class PatchRef;
@@ -125,6 +126,11 @@ public:
      * Plane in which patch is located.
      */
     inline const Plane *&getPlane() { return m_List.m_pPlane[m_iIndex]; }
+
+    /**
+     * Diffuse reflectivity of the patch.
+     */
+    inline glm::vec3 &getReflectivity() { return m_List.m_Reflectivity[m_iIndex]; }
 
     /**
      * Final color of the patch.

@@ -89,6 +89,7 @@ rad::PatchIndex rad::PatchDivider::transferPatches(RadSimImpl *pRadSim, appfw::S
         patch.getOrigin() = face.faceToWorld(faceOrg);
         patch.getNormal() = face.vNormal;
         patch.getPlane() = face.pPlane;
+        patch.getReflectivity() = glm::vec3(face.flBaseReflectivity);
 
         // Add origin and normal to hash
         hash.update(reinterpret_cast<uint8_t *>(&patch.getOrigin()), sizeof(glm::vec3));

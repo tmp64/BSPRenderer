@@ -63,8 +63,17 @@ struct Face : public bsp::BSPFace {
     //! List of vertices.
     std::vector<Vertex> vertices;
 
+    //! Diffuse light source, in linear space with brightness pre-multiplied.
+    glm::vec3 vLightColor;
+
     //! Length of a side of the square patch.
     float flPatchSize = 0;
+
+    //! Scale of the lightmap, higher number means larger lightmap
+    float flLightmapScale = 1;
+
+    //! Base reflectivity, it is multiplied with color value per patch.
+    float flBaseReflectivity = 0.4f;
 
     //! Index of first patch
     PatchIndex iFirstPatch = 0;
@@ -72,7 +81,7 @@ struct Face : public bsp::BSPFace {
     //! Number of patches of this face
     PatchIndex iNumPatches = 0;
 
-    void load(RadSimImpl &radSim, const bsp::BSPFace &bspFace);
+    void load(RadSimImpl &radSim, const bsp::BSPFace &bspFace, int faceIndex);
 
     //! @returns whether the face has lightmaps and should be split into patches
     inline bool hasLightmap() const {

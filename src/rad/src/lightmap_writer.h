@@ -40,7 +40,7 @@ private:
     std::vector<FaceLightmap> m_Lightmaps;
 
     void processFace(size_t faceIdx);
-    void sampleLightmap(FaceLightmap &lm, size_t faceIdx);
+    void sampleLightmap(FaceLightmap &lm, size_t faceIdx, float luxelSize);
     void sampleFace(const Face &face, glm::vec2 luxelPos, float radius, glm::vec2 filterk,
                     glm::vec3 &out, float &weightSum, bool checkTrace);
     void createBlock();

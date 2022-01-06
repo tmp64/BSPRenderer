@@ -40,34 +40,35 @@ void rad::LightmapWriter::processFace(size_t faceIdx) {
     FaceLightmap lm;
 
     // Calculate lightmap size
+    float luxelSize = m_flLuxelSize / face.flLightmapScale;
     glm::vec2 faceRealSize = face.vFaceMaxs - face.vFaceMins;
-    lm.vSize.x = (int)(faceRealSize.x / m_flLuxelSize) + 1 + 2 * m_iOversampleSize;
-    lm.vSize.y = (int)(faceRealSize.y / m_flLuxelSize) + 1 + 2 * m_iOversampleSize;
+    lm.vSize.x = (int)(faceRealSize.x / luxelSize) + 1 + 2 * m_iOversampleSize;
+    lm.vSize.y = (int)(faceRealSize.y / luxelSize) + 1 + 2 * m_iOversampleSize;
 
     // Calculate tex coords
     glm::vec2 lmSize = lm.vSize;
-    glm::vec2 faceSize = faceRealSize / glm::vec2(m_flLuxelSize); //!< Face size in luxels
+    glm::vec2 faceSize = faceRealSize / glm::vec2(luxelSize); //!< Face size in luxels
     glm::vec2 texOffset = (lmSize - faceSize) / 2.0f;
-    lm.vFaceOffset = face.vFaceMins - texOffset * m_flLuxelSize;
+    lm.vFaceOffset = face.vFaceMins - texOffset * luxelSize;
     lm.vTexCoords.resize(face.vertices.size());
 
     for (size_t i = 0; i < face.vertices.size(); i++) {
         const Face::Vertex &v = face.vertices[i];
         glm::vec2 &uv = lm.vTexCoords[i];
 
-        uv = (v.vFacePos - face.vFaceMins) / glm::vec2(m_flLuxelSize);
+        uv = (v.vFacePos - face.vFaceMins) / glm::vec2(luxelSize);
         uv += texOffset;
     }
 
     // Lightmap
     lm.lightmapData.resize((size_t)lm.vSize.x * lm.vSize.y);
-    sampleLightmap(lm, faceIdx);
+    sampleLightmap(lm, faceIdx, luxelSize);
 
     m_LightmapIdx[faceIdx] = m_Lightmaps.size();
     m_Lightmaps.push_back(std::move(lm));
 }
 
-void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
+void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx, float luxelSize) {
     glm::ivec2 lmSize = lm.vSize;
     bool bSampleNeighbours = m_RadSim.m_Profile.bSampleNeighbours;
     const Face &face = m_RadSim.m_Faces[faceIdx];
@@ -79,12 +80,12 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx) {
             glm::vec3 &luxel = lmrow[lmx];
 #if 1
             glm::vec2 luxelPos =
-                lm.vFaceOffset + (glm::vec2(lmx, lmy) + glm::vec2(0.5f)) * m_flLuxelSize;
+                lm.vFaceOffset + (glm::vec2(lmx, lmy) + glm::vec2(0.5f)) * luxelSize;
             glm::vec3 output = glm::vec3(0, 0, 0);
             float weightSum = 0;
 
             // Filter options
-            float maxPixelSize = std::max(face.flPatchSize, m_flLuxelSize);
+            float maxPixelSize = std::max(face.flPatchSize, luxelSize);
             float filterk = 1.0f / maxPixelSize;
             float radius = FILTER_RADIUS * maxPixelSize;
 

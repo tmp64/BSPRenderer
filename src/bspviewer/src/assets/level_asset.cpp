@@ -1,3 +1,4 @@
+#include <bsp/utils.h>
 #include "asset_manager.h"
 #include "level_asset.h"
 
@@ -126,47 +127,12 @@ void LevelAsset::loadFromFile(AssetManager &assMgr, std::string_view path, Share
 }
 
 std::vector<std::string> LevelAsset::getRequiredWads() {
-    std::vector<std::string> wadList;
-
     auto &ws = m_Level.getEntities().getWorldspawn();
     std::string wads = ws.getValue<std::string>("wad", "");
 
     if (wads.empty()) {
         printw("Level doesn't reference any WAD files.");
-        return wadList;
     }
 
-    size_t oldsep = static_cast<size_t>(0) - 1;
-    size_t sep = 0;
-
-    auto fnLoadWad = [&](const std::string &wadpath) {
-        if (wadpath.empty()) {
-            return;
-        }
-
-        // Find last '/' or '\'
-        size_t pos = 0;
-
-        size_t slashpos = wadpath.find_last_of('/');
-        if (slashpos != wadpath.npos)
-            pos = slashpos;
-
-        size_t backslashpos = wadpath.find_last_of('\\');
-        if (backslashpos != wadpath.npos && (slashpos == wadpath.npos || backslashpos > slashpos))
-            pos = backslashpos;
-
-        std::string wadname = wadpath.substr(pos + 1);
-        wadList.push_back(wadname);
-    };
-
-    while ((sep = wads.find(';', sep)) != wads.npos) {
-        std::string wadpath = wads.substr(oldsep + 1, sep - oldsep - 1);
-        fnLoadWad(wadpath);
-        oldsep = sep;
-        sep++;
-    }
-
-    fnLoadWad(wads.substr(oldsep + 1));
-
-    return wadList;
+    return bsp::parseWadListString(wads);
 }

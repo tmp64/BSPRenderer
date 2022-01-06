@@ -17,7 +17,7 @@ static const char s_TypeChars[(int)SoundMaterials::Type::TypeCount] = {
 
 static const std::string_view s_TypeNames[(int)SoundMaterials::Type::TypeCount] = {
     "default",      // Undefined
-    "meta;",        // Metal
+    "metal",        // Metal
     "vent",         // Vent
     "dirt",         // Dirt
     "slosh_liquid", // SloshLiquid
