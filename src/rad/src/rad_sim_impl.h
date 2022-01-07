@@ -145,6 +145,8 @@ private:
 
     //! Loads lights from entities.
     void loadLevelEntities();
+
+    void samplePatchReflectivity();
 };
 
 } // namespace rad

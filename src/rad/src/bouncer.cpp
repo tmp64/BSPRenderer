@@ -89,7 +89,7 @@ void rad::Bouncer::bounceLight() {
             // Write it
             PatchRef patch(m_RadSim.m_Patches, i);
             AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
-            getPatchBounce(i, bounce) = m_PatchSum[i] * patch.getReflectivity();
+            getPatchBounce(i, bounce) = m_PatchSum[i];
             patch.getFinalColor() += getPatchBounce(i, bounce);
         }
     }
@@ -135,9 +135,6 @@ void rad::Bouncer::addEnvLighting() {
 
 void rad::Bouncer::addTexLights() {
     for (Face &face : m_RadSim.m_Faces) {
-        const bsp::BSPTextureInfo &texinfo = m_RadSim.m_pLevel->getTexInfo()[face.iTextureInfo];
-        const bsp::BSPMipTex &miptex = m_RadSim.m_pLevel->getTextures()[texinfo.iMiptex];
-
         if (!isNullVector(face.vLightColor)) {
             glm::vec3 light = face.vLightColor;
             for (PatchIndex p = face.iFirstPatch; p < face.iFirstPatch + face.iNumPatches; p++) {
@@ -224,7 +221,7 @@ void rad::Bouncer::receiveLightFromThis(int bounce, PatchIndex i) {
             AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
 
             // Take light from i to patch2
-            m_PatchSum[patch2] += getPatchBounce(i, bounce - 1) *
+            m_PatchSum[patch2] += getPatchBounce(i, bounce - 1) * patch.getReflectivity() *
                                   (vf * vfkoeff[patch2] * patch.getSize() * patch.getSize());
 
             AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
@@ -264,7 +261,7 @@ void rad::Bouncer::receiveLightFromOther(int bounce, PatchIndex i) {
             AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
 
             // Take light from patch2 to i
-            m_PatchSum[i] += getPatchBounce(patch2, bounce - 1) *
+            m_PatchSum[i] += getPatchBounce(patch2, bounce - 1) * patch2ref.getReflectivity() *
                              (vf * vfkoeff[i] * patch2ref.getSize() * patch2ref.getSize());
 
             AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);

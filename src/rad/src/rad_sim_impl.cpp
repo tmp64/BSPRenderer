@@ -40,6 +40,7 @@ void rad::RadSimImpl::setLevel(const bsp::Level *pLevel, const std::string &name
     loadFaces();
     createPatches(hash);
     loadLevelEntities();
+    samplePatchReflectivity();
 
     m_PatchHash = hash.digest();
 }
@@ -224,6 +225,7 @@ void rad::RadSimImpl::loadMaterials() {
         if (pWadTex) {
             // Texture is in the WAD
             material.loadProps(m_MatPropLoader, texName, wadName);
+            material.loadFromWad(*this, *pWadTex);
         } else {
             // Texture is in the level
             material.loadProps(m_MatPropLoader, texName, m_LevelName + ".bsp");
@@ -348,8 +350,20 @@ void rad::RadSimImpl::loadLevelEntities() {
                     m_LevelConfig.sunLight.flBrightness = color[3] / m_Config.flEnvLightDiv;
 
                     // Read angle
-                    m_LevelConfig.sunLight.flYaw = ent.getValue<float>("angle");
-                    m_LevelConfig.sunLight.flPitch = ent.getValue<float>("pitch");
+                    if (ent.hasValue("angles")) {
+                        std::string angles = ent.getValue<std::string>("angles");
+                        int pitch, yaw, roll;
+                        if (sscanf(angles.c_str(), "%d %d %d", &pitch, &yaw, &roll) != 3) {
+                            throw std::runtime_error(
+                                fmt::format("light_environment angles = '{}' is invalid", angles));
+                        }
+
+                        m_LevelConfig.sunLight.flYaw = (float)yaw;
+                        m_LevelConfig.sunLight.flPitch = (float)pitch;
+                    } else {
+                        m_LevelConfig.sunLight.flYaw = ent.getValue<float>("angle");
+                        m_LevelConfig.sunLight.flPitch = ent.getValue<float>("pitch");
+                    }
                 }
 
                 if (isEnvLightFound) {
@@ -360,6 +374,39 @@ void rad::RadSimImpl::loadLevelEntities() {
             }
         }
     }
+}
+
+void rad::RadSimImpl::samplePatchReflectivity() {
+    auto fnSampleFacePatches = [&](size_t faceIndex) {
+        Face &face = m_Faces[faceIndex];
+        const bsp::BSPTextureInfo &texInfo = m_pLevel->getTexInfo()[face.iTextureInfo];
+        Material &material = *face.pMaterial;
+        PatchIndex lastPatch = face.iFirstPatch + face.iNumPatches;
+
+        for (PatchIndex i = face.iFirstPatch; i < lastPatch; i++) {
+            PatchRef patch(m_Patches, i);
+            glm::vec2 texPos, texScale;
+            float patchSize = patch.getSize();
+            texPos.s = glm::dot(patch.getOrigin(), texInfo.vS) + texInfo.fSShift;
+            texPos.t = glm::dot(patch.getOrigin(), texInfo.vT) + texInfo.fTShift;
+            texScale.s = std::max(patchSize / glm::length(texInfo.vS), 1.0f);
+            texScale.t = std::max(patchSize / glm::length(texInfo.vT), 1.0f);
+
+            patch.getReflectivity() *= material.sampleColor(texPos, texScale);
+        }
+    };
+
+    printi("Sampling textures for patch reflectivity...");
+#if 1
+    tf::Taskflow taskflow;
+    taskflow.for_each_index_dynamic((size_t)0, m_Faces.size(), (size_t)1, fnSampleFacePatches);
+    m_Executor.run(taskflow).wait();
+#else
+    // Run in signle thread for easier debugging
+    for (size_t i = 0; i < m_Faces.size(); i++) {
+        fnSampleFacePatches(i);
+    }
+#endif
 }
 
 void rad::RadSimImpl::updateProgress(double progress) {

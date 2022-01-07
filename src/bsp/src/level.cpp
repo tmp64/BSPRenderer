@@ -262,6 +262,7 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
     };
 
     fnLoadLump(LUMP_PLANES, m_Planes);
+    fnLoadLump(LUMP_TEXTURES, m_RawTextureLump);
     fnLoadTextures();
     fnLoadLump(LUMP_VERTICES, m_Vertices);
     fnLoadLump(LUMP_VISIBILITY, m_VisData);

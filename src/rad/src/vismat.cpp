@@ -203,7 +203,7 @@ void rad::VisMat::buildVisRow(PatchIndex patchnum, uint8_t *pvs, size_t bitpos, 
                 continue;
             face_tested[l] = 1;
 
-            if (m_RadSim.m_Faces[l].iFlags & FACE_SKY) {
+            if (m_RadSim.m_Faces[l].iFlags & FACE_NO_LIGHTMAPS) {
                 continue;
             }
 

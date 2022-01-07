@@ -22,7 +22,7 @@ inline std::vector<std::string> parseWadListString(std::string_view wads) {
         }
 
         // Find last '/' or '\'
-        size_t pos = 0;
+        size_t pos = (size_t)0 - 1;
 
         size_t slashpos = wadpath.find_last_of('/');
         if (slashpos != wadpath.npos)

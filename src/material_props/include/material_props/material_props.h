@@ -5,7 +5,7 @@
 
 struct MaterialProps {
     //! Reflectivity of the surface. It will be multiplied by the texture color.
-    float flReflectivity = 0.5f;
+    float flReflectivity = 1.0f;
 
     //! Light color in gamma-space
     glm::vec3 vLightColor = glm::vec3(1, 1, 1);

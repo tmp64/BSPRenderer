@@ -1,3 +1,4 @@
+#include <appfw/str_utils.h>
 #include "types.h"
 
 namespace {
@@ -149,8 +150,9 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace, int faceIn
     // Flags
     const bsp::BSPMipTex &mipTex = radSim.m_pLevel->getTextures().at(texInfo.iMiptex);
 
-    if (!strncmp(mipTex.szName, "SKY", 3) || !strncmp(mipTex.szName, "sky", 3)) {
-        iFlags |= FACE_SKY;
+    if (!appfw::strncasecmp(mipTex.szName, "SKY", 3) || 
+        !appfw::strncasecmp(mipTex.szName, "AAATRIGGER", 10)) {
+        iFlags |= FACE_NO_LIGHTMAPS;
     }
 
     // Process vertices
@@ -197,7 +199,8 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace, int faceIn
     Props props;
 
     // Load material props
-    Material &material = radSim.m_Materials.at(texInfo.iMiptex);
+    pMaterial = &radSim.m_Materials.at(texInfo.iMiptex);
+    Material &material = *pMaterial;
     const MaterialProps &matProps = material.getProps();
     props.flLightIntensityScale *= matProps.flLightIntensityScale;
     props.vLightColor = matProps.vLightColor;
@@ -234,5 +237,6 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace, int faceIn
                   (props.flLightIntensity * props.flLightIntensityScale / textureLightDivisor);
 
     flPatchSize = (float)radSim.m_Profile.iBasePatchSize / props.flLightmapScale;
+    flLightmapScale = props.flLightmapScale;
     flBaseReflectivity = props.flReflectivity;
 }

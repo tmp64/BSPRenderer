@@ -24,7 +24,7 @@ rad:
     light_env_brightness_divisor: 140
     
     # Brightness multiplier relative to sun brightness
-    sky_light_brightness_multiplier: 0.2
+    sky_light_brightness_multiplier: 0.3
 
 commands:
     - app_sync_rates 1

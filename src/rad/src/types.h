@@ -6,6 +6,7 @@
 namespace rad {
 
 class RadSimImpl;
+class Material;
 
 using PatchIndex = uint32_t;
 static_assert(std::atomic<PatchIndex>::is_always_lock_free, "PatchIndex atomic is not lock free");
@@ -31,7 +32,7 @@ constexpr float EPSILON = 1.f / 64.f;
 constexpr float ON_EPSILON = 0.01f;
 
 enum FaceFlags : unsigned {
-    FACE_SKY = (1u << 0), //!< Face is a sky surface
+    FACE_NO_LIGHTMAPS = (1u << 0), //!< Face doesn't need to have lightmaps
 };
 
 struct Plane : public bsp::BSPPlane {
@@ -63,6 +64,9 @@ struct Face : public bsp::BSPFace {
     //! List of vertices.
     std::vector<Vertex> vertices;
 
+    //! Material of the face
+    Material *pMaterial;
+
     //! Diffuse light source, in linear space with brightness pre-multiplied.
     glm::vec3 vLightColor;
 
@@ -73,7 +77,7 @@ struct Face : public bsp::BSPFace {
     float flLightmapScale = 1;
 
     //! Base reflectivity, it is multiplied with color value per patch.
-    float flBaseReflectivity = 0.4f;
+    float flBaseReflectivity = 1.0f;
 
     //! Index of first patch
     PatchIndex iFirstPatch = 0;
@@ -85,8 +89,7 @@ struct Face : public bsp::BSPFace {
 
     //! @returns whether the face has lightmaps and should be split into patches
     inline bool hasLightmap() const {
-        // Skies don't have lightmaps
-        return !(iFlags & FACE_SKY);
+        return !(iFlags & FACE_NO_LIGHTMAPS);
     }
 
     inline glm::vec3 faceToWorld(const glm::vec2 &face) const {

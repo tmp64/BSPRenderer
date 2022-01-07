@@ -14,7 +14,7 @@ struct SurfacePropsFile {
     float flLightIntensity = 0.0f;
 
     bool bHasReflectivity = false;
-    float flReflectivity = 0.5f;
+    float flReflectivity = 1.0f;
 
     inline bool isIdentical(const SurfacePropsFile &other) {
         if (flLightmapScale != other.flLightmapScale) {
@@ -100,7 +100,7 @@ struct MaterialPropsFile {
     float flLightIntensity = 0.0f;
 
     bool bHasReflectivity = false;
-    float flReflectivity = 0.5f;
+    float flReflectivity = 1.0f;
 
     char szBaseName[MAX_MAT_BASE_NAME] = "";
 
@@ -192,7 +192,7 @@ private:
 };
 
 struct BaseMaterialPropsFile {
-    float flReflectivity = 0.5f;
+    float flReflectivity = 1.0f;
     char szName[MAX_MAT_BASE_NAME] = "";
 
     inline BaseMaterialPropsFile getDefault() { return BaseMaterialPropsFile(); }

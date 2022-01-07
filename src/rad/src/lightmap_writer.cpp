@@ -159,7 +159,13 @@ void rad::LightmapWriter::sampleFace(const Face &face, glm::vec2 luxelPos, float
         if (std::abs(d.x) <= radius && std::abs(d.y) <= radius &&
             (!checkTrace || m_RadSim.traceLine(tracePos, patchTracePos) == bsp::CONTENTS_EMPTY)) {
             float weight = lightmapFilter(d.x * filterk.x) * lightmapFilter(d.y * filterk.y);
+#if 1
+            // Sample final color
             out += weight * patch.getFinalColor();
+#else
+            // Sample reflectivity (for debugging)
+            out += weight * patch.getReflectivity();
+#endif
             weightSum += weight;
         }
     }

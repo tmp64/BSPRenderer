@@ -159,6 +159,7 @@ public:
     inline const std::vector<BSPSurfEdge> &getSurfEdges() const { return m_SurfEdges; }
     inline const std::vector<BSPModel> &getModels() const { return m_Models; }
     inline const EntityList &getEntities() const { return m_Entities; }
+    inline const std::vector<uint8_t> &getRawTextures() const { return m_RawTextureLump; }
 
 private:
     std::vector<BSPPlane> m_Planes;
@@ -175,6 +176,7 @@ private:
     std::vector<BSPSurfEdge> m_SurfEdges;
     std::vector<BSPModel> m_Models;
     EntityList m_Entities;
+    std::vector<uint8_t> m_RawTextureLump;
 
     int recursiveTraceLine(int node, const glm::vec3 &from, const glm::vec3 &to) const;
 };
