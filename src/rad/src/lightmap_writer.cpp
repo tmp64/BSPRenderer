@@ -104,7 +104,7 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx, float
                     if (neighbourIdx != faceIdx && neighbour.hasLightmap() &&
                         normalDir == !!neighbour.nPlaneSide) {
                         glm::vec2 luxelPosHere = neighbour.worldToFace(luxelWorldPos);
-                        sampleFace(face, luxelPosHere, radius, glm::vec2(filterk), output,
+                        sampleFace(neighbour, luxelPosHere, radius, glm::vec2(filterk), output,
                                    weightSum, true);
                     }
                 }
