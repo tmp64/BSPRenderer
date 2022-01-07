@@ -138,7 +138,8 @@ void rad::Bouncer::addTexLights() {
         if (!isNullVector(face.vLightColor)) {
             glm::vec3 light = face.vLightColor;
             for (PatchIndex p = face.iFirstPatch; p < face.iFirstPatch + face.iNumPatches; p++) {
-                addPatchLight(p, light);
+                PatchRef patch(m_RadSim.m_Patches, p);
+                addPatchLight(p, light / patch.getReflectivity());
             }
         }
     }
