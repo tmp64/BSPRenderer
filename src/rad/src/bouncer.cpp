@@ -57,6 +57,14 @@ void rad::Bouncer::addPatchLight(PatchIndex patch, const glm::vec3 &light) {
 }
 
 void rad::Bouncer::bounceLight() {
+    // Prepare patch refl * area
+    m_PatchReflArea.resize(m_uPatchCount);
+    for (PatchIndex i = 0; i < m_uPatchCount; i++) {
+        PatchRef patch(m_RadSim.m_Patches, i);
+        float area = patch.getSize() * patch.getSize();
+        m_PatchReflArea[i] = patch.getReflectivity() * area;
+    }
+
     // Copy bounce 0 into the lightmap
     for (PatchIndex i = 0; i < m_uPatchCount; i++) {
         PatchRef patch(m_RadSim.m_Patches, i);
@@ -94,6 +102,7 @@ void rad::Bouncer::bounceLight() {
         }
     }
 
+    m_PatchReflArea.clear();
     m_RadSim.updateProgress(1);
 }
 
@@ -199,48 +208,37 @@ void rad::Bouncer::addDiffuseSkylight(PatchRef &patch, const glm::vec3 &vSkyColo
 
 template <bool secondPass>
 void rad::Bouncer::receiveLight(int bounce, PatchIndex i) {
-    auto &countTable = m_RadSim.m_SVisMat.getCountTable();
-    auto &offsetTable = m_RadSim.m_SVisMat.getOffsetTable();
-    auto &listItems = m_RadSim.m_SVisMat.getListItems();
-    auto &vfoffsets = m_RadSim.m_VFList.getPatchOffsets();
     auto &vfdata = m_RadSim.m_VFList.getVFData();
     auto &vfkoeff = m_RadSim.m_VFList.getVFKoeff();
 
-    PatchRef patch(m_RadSim.m_Patches, i);
-    PatchIndex poff = i + 1;
-    size_t dataOffset = vfoffsets[i];
+    PatchRef patch1ref(m_RadSim.m_Patches, i);
+    size_t dataOffset = m_RadSim.m_VFList.getPatchOffsets()[i];
 
-    for (size_t j = 0; j < countTable[i]; j++) {
-        const SparseVisMat::ListItem &item = listItems[offsetTable[i] + j];
-        poff += item.offset;
+    glm::vec3 patch1ReflArea = m_PatchReflArea[i];
 
-        for (PatchIndex k = 0; k < item.size; k++) {
-            PatchIndex patch2 = poff + k;
-            float vf = vfdata[dataOffset];
+    m_RadSim.forEachVisiblePatch(i, [&](PatchRef patch2ref) {
+        PatchIndex patch2 = patch2ref.index();
+        float vf = vfdata[dataOffset];
 
-            AFW_ASSERT(!isnan(vf) && !isinf(vf));
-            AFW_ASSERT(!isnan(vfkoeff[i]) && !isinf(vfkoeff[i]));
-            AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
+        AFW_ASSERT(!isnan(vf) && !isinf(vf));
+        AFW_ASSERT(!isnan(vfkoeff[i]) && !isinf(vfkoeff[i]));
+        AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
 
-            if constexpr (!secondPass) {
-                // Take light from i to patch2
-                m_PatchSum[patch2] += getPatchBounce(i, bounce - 1) * patch.getReflectivity() *
-                                      (vf * vfkoeff[patch2] * patch.getSize() * patch.getSize());
-            } else {
-                // Take light from patch2 to i
-                PatchRef patch2ref(m_RadSim.m_Patches, patch2);
-                m_PatchSum[i] += getPatchBounce(patch2, bounce - 1) * patch2ref.getReflectivity() *
-                                 (vf * vfkoeff[i] * patch2ref.getSize() * patch2ref.getSize());
-            }
-            
-
-            AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
-            AFW_ASSERT(m_PatchSum[patch2].r >= 0 && m_PatchSum[patch2].g >= 0 &&
-                       m_PatchSum[patch2].b >= 0);
-
-            dataOffset++;
+        if constexpr (!secondPass) {
+            // Take light from i to patch2
+            m_PatchSum[patch2] +=
+                getPatchBounce(i, bounce - 1) * patch1ReflArea * (vf * vfkoeff[i]);
+        } else {
+            // Take light from patch2 to i
+            glm::vec3 patch2ReflArea = m_PatchReflArea[patch2];
+            m_PatchSum[i] +=
+                getPatchBounce(patch2, bounce - 1) * patch2ReflArea * (vf * vfkoeff[patch2]);
         }
 
-        poff += item.size;
-    }
+        AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
+        AFW_ASSERT(m_PatchSum[patch2].r >= 0 && m_PatchSum[patch2].g >= 0 &&
+                   m_PatchSum[patch2].b >= 0);
+
+        dataOffset++;
+    });
 }

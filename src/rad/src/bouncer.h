@@ -36,6 +36,9 @@ private:
     //! Sum of all light for each patch
     std::vector<glm::vec3> m_PatchSum;
 
+    //! Patch reflectivity multiplied by area
+    std::vector<glm::vec3> m_PatchReflArea;
+
     //! Returns reference to color of patch in specified bounce.
     //! Bounce 0 is initial color.
     inline AFW_FORCE_INLINE glm::vec3 &getPatchBounce(PatchIndex patch, int bounce) {

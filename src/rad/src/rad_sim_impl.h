@@ -125,6 +125,32 @@ public:
     float linearToGamma(float val);
     glm::vec3 linearToGamma(const glm::vec3 &val);
 
+    //! Executes func for each patch pair. Pairs don't duplicate: if (i, j) was called, (j, i) won't be.
+    
+    //! Executes func for each patch that is visible from patch i
+    //! void func(PatchRef j)
+    template <typename F>
+    void forEachVisiblePatch(PatchIndex i, F func) {
+        AFW_ASSERT(isVisMatValid());
+        PatchIndex itemCount = m_SVisMat.getCountTable()[i];
+        size_t offset = m_SVisMat.getOffsetTable()[i];
+        auto &listItems = m_SVisMat.getListItems();
+
+        PatchRef patch(m_Patches, i);
+        PatchIndex poff = i + 1;
+
+        for (size_t j = 0; j < itemCount; j++) {
+            const SparseVisMat::ListItem &item = listItems[offset + j];
+            poff += item.offset;
+
+            for (PatchIndex k = 0; k < item.size; k++) {
+                func(PatchRef(m_Patches, poff + k));
+            }
+
+            poff += item.size;
+        }
+    }
+
     static inline tf::Executor m_Executor;
 
 private:
