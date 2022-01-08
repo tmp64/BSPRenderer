@@ -75,11 +75,11 @@ void rad::Bouncer::bounceLight() {
         tf::Taskflow taskflow;
         tf::Task taskThis = taskflow.for_each_index_dynamic(
             (PatchIndex)0, m_uPatchCount, (PatchIndex)1,
-            [&](PatchIndex idx) { receiveLightFromThis(bounce, idx); }, (PatchIndex)128);
+            [&](PatchIndex idx) { receiveLight<false>(bounce, idx); }, (PatchIndex)128);
 
         tf::Task taskOther = taskflow.for_each_index_dynamic(
             (PatchIndex)0, m_uPatchCount, (PatchIndex)1,
-            [&](PatchIndex idx) { receiveLightFromOther(bounce, idx); }, (PatchIndex)128);
+            [&](PatchIndex idx) { receiveLight<true>(bounce, idx); }, (PatchIndex)128);
 
         taskThis.precede(taskOther);
         m_RadSim.m_Executor.run(taskflow).wait();
@@ -197,7 +197,8 @@ void rad::Bouncer::addDiffuseSkylight(PatchRef &patch, const glm::vec3 &vSkyColo
     }
 }
 
-void rad::Bouncer::receiveLightFromThis(int bounce, PatchIndex i) {
+template <bool secondPass>
+void rad::Bouncer::receiveLight(int bounce, PatchIndex i) {
     auto &countTable = m_RadSim.m_SVisMat.getCountTable();
     auto &offsetTable = m_RadSim.m_SVisMat.getOffsetTable();
     auto &listItems = m_RadSim.m_SVisMat.getListItems();
@@ -221,49 +222,17 @@ void rad::Bouncer::receiveLightFromThis(int bounce, PatchIndex i) {
             AFW_ASSERT(!isnan(vfkoeff[i]) && !isinf(vfkoeff[i]));
             AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
 
-            // Take light from i to patch2
-            m_PatchSum[patch2] += getPatchBounce(i, bounce - 1) * patch.getReflectivity() *
-                                  (vf * vfkoeff[patch2] * patch.getSize() * patch.getSize());
-
-            AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
-            AFW_ASSERT(m_PatchSum[patch2].r >= 0 && m_PatchSum[patch2].g >= 0 &&
-                       m_PatchSum[patch2].b >= 0);
-
-            dataOffset++;
-        }
-
-        poff += item.size;
-    }
-}
-
-void rad::Bouncer::receiveLightFromOther(int bounce, PatchIndex i) {
-    auto &countTable = m_RadSim.m_SVisMat.getCountTable();
-    auto &offsetTable = m_RadSim.m_SVisMat.getOffsetTable();
-    auto &listItems = m_RadSim.m_SVisMat.getListItems();
-    auto &vfoffsets = m_RadSim.m_VFList.getPatchOffsets();
-    auto &vfdata = m_RadSim.m_VFList.getVFData();
-    auto &vfkoeff = m_RadSim.m_VFList.getVFKoeff();
-
-    PatchRef patch(m_RadSim.m_Patches, i);
-    PatchIndex poff = i + 1;
-    size_t dataOffset = vfoffsets[i];
-
-    for (size_t j = 0; j < countTable[i]; j++) {
-        const SparseVisMat::ListItem &item = listItems[offsetTable[i] + j];
-        poff += item.offset;
-
-        for (PatchIndex k = 0; k < item.size; k++) {
-            PatchIndex patch2 = poff + k;
-            PatchRef patch2ref(m_RadSim.m_Patches, patch2);
-            float vf = vfdata[dataOffset];
-
-            AFW_ASSERT(!isnan(vf) && !isinf(vf));
-            AFW_ASSERT(!isnan(vfkoeff[i]) && !isinf(vfkoeff[i]));
-            AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
-
-            // Take light from patch2 to i
-            m_PatchSum[i] += getPatchBounce(patch2, bounce - 1) * patch2ref.getReflectivity() *
-                             (vf * vfkoeff[i] * patch2ref.getSize() * patch2ref.getSize());
+            if constexpr (!secondPass) {
+                // Take light from i to patch2
+                m_PatchSum[patch2] += getPatchBounce(i, bounce - 1) * patch.getReflectivity() *
+                                      (vf * vfkoeff[patch2] * patch.getSize() * patch.getSize());
+            } else {
+                // Take light from patch2 to i
+                PatchRef patch2ref(m_RadSim.m_Patches, patch2);
+                m_PatchSum[i] += getPatchBounce(patch2, bounce - 1) * patch2ref.getReflectivity() *
+                                 (vf * vfkoeff[i] * patch2ref.getSize() * patch2ref.getSize());
+            }
+            
 
             AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
             AFW_ASSERT(m_PatchSum[patch2].r >= 0 && m_PatchSum[patch2].g >= 0 &&
