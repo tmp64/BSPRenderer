@@ -9,6 +9,7 @@
 #include <input/input_system.h>
 #include <input/key_bind.h>
 #include <graphics/graphics_stack.h>
+#include <material_system/material_system.h>
 
 class DevConsoleDialog;
 class ProfilerDialog;
@@ -58,6 +59,7 @@ protected:
 private:
     struct GraphicsSubSystem {
         GraphicsStack m_GraphicsStack;
+        MaterialSystem m_MaterialSystem;
     };
 
     SDLComponent m_SDL;

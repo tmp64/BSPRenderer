@@ -13,6 +13,9 @@ public:
     ShaderProgram &operator=(const ShaderProgram &) = delete;
     ShaderProgram &operator=(ShaderProgram &&other) noexcept;
 
+    //! @returns the ID of the shader.
+    inline GLuint getId() const { return m_Id; }
+
     //! Creates the shader program.
     void create();
 

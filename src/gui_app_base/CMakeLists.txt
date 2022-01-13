@@ -36,6 +36,7 @@ target_link_libraries(gui_app_base
 	glad
 	glm::glm
 	graphics
+	material_system
 	imgui
 	input_system
 	SDL2::SDL2
