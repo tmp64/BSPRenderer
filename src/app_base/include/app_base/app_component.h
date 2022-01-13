@@ -1,5 +1,6 @@
 #ifndef APP_COMPONENT_H
 #define APP_COMPONENT_H
+#include <appfw/appfw.h>
 
 //! A component of an application.
 //! It is always a singleton.

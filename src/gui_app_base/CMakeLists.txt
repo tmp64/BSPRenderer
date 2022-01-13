@@ -8,8 +8,8 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/imgui_controls.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/gui_app_base/opengl_context.h
 
-	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/base_view_2d.cpp
+	#${CMAKE_CURRENT_SOURCE_DIR}/src/base_view.cpp
+	#${CMAKE_CURRENT_SOURCE_DIR}/src/base_view_2d.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/config_component.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/config_item.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/dev_console_dialog.cpp
@@ -35,9 +35,9 @@ target_link_libraries(gui_app_base
 	app_base
 	glad
 	glm::glm
+	graphics
 	imgui
 	input_system
-	renderer
 	SDL2::SDL2
 	SDL2::SDL2main
 )

@@ -1,5 +1,6 @@
 #ifndef GUI_APP_BASE_COMPONENTS_H
 #define GUI_APP_BASE_COMPONENTS_H
+#include <string_view>
 #include "SDL.h"
 #include <imgui.h>
 #include <app_base/app_component.h>

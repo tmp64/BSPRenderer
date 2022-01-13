@@ -1,0 +1,18 @@
+gui:
+    win_title: New Graphics Stack Test
+    win_width: 1600
+    win_height: 900
+    
+    imgui_scale: 0 # zero to auto scale based on display DPI
+    imgui_font_path: "assets:fonts/CascadiaMono-Regular.ttf"
+    imgui_font_size: 14.0  # Size without scaling
+
+commands:
+    - app_fps_max 240
+
+filesystem:
+    assets:
+        - graphics_test
+        - base
+    config:
+        - graphics_test/cfg

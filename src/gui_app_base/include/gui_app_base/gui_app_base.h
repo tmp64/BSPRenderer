@@ -8,9 +8,7 @@
 #include <gui_app_base/config_component.h>
 #include <input/input_system.h>
 #include <input/key_bind.h>
-#include <renderer/gpu_resource_manager.h>
-#include <renderer/shader_manager.h>
-#include <renderer/material_manager.h>
+#include <graphics/graphics_stack.h>
 
 class DevConsoleDialog;
 class ProfilerDialog;
@@ -59,9 +57,7 @@ protected:
 
 private:
     struct GraphicsSubSystem {
-        GPUResourceManager m_GPUManager;
-        ShaderManager m_ShaderManager;
-        MaterialManager m_MaterialManager;
+        GraphicsStack m_GraphicsStack;
     };
 
     SDLComponent m_SDL;

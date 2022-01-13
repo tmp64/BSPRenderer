@@ -1,4 +1,5 @@
 #include <SDL.h>
+#include <appfw/appfw.h>
 #include <app_base/app_base.h>
 #include <gui_app_base/config_component.h>
 
