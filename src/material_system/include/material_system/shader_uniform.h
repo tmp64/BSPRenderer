@@ -4,12 +4,15 @@
 
 class ShaderUniform {
 public:
-
     inline void setName(const char *name) { m_pszUniformName = name; }
 
-private:
+    inline void loadLocation(GLuint progId) {
+        m_nLocation = glGetUniformLocation(progId, m_pszUniformName);
+    }
+
+protected:
     const char *m_pszUniformName = nullptr;
-    GLint m_nLocation = -1;
+    GLint m_nLocation = -2;
 };
 
 #endif

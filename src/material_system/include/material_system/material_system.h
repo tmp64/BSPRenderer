@@ -2,6 +2,7 @@
 #define MATERIAL_SYSTEM_MATERIAL_SYSTEM_H
 #include <app_base/app_component.h>
 #include <material_system/shader_definitions.h>
+#include <material_system/material.h>
 
 class Shader;
 
@@ -11,6 +12,18 @@ public:
     ~MaterialSystem();
 
     void tick() override;
+
+    //! @returns the fallback shader (used if no other is available).
+    Shader *getFallbackShader();
+
+    //! Returns the default black-purple material.
+    Material *getNullMaterial();
+
+    //! Creates a new material.
+    Material *createMaterial(std::string_view name);
+
+    //! Destroys a material. mat will become an invalid pointer.
+    void destroyMaterial(Material *mat);
 
     //! Reloads all shaders.
     void reloadShaders();
@@ -37,10 +50,14 @@ public:
     inline std::string getGlobalFragmentShaderDefs() { return m_GlobalShaderDefs.toStringFragment(); }
 
 private:
+    // Shaders
     ShaderProgramDefinitions m_GlobalShaderDefs;
 
-    //! Frees all shaders.
+    // Materials
+    std::list<Material> m_Materials;
+
     void unloadShaders();
+    void createNullMaterial();
 };
 
 #endif

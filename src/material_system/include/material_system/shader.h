@@ -106,8 +106,64 @@ private:
     //! Frees all shader instances.
     void freeShaderInstances();
 
+    void loadUniformLocations(GLuint progId);
+
     friend class MaterialSystem;
     friend class ShaderInstance;
+
+public:
+    template <typename T>
+    class Var : public ShaderUniform {
+        inline Var() { static_assert(appfw::FalseT<T>::value, "Unknown uniform type"); }
+    };
+
+    template <>
+    class Var<int> : public ShaderUniform {
+    public:
+        inline void set(int val) { glUniform1i(m_nLocation, val); }
+    };
+
+    template <>
+    class Var<float> : public ShaderUniform {
+    public:
+        inline void set(float val) { glUniform1f(m_nLocation, val); }
+    };
+
+    template <>
+    class Var<glm::vec3> : public ShaderUniform {
+    public:
+        inline void set(const glm::vec3 &v) { glUniform3f(m_nLocation, v.x, v.y, v.z); }
+    };
+
+    template <>
+    class Var<glm::vec4> : public ShaderUniform {
+    public:
+        inline void set(const glm::vec4 &v) { glUniform4f(m_nLocation, v.x, v.y, v.z, v.w); }
+    };
+
+    template <>
+    class Var<glm::mat4> : public ShaderUniform {
+    public:
+        inline void set(const glm::mat4 &v) {
+            glUniformMatrix4fv(m_nLocation, 1, false, glm::value_ptr(v));
+        }
+    };
+
+    class TextureVar : public Var<int> {};
+};
+
+template <typename T>
+class ShaderT : public Shader {
+public:
+    using BaseClass = ShaderT<T>;
+
+    inline ShaderT(unsigned typeIdx)
+        : Shader(typeIdx) {}
+
+private:
+    inline std::unique_ptr<Shader> createShaderInfoInstance(unsigned typeIdx) override {
+        return std::make_unique<T>(typeIdx);
+    }
 };
 
 #endif

@@ -46,3 +46,9 @@ void Shader::freeShaderInstances() {
         m_pInstances[i] = nullptr;
     }
 }
+
+void Shader::loadUniformLocations(GLuint progId) {
+    for (ShaderUniform *uniform : m_Uniforms) {
+        uniform->loadLocation(progId);
+    }
+}

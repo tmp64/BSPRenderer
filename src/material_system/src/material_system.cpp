@@ -1,10 +1,29 @@
+#include <graphics/texture2d.h>
 #include <material_system/material_system.h>
 #include <material_system/shader.h>
 #include <material_system/shader_instance.h>
 
+namespace {
+
+class FallbackShader : public ShaderT<FallbackShader> {
+public:
+    FallbackShader(unsigned typeIdx)
+        : BaseClass(typeIdx) {
+        setTitle("MaterialSystem::FallbackShader");
+        setVert("assets:shaders/fallback.vert");
+        setFrag("assets:shaders/fallback.frag");
+        setTypes(SHADER_TYPE_ALL);
+    }
+};
+
+FallbackShader s_FallbackShader;
+
+}
+
 MaterialSystem::MaterialSystem() {
     setTickEnabled(true);
     reloadShaders();
+    createNullMaterial();
 }
 
 MaterialSystem::~MaterialSystem() {
@@ -12,6 +31,24 @@ MaterialSystem::~MaterialSystem() {
 }
 
 void MaterialSystem::tick() {}
+
+Shader *MaterialSystem::getFallbackShader() {
+    return &s_FallbackShader;
+}
+
+Material *MaterialSystem::getNullMaterial() {
+    return &(*m_Materials.begin());
+}
+
+Material *MaterialSystem::createMaterial(std::string_view name) {
+    auto it = m_Materials.emplace(m_Materials.end(), name);
+    it->m_Iter = it;
+    return &(*it);
+}
+
+void MaterialSystem::destroyMaterial(Material *mat) {
+    m_Materials.erase(mat->m_Iter);
+}
 
 void MaterialSystem::reloadShaders() {
     unloadShaders();
@@ -32,4 +69,16 @@ void MaterialSystem::unloadShaders() {
     for (Shader *pShader : prototypes) {
         pShader->freeShaderInstances();
     }
+}
+
+void MaterialSystem::createNullMaterial() {
+    int size = CheckerboardImage::get().size;
+    Material *mat = createMaterial("Null Material");
+    mat->setSize(size, size);
+    mat->setTexture(0, std::make_unique<Texture2D>());
+    
+    auto tex = static_cast<Texture2D *>(mat->getTexture(0));
+    tex->create("Null Texture");
+    tex->initTexture(GraphicsFormat::RGB8, size, size, false, GL_RGB, GL_UNSIGNED_BYTE,
+                     CheckerboardImage::get().data.data());
 }

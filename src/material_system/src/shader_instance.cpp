@@ -49,6 +49,9 @@ bool ShaderInstance::compile() {
         printw("{}", errorLog);
     }
 
+    // Load uniforms
+    m_pShader->loadUniformLocations(m_Prog.getId());
+
     return true;
 }
 
