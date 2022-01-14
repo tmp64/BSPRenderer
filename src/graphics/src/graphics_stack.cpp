@@ -1,6 +1,8 @@
 #include <graphics/graphics_stack.h>
 #include <graphics/gpu_buffer.h>
 
+ConVar<bool> gpu_ui("gpu_ui", false, "");
+
 GraphicsStack::GraphicsStack() {
     
 }

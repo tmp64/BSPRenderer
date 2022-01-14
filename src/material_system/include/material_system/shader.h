@@ -10,6 +10,8 @@ class ShaderInstance;
 
 class Shader : appfw::NoMove {
 public:
+    class UniformBlock;
+
     //! @param  type    Type of the shader being created or 0 if it's the prototype
     Shader(unsigned type);
     virtual ~Shader();
@@ -54,25 +56,32 @@ protected:
 
     //! Adds a shared definition to the shader.
     template <typename T>
-    void addSharedDef(const T &value) {
-        m_Defs.addSharedDef(value);
+    void addSharedDef(std::string_view key, const T &value) {
+        m_Defs.addSharedDef(key, value);
     }
 
     //! Adds a vertex definition to the shader.
     template <typename T>
-    void addVertexDef(const T &value) {
-        m_Defs.addVertexDef(value);
+    void addVertexDef(std::string_view key, const T &value) {
+        m_Defs.addVertexDef(key, value);
     }
 
     //! Adds a fragment definition to the shader.
     template <typename T>
-    void addFragmentDef(const T &value) {
-        m_Defs.addFragmentDef(value);
+    void addFragmentDef(std::string_view key, const T &value) {
+        m_Defs.addFragmentDef(key, value);
     }
 
     //! Adds a uniform to the list.
     //! @param  name    Name of the uniform, must be a constant string
     void addUniform(ShaderUniform &uniform, const char *name);
+
+    //! Adds a uniform block to the list.
+    //! @param  name    Name of the uniform, must be a constant string
+    void addUniform(UniformBlock &uniform, const char *name, GLuint bindingPoint);
+
+    //! Called when the shader was compiled. It will be enabled in this call.
+    virtual void onShaderCompiled();
 
 private:
     // Prototype information
@@ -83,6 +92,7 @@ private:
     std::string_view m_VertexFilePath;
     std::string_view m_FragmentFilePath;
     std::vector<ShaderUniform *> m_Uniforms;
+    std::vector<UniformBlock *> m_UniformBlocks;
     ShaderProgramDefinitions m_Defs;
 
     // Shader instances (actual OpenGL shaders)
@@ -150,6 +160,20 @@ public:
     };
 
     class TextureVar : public Var<int> {};
+
+    class UniformBlock : appfw::NoCopy {
+    public:
+        inline void setName(const char *name) { m_pszUniformName = name; }
+        inline void setBindingPoint(GLuint bindingPoint) { m_nBindingPoint = bindingPoint; }
+        void load(GLuint progId);
+
+    private:
+        const char *m_pszUniformName;
+        GLuint m_nIndex = 0;
+        GLuint m_nBindingPoint = 0;
+
+        friend class BaseShader;
+    };
 };
 
 template <typename T>

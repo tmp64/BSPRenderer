@@ -3,10 +3,12 @@
 #include <vector>
 #include <functional>
 #include <app_base/texture_block.h>
-#include <renderer/gpu_managed_objects.h>
+#include <graphics/raii.h>
+#include <graphics/texture2d.h>
+#include <graphics/gpu_buffer.h>
+#include <graphics/render_buffer.h>
+#include <material_system/material_system.h>
 #include <renderer/surface_renderer.h>
-#include <renderer/base_shader.h>
-#include <renderer/raii.h>
 #include <renderer/client_entity.h>
 
 class IRendererEngine;
@@ -16,6 +18,11 @@ public:
     struct Shaders;
 
     static constexpr int GLOBAL_UNIFORM_BIND = 0;
+
+    enum TextureBinds
+    {
+        TEX_LIGHTMAP = Material::MAX_TEXTURES,
+    };
 
     SceneRenderer();
     ~SceneRenderer();
@@ -107,6 +114,9 @@ public:
     void setSurfaceTint(int surface, glm::vec4 color);
 #endif
 
+    //! @returns shader used by surface materials.
+    static Shader *getDefaultSurfaceShader();
+
 private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
     static constexpr int BSP_LIGHTMAP_BLOCK_SIZE = 1024;
@@ -177,8 +187,8 @@ private:
         GLTexture skyboxCubemap;
         
         // Lightmaps
-        GPUTexture bspLightmapBlockTex;
-        GPUTexture customLightmapBlockTex;
+        Texture2D bspLightmapBlockTex;
+        Texture2D customLightmapBlockTex;
         GPUBuffer bspLightmapCoords;
         GPUBuffer customLightmapCoords;
         LightmapType lightmapType = LightmapType::Custom;
@@ -251,8 +261,8 @@ private:
     bool m_bNeedRefreshFB = true;
     glm::ivec2 m_vViewportSize = glm::ivec2(1, 1);
     GLFramebuffer m_nHdrFramebuffer;
-    GPUTexture m_nColorBuffer;
-    GPURenderbuffer m_nRenderBuffer;
+    Texture2D m_nColorBuffer;
+    RenderBuffer m_nRenderBuffer;
 
     // Global uniform buffer
     GPUBuffer m_GlobalUniformBuffer;

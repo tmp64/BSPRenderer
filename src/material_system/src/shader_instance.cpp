@@ -27,7 +27,7 @@ bool ShaderInstance::compile() {
     }
 
     ShaderStage fragmentShader;
-    vertexShader.createFragmentShader();
+    fragmentShader.createFragmentShader();
     if (!compileShader(fragmentShader, m_pShader->m_FragmentFilePath,
                        MaterialSystem::get().getGlobalFragmentShaderDefs(),
                        m_pShader->m_Defs.toStringFragment())) {
@@ -51,6 +51,10 @@ bool ShaderInstance::compile() {
 
     // Load uniforms
     m_pShader->loadUniformLocations(m_Prog.getId());
+    
+    enable();
+    m_pShader->onShaderCompiled();
+    disable();
 
     return true;
 }

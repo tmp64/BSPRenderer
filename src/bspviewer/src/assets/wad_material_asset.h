@@ -1,6 +1,6 @@
 #ifndef ASSETS_MATERIAL_ASSET_H
 #define ASSETS_MATERIAL_ASSET_H
-#include <renderer/material_manager.h>
+#include <material_system/material_system.h>
 #include "asset.h"
 
 class AssetManager;

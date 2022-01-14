@@ -8,8 +8,6 @@
 #include <imgui.h>
 #include <imgui_impl_sdl.h>
 #include <imgui_impl_opengl3.h>
-#include <renderer/shader_manager.h>
-#include <renderer/material_manager.h>
 
 #include "bspviewer.h"
 

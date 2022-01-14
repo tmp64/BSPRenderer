@@ -6,8 +6,11 @@ Texture::~Texture() {
 }
 
 void Texture::create(std::string_view name) {
+    destroy();
     m_Texture.create();
     m_Name = name;
+    m_InternalFormat = GraphicsFormat::None;
+    resetProperties();
 }
 
 void Texture::destroy() {
@@ -15,6 +18,12 @@ void Texture::destroy() {
         m_Texture.destroy();
         updateMemUsage(0);
     }
+}
+
+void Texture::resetProperties() {
+    setFilter(TextureDefaults::Filter);
+    setWrapMode(TextureDefaults::Wrap);
+    setAnisoLevel(TextureDefaults::Aniso);
 }
 
 void Texture::setFilter(TextureFilter filter) {

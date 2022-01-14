@@ -21,6 +21,9 @@ public:
     //! Number of textures that a material can own.
     static constexpr int MAX_TEXTURES = 1;
 
+    //! Do not use directly, use MaterialSystem instead.
+    Material(std::string_view name);
+
     //! Binds material's textures into TUs [0, MAX_TEXTURES).
     void activateTextures() const;
 
@@ -28,9 +31,9 @@ public:
     void enableShader(unsigned typeIdx) const;
 
     inline int getWide() const { return m_iWide; }
-    inline int getTall() const { return m_iWide; }
-    inline std::string_view getName() const { return m_Name; }
-    inline std::string_view getWadName() const { return m_WadName; }
+    inline int getTall() const { return m_iTall; }
+    inline const std::string &getName() const { return m_Name; }
+    inline const std::string &getWadName() const { return m_WadName; }
     inline Texture *getTexture(int idx) const { return m_pOwnTextures[idx].get(); }
     inline bool getUsesGraphicalSettings() const { return m_bUseGraphicalSettings; }
 
@@ -46,6 +49,9 @@ public:
     //! Sets whether the material's textures should use global graphical settings.
     void setUsesGraphicalSettings(bool value);
 
+    //! Sets the material's shader.
+    void setShader(Shader *shader);
+
 private:
     int m_iWide = 0;
     int m_iTall = 0;
@@ -55,8 +61,6 @@ private:
     std::unique_ptr<Texture> m_pOwnTextures[MAX_TEXTURES];
     bool m_bUseGraphicalSettings = false;
     Shader *m_pShader = nullptr;
-
-    Material(std::string_view name);
 
     friend class MaterialSystem;
 };

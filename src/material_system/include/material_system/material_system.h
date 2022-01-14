@@ -30,20 +30,20 @@ public:
 
     //! Adds a definition to all shaders.
     template <typename T>
-    void addSharedShaderDef(const T &value) {
-        m_GlobalShaderDefs.addSharedDef(value);
+    void addSharedShaderDef(std::string_view key, const T &value) {
+        m_GlobalShaderDefs.addSharedDef(key, value);
     }
 
     //! Adds a definition to all vertex shaders.
     template <typename T>
-    void addVertexShaderDef(const T &value) {
-        m_GlobalShaderDefs.addVertexDef(value);
+    void addVertexShaderDef(std::string_view key, const T &value) {
+        m_GlobalShaderDefs.addVertexDef(key, value);
     }
 
     //! Adds a definition to all fragment shaders.
     template <typename T>
-    void addFragmentShaderDef(const T &value) {
-        m_GlobalShaderDefs.addFragmentDef(value);
+    void addFragmentShaderDef(std::string_view key, const T &value) {
+        m_GlobalShaderDefs.addFragmentDef(key, value);
     }
 
     inline std::string getGlobalVertexShaderDefs() { return m_GlobalShaderDefs.toStringVertex(); }

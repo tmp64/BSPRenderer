@@ -53,6 +53,7 @@ target_link_libraries(bspviewer
 	gui_app_base
 	app_gui_launcher
 	material_props
+	renderer
 )
 
 target_precompile_headers(bspviewer PRIVATE

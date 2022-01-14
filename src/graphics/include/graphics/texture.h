@@ -72,6 +72,9 @@ public:
     //! @returns whether the texture can be used for rendering.
     inline bool isValid() const { return m_InternalFormat != GraphicsFormat::None; }
 
+    //! Resets filtering and wrapping properties to defaults.
+    virtual void resetProperties();
+
     inline GLuint getId() const { return m_Texture; }
     inline GLenum getGLTarget() const { return m_Target; }
     inline TextureDimension getDimension() const { return m_Dimension; }

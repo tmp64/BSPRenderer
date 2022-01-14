@@ -1,7 +1,7 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 #include <appfw/utils.h>
-#include <renderer/gpu_managed_objects.h>
+#include <graphics/texture2d.h>
 #include <renderer/scene_renderer.h>
 #include <renderer/renderer_engine_interface.h>
 #include "assets/level_asset.h"
@@ -85,10 +85,11 @@ private:
     GLVao m_BoxVao;
     GPUBuffer m_BoxVbo;
     GPUBuffer m_BoxInstances;
+    Material *m_pBoxMaterial = nullptr;
 
     // Backbuffer
     GLFramebuffer m_Framebuffer;
-    GPUTexture m_ColorBuffer;
+    Texture2D m_ColorBuffer;
 
     // Main view
     glm::vec3 m_vPosition = {0.f, 0.f, 0.f};

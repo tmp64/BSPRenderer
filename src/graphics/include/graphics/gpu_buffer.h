@@ -20,6 +20,9 @@ public:
     //! Binds the buffer (calls glBindBuffer);
     inline void bind() const { glBindBuffer(m_Target, m_Buf); }
 
+    //! Unbinds the buffer (or any other buffer from the target).
+    inline void unbind() const { glBindBuffer(m_Target, 0); }
+
     //! Creates the buffer. data can be null.
     //! Changes currently bound buffer.
     void init(GLsizeiptr size, const void *data, GLenum usage);

@@ -6,8 +6,10 @@ RenderBuffer::~RenderBuffer() {
 }
 
 void RenderBuffer::create(std::string_view name) {
+    destroy();
     m_Buf.create();
     m_Name = name;
+    m_InternalFormat = GraphicsFormat::None;
 }
 
 void RenderBuffer::destroy() {

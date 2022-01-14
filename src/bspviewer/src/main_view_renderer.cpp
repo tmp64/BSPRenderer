@@ -1,4 +1,5 @@
 #include <appfw/str_utils.h>
+#include <material_system/shader.h>
 #include <renderer/utils.h>
 #include "main_view_renderer.h"
 #include "world_state.h"
@@ -34,12 +35,14 @@ static ConCommand cmd_setpos("setpos", "", [](const CmdString &cmd) {
     }
 });
 
-class EntityBoxShader : public BaseShader {
+class EntityBoxShader : public ShaderT<EntityBoxShader> {
 public:
-    EntityBoxShader() {
+    EntityBoxShader(unsigned type = 0)
+        : BaseClass(type) {
         setTitle("EntityBoxShader");
         setVert("assets:shaders/entity_box.vert");
         setFrag("assets:shaders/entity_box.frag");
+        setTypes(SHADER_TYPE_CUSTOM);
 
         addUniform(m_uGlobalUniform, "GlobalUniform", SceneRenderer::GLOBAL_UNIFORM_BIND);
     }
@@ -79,17 +82,17 @@ MainViewRenderer::MainViewRenderer() {
         bv[5], bn[2], bv[4], bn[2], bv[6], bn[2], bv[7], bn[3], bv[3], bn[3], bv[1], bn[3],
         bv[3], bn[4], bv[2], bn[4], bv[0], bn[4], bv[1], bn[5], bv[0], bn[5], bv[4], bn[5]};
 
-    m_BoxVbo.create("Entity Box VBO");
-    m_BoxVbo.bind(GL_ARRAY_BUFFER);
-    m_BoxVbo.bufferData(GL_ARRAY_BUFFER, sizeof(faceVerts), &faceVerts, GL_STATIC_DRAW);
+    m_BoxVbo.create(GL_ARRAY_BUFFER, "Entity Box VBO");
+    m_BoxVbo.bind();
+    m_BoxVbo.init(sizeof(faceVerts), &faceVerts, GL_STATIC_DRAW);
 
-    m_BoxInstances.create("Entity Box Instances");
-    m_BoxInstances.bind(GL_ARRAY_BUFFER);
-    m_BoxInstances.bufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * MAX_VISIBLE_ENTS, nullptr, GL_DYNAMIC_DRAW);
+    m_BoxInstances.create(GL_ARRAY_BUFFER, "Entity Box Instances");
+    m_BoxInstances.bind();
+    m_BoxInstances.init(sizeof(glm::mat4) * MAX_VISIBLE_ENTS, nullptr, GL_DYNAMIC_DRAW);
 
     m_BoxVao.create();
     glBindVertexArray(m_BoxVao);
-    m_BoxVbo.bind(GL_ARRAY_BUFFER);
+    m_BoxVbo.bind();
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, false, 2 * sizeof(glm::vec3), (void *)0); // position
     glEnableVertexAttribArray(1);
@@ -97,7 +100,7 @@ MainViewRenderer::MainViewRenderer() {
                           (void *)sizeof(glm::vec3)); // normal
 
     // transformations attribute
-    m_BoxInstances.bind(GL_ARRAY_BUFFER);
+    m_BoxInstances.bind();
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 4, GL_FLOAT, false, sizeof(glm::mat4),
                           (void *)(0 * sizeof(glm::vec4)));
@@ -117,11 +120,17 @@ MainViewRenderer::MainViewRenderer() {
 
     m_BoxTransforms.resize(MAX_VISIBLE_ENTS);
     glBindVertexArray(0);
+
+    m_pBoxMaterial = MaterialSystem::get().createMaterial("Entity Box");
+    m_pBoxMaterial->setSize(1, 1);
+    m_pBoxMaterial->setShader(&s_EntityBoxShader);
 }
 
 MainViewRenderer::~MainViewRenderer() {
     AFW_ASSERT(m_spInstance == this);
     m_spInstance = nullptr;
+    MaterialSystem::get().destroyMaterial(m_pBoxMaterial);
+    m_pBoxMaterial = nullptr;
 }
 
 bool MainViewRenderer::isWorldRenderingEnabled() {
@@ -296,11 +305,11 @@ Material *MainViewRenderer::getMaterial(const bsp::BSPMipTex &tex) {
 
 void MainViewRenderer::drawNormalTriangles(unsigned &drawcallCount) {
     if (m_uBoxCount > 0) {
+        m_pBoxMaterial->activateTextures();
+        m_pBoxMaterial->enableShader(SHADER_TYPE_CUSTOM_IDX);
         glBindVertexArray(m_BoxVao);
-        s_EntityBoxShader.enable();
         glDrawArraysInstanced(GL_TRIANGLES, 0, BOX_VERT_COUNT, m_uBoxCount);
         drawcallCount++;
-        s_EntityBoxShader.disable();
         glBindVertexArray(0);
     }
 }
@@ -358,20 +367,16 @@ void MainViewRenderer::updateVisibleEnts() {
 
     // Update box buffer
     if (m_uBoxCount > 0) {
-        m_BoxInstances.bind(GL_ARRAY_BUFFER);
-        m_BoxInstances.bufferSubData(GL_ARRAY_BUFFER, 0, m_uBoxCount * sizeof(glm::mat4),
-                                     m_BoxTransforms.data());
+        m_BoxInstances.bind();
+        m_BoxInstances.update(0, m_uBoxCount * sizeof(glm::mat4), m_BoxTransforms.data());
     }
 }
 
 void MainViewRenderer::refreshFramebuffer() {
     // Create color buffer
     m_ColorBuffer.create("Main View FB");
-    glBindTexture(GL_TEXTURE_2D, m_ColorBuffer.getId());
-    m_ColorBuffer.texImage2D(GL_TEXTURE_2D, 0, GL_RGB8, m_vViewportSize.x, m_vViewportSize.y, 0,
-                              GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    m_ColorBuffer.initTexture(GraphicsFormat::RGB8, m_vViewportSize.x, m_vViewportSize.y, false,
+                              GL_RGB, GL_UNSIGNED_BYTE, nullptr);
 
     // Attach buffers
     m_Framebuffer.create();

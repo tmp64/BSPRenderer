@@ -26,10 +26,18 @@ void Shader::addUniform(ShaderUniform &uniform, const char *name) {
     m_Uniforms.push_back(&uniform);
 }
 
+void Shader::addUniform(UniformBlock &uniform, const char *name, GLuint bindingPoint) {
+    uniform.setName(name);
+    uniform.setBindingPoint(bindingPoint);
+    m_UniformBlocks.push_back(&uniform);
+}
+
+void Shader::onShaderCompiled() {}
+
 void Shader::createShaderInstances() {
     for (unsigned i = 0; i < MAX_SHADER_TYPE_COUNT; i++) {
-        if (m_uShaderTypes & (1 << i)) {
-            std::unique_ptr<Shader> shaderInfo = createShaderInfoInstance(i);
+        if (m_uShaderTypes & (1u << i)) {
+            std::unique_ptr<Shader> shaderInfo = createShaderInfoInstance(1u << i);
             auto shader = std::make_unique<ShaderInstance>(shaderInfo);
 
             if (shader->compile()) {
@@ -51,4 +59,18 @@ void Shader::loadUniformLocations(GLuint progId) {
     for (ShaderUniform *uniform : m_Uniforms) {
         uniform->loadLocation(progId);
     }
+
+    for (UniformBlock *uniform : m_UniformBlocks) {
+        uniform->load(progId);
+    }
+}
+
+void Shader::UniformBlock::load(GLuint progId) {
+    m_nIndex = glGetUniformBlockIndex(progId, m_pszUniformName);
+
+    if (m_nIndex == GL_INVALID_INDEX) {
+        printe("Uniform block {} not found", m_pszUniformName);
+    }
+
+    glUniformBlockBinding(progId, m_nIndex, m_nBindingPoint);
 }

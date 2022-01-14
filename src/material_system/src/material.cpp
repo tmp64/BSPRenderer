@@ -44,6 +44,10 @@ const CheckerboardImage &CheckerboardImage::get() {
 //----------------------------------------------------------------
 // Material
 //----------------------------------------------------------------
+Material::Material(std::string_view name) {
+    m_Name = name;
+}
+
 void Material::activateTextures() const {
     AFW_ASSERT(m_iWide > 0 && m_iTall > 0);
 
@@ -88,4 +92,8 @@ void Material::setTexture(int idx, std::unique_ptr<Texture> &&pTexture) {
 
 void Material::setUsesGraphicalSettings(bool value) {
     m_bUseGraphicalSettings = value;
+}
+
+void Material::setShader(Shader *shader) {
+    m_pShader = shader;
 }

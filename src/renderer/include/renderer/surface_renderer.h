@@ -4,7 +4,7 @@
 #include <appfw/appfw.h>
 #include <bsp/level.h>
 #include <glm/glm.hpp>
-#include <renderer/material_manager.h>
+#include <material_system/material.h>
 
 /**
  * Error for checking on which side of plane a point is.

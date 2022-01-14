@@ -3,6 +3,7 @@
 #include <appfw/prof.h>
 #include <app_base/lightmap.h>
 #include <stb_image.h>
+#include <material_system/shader_instance.h>
 #include <renderer/scene_renderer.h>
 #include <renderer/renderer_engine_interface.h>
 #include <imgui.h>
@@ -371,10 +372,13 @@ void SceneRenderer::setSurfaceTint(int surface, glm::vec4 color) {
     color.g = pow(color.g, 2.2f);
     color.b = pow(color.b, 2.2f);
     std::vector<glm::vec4> colors(surf.m_iVertexCount, color);
-    m_Data.surfTintBuf.bind(GL_ARRAY_BUFFER);
-    m_Data.surfTintBuf.bufferSubData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * surf.m_nFirstVertex,
-                                     sizeof(glm::vec4) * colors.size(), colors.data());
+    m_Data.surfTintBuf.bind();
+    m_Data.surfTintBuf.update(sizeof(glm::vec4) * surf.m_nFirstVertex,
+                              sizeof(glm::vec4) * colors.size(), colors.data());
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+Shader *SceneRenderer::getDefaultSurfaceShader() {
+    return &Shaders::world;
 }
 #endif
 
@@ -390,11 +394,11 @@ void SceneRenderer::createScreenQuad() {
     // clang-format on
 
     m_nQuadVao.create();
-    m_nQuadVbo.create("SceneRenderer: Quad VBO");
+    m_nQuadVbo.create(GL_ARRAY_BUFFER, "SceneRenderer: Quad VBO");
 
     glBindVertexArray(m_nQuadVao);
-    m_nQuadVbo.bind(GL_ARRAY_BUFFER);
-    m_nQuadVbo.bufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    m_nQuadVbo.bind();
+    m_nQuadVbo.init(sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(1);
@@ -403,10 +407,10 @@ void SceneRenderer::createScreenQuad() {
 }
 
 void SceneRenderer::createGlobalUniform() {
-    m_GlobalUniformBuffer.create("SceneRenderer: Global Uniform");
-    m_GlobalUniformBuffer.bind(GL_UNIFORM_BUFFER);
-    m_GlobalUniformBuffer.bufferData(GL_UNIFORM_BUFFER, sizeof(GlobalUniform), nullptr, GL_DYNAMIC_DRAW);
-    m_GlobalUniformBuffer.unbind(GL_UNIFORM_BUFFER);
+    m_GlobalUniformBuffer.create(GL_UNIFORM_BUFFER, "SceneRenderer: Global Uniform");
+    m_GlobalUniformBuffer.bind();
+    m_GlobalUniformBuffer.init(sizeof(GlobalUniform), nullptr, GL_DYNAMIC_DRAW);
+    m_GlobalUniformBuffer.unbind();
 }
 
 void SceneRenderer::recreateFramebuffer() {
@@ -414,17 +418,12 @@ void SceneRenderer::recreateFramebuffer() {
 
     // Create FP color buffer
     m_nColorBuffer.create("SceneRenderer: Backbuffer color buffer");
-    glBindTexture(GL_TEXTURE_2D, m_nColorBuffer.getId());
-    m_nColorBuffer.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_vViewportSize.x, m_vViewportSize.y, 0,
-                              GL_RGBA, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    m_nColorBuffer.initTexture(GraphicsFormat::RGBA16F, m_vViewportSize.x, m_vViewportSize.y, false,
+                               GL_RGBA, GL_FLOAT, nullptr);
 
     // Create depth buffer
     m_nRenderBuffer.create("SceneRenderer: Backbuffer depth buffer");
-    glBindRenderbuffer(GL_RENDERBUFFER, m_nRenderBuffer.getId());
-    m_nRenderBuffer.renderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, m_vViewportSize.x,
-                                        m_vViewportSize.y);
+    m_nRenderBuffer.init(GraphicsFormat::Depth32, m_vViewportSize.x, m_vViewportSize.y);
 
     // Attach buffers
     m_nHdrFramebuffer.create();
@@ -568,17 +567,15 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
 
 void SceneRenderer::finishLoadBSPLightmaps() {
     // Load the block into the GPU
-    m_Data.bspLightmapBlockTex.create("SceneRenderer: BSP lightmap block");
-    int filter = r_filter_lm.getValue() ? GL_LINEAR : GL_NEAREST;
-    glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex.getId());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-    m_Data.bspLightmapBlockTex.texImage2D(GL_TEXTURE_2D, 0, GL_RGB8, BSP_LIGHTMAP_BLOCK_SIZE,
-                                          BSP_LIGHTMAP_BLOCK_SIZE, 0, GL_RGB, GL_UNSIGNED_BYTE,
-                                          m_pLoadingState->bspLightmapBlock.getData());
-    glGenerateMipmap(GL_TEXTURE_2D);
+    Texture2D &texture = m_Data.bspLightmapBlockTex;
+    TextureFilter filter =
+        r_filter_lm.getValue() ? TextureFilter::Bilinear : TextureFilter::Nearest;
+    texture.create("SceneRenderer: BSP lightmap block");
+    texture.setWrapMode(TextureWrapMode::Clamp);
+    texture.setFilter(filter);
+    texture.initTexture(GraphicsFormat::RGB8, BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE,
+                        false, GL_RGB, GL_UNSIGNED_BYTE,
+                        m_pLoadingState->bspLightmapBlock.getData());
 
     m_pLoadingState->bspLightmapBlock.clear();
     printi("BSP lightmaps: loaded.");
@@ -714,17 +711,14 @@ void SceneRenderer::finishLoadCustomLightmaps() {
     auto &blockData = m_pLoadingState->customLightmapTex;
 
     // Load the block into the GPU
-    m_Data.customLightmapBlockTex.create("SceneRenderer: custom lightmap block");
-    int filter = r_filter_lm.getValue() ? GL_LINEAR : GL_NEAREST;
-    glBindTexture(GL_TEXTURE_2D, m_Data.customLightmapBlockTex.getId());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-    m_Data.customLightmapBlockTex.texImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, blockSize.x, blockSize.y, 0,
-                                             GL_RGB, GL_FLOAT,
-                 blockData.data());
-    glGenerateMipmap(GL_TEXTURE_2D);
+    Texture2D &texture = m_Data.customLightmapBlockTex;
+    TextureFilter filter =
+        r_filter_lm.getValue() ? TextureFilter::Bilinear : TextureFilter::Nearest;
+    texture.create("SceneRenderer: custom lightmap block");
+    texture.setWrapMode(TextureWrapMode::Clamp);
+    texture.setFilter(filter);
+    texture.initTexture(GraphicsFormat::RGB16F, blockSize.x, blockSize.y, false, GL_RGB, GL_FLOAT,
+                        blockData.data());
 
     blockData.clear();
 
@@ -733,12 +727,12 @@ void SceneRenderer::finishLoadCustomLightmaps() {
     if (!patchBuf.empty()) {
         m_Data.patchesVerts = (uint32_t)patchBuf.size();
         m_Data.patchesVao.create();
-        m_Data.patchesVbo.create("SceneRenderer: Patches");
+        m_Data.patchesVbo.create(GL_ARRAY_BUFFER , "SceneRenderer: Patches");
 
         glBindVertexArray(m_Data.patchesVao);
-        m_Data.patchesVbo.bind(GL_ARRAY_BUFFER);
-        m_Data.patchesVbo.bufferData(GL_ARRAY_BUFFER, m_Data.patchesVerts * sizeof(glm::vec3),
-                                     patchBuf.data(), GL_STATIC_DRAW);
+        m_Data.patchesVbo.bind();
+        m_Data.patchesVbo.init(m_Data.patchesVerts * sizeof(glm::vec3), patchBuf.data(),
+                               GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
     }
@@ -835,24 +829,22 @@ void SceneRenderer::finishCreateSurfaceObjects() {
     auto &allVertices = m_pLoadingState->allVertices;
 
     // Lightmap coord buffers
-    m_Data.bspLightmapCoords.create("BSP lm coords");
-    m_Data.bspLightmapCoords.bind(GL_ARRAY_BUFFER);
-    m_Data.bspLightmapCoords.bufferData(GL_ARRAY_BUFFER,
-                                        sizeof(glm::vec2) * m_pLoadingState->bspLMCoordsBuf.size(),
-                                        m_pLoadingState->bspLMCoordsBuf.data(), GL_STATIC_DRAW);
+    m_Data.bspLightmapCoords.create(GL_ARRAY_BUFFER, "BSP lm coords");
+    m_Data.bspLightmapCoords.bind();
+    m_Data.bspLightmapCoords.init(sizeof(glm::vec2) * m_pLoadingState->bspLMCoordsBuf.size(),
+                                  m_pLoadingState->bspLMCoordsBuf.data(), GL_STATIC_DRAW);
 
-    m_Data.customLightmapCoords.create("Custom lm coords");
-    m_Data.customLightmapCoords.bind(GL_ARRAY_BUFFER);
-    m_Data.customLightmapCoords.bufferData(
-        GL_ARRAY_BUFFER, sizeof(glm::vec2) * m_pLoadingState->customLMCoordsBuf.size(),
-        m_pLoadingState->customLMCoordsBuf.data(), GL_STATIC_DRAW);
+    m_Data.customLightmapCoords.create(GL_ARRAY_BUFFER, "Custom lm coords");
+    m_Data.customLightmapCoords.bind();
+    m_Data.customLightmapCoords.init(sizeof(glm::vec2) * m_pLoadingState->customLMCoordsBuf.size(),
+                                     m_pLoadingState->customLMCoordsBuf.data(), GL_STATIC_DRAW);
 
     // Surface vertices
-    m_Data.surfVbo.create("SceneRenderer: Surface vertices");
-    m_Data.surfVbo.bind(GL_ARRAY_BUFFER);
-    m_Data.surfVbo.bufferData(GL_ARRAY_BUFFER, sizeof(SurfaceVertex) * allVertices.size(),
-                              allVertices.data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    m_Data.surfVbo.create(GL_ARRAY_BUFFER, "SceneRenderer: Surface vertices");
+    m_Data.surfVbo.bind();
+    m_Data.surfVbo.init(sizeof(SurfaceVertex) * allVertices.size(), allVertices.data(),
+                        GL_STATIC_DRAW);
+    m_Data.surfVbo.unbind();
 
     // Set lightmap type
     if (m_Data.customLightmapBlockTex.getId()) {
@@ -865,10 +857,9 @@ void SceneRenderer::finishCreateSurfaceObjects() {
 #ifdef RENDERER_SUPPORT_TINTING
     {
         std::vector<glm::vec4> defaultTint(allVertices.size(), glm::vec4(0, 0, 0, 0));
-        m_Data.surfTintBuf.create("Surface tinting");
-        m_Data.surfTintBuf.bind(GL_ARRAY_BUFFER);
-        m_Data.surfTintBuf.bufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * defaultTint.size(),
-                                      defaultTint.data(), GL_DYNAMIC_DRAW);
+        m_Data.surfTintBuf.create(GL_ARRAY_BUFFER, "Surface tinting");
+        m_Data.surfTintBuf.init(sizeof(glm::vec4) * defaultTint.size(), defaultTint.data(),
+                                GL_DYNAMIC_DRAW);
     }
 #endif
 
@@ -879,11 +870,10 @@ void SceneRenderer::finishCreateSurfaceObjects() {
     printi("Maximum EBO size: {} B", maxEboSize * sizeof(uint16_t));
     printi("Vertex count: {}", allVertices.size());
     m_Data.surfEboData.resize(maxEboSize);
-    m_Data.surfEbo.create("SceneRenderer: Surface vertex indices");
-    m_Data.surfEbo.bind(GL_ELEMENT_ARRAY_BUFFER);
-    m_Data.surfEbo.bufferData(GL_ELEMENT_ARRAY_BUFFER, maxEboSize * sizeof(uint16_t), nullptr,
-                              GL_DYNAMIC_DRAW);
-    m_Data.surfEbo.unbind(GL_ELEMENT_ARRAY_BUFFER);
+    m_Data.surfEbo.create(GL_ELEMENT_ARRAY_BUFFER, "SceneRenderer: Surface vertex indices");
+    m_Data.surfEbo.bind();
+    m_Data.surfEbo.init(maxEboSize * sizeof(uint16_t), nullptr, GL_DYNAMIC_DRAW);
+    m_Data.surfEbo.unbind();
 
     printi("Surface objects: finished");
 }
@@ -895,7 +885,7 @@ void SceneRenderer::updateVao() {
     glBindVertexArray(m_Data.surfVao);
 
     // Common attributes
-    m_Data.surfVbo.bind(GL_ARRAY_BUFFER);
+    m_Data.surfVbo.bind();
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
@@ -908,9 +898,9 @@ void SceneRenderer::updateVao() {
 
     // Lightmap attributes
     if (m_Data.lightmapType == LightmapType::BSP) {
-        m_Data.bspLightmapCoords.bind(GL_ARRAY_BUFFER);
+        m_Data.bspLightmapCoords.bind();
     } else {
-        m_Data.customLightmapCoords.bind(GL_ARRAY_BUFFER);
+        m_Data.customLightmapCoords.bind();
     }
 
     glEnableVertexAttribArray(3);
@@ -918,7 +908,7 @@ void SceneRenderer::updateVao() {
 
 #ifdef RENDERER_SUPPORT_TINTING
     // Tinting
-    m_Data.surfTintBuf.bind(GL_ARRAY_BUFFER);
+    m_Data.surfTintBuf.bind();
     glEnableVertexAttribArray(4);
     glVertexAttribPointer(4, 4, GL_FLOAT, false, sizeof(glm::vec4), reinterpret_cast<void *>(0));
 #endif
@@ -935,7 +925,7 @@ void SceneRenderer::loadTextures() {
         Material *mat = m_pEngine->getMaterial(tex);
 
         if (!mat) {
-            mat = MaterialManager::get().getNullMaterial();
+            mat = MaterialSystem::get().getNullMaterial();
         }
 
         m_Surf.setSurfaceMaterial(i, mat);
@@ -1088,8 +1078,8 @@ void SceneRenderer::frameSetup(float flSimTime, float flTimeDelta) {
         m_GlobalUniform.vflParams2.x = 1.0f;
     }
     
-    m_GlobalUniformBuffer.bind(GL_UNIFORM_BUFFER);
-    m_GlobalUniformBuffer.bufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(m_GlobalUniform), &m_GlobalUniform);
+    m_GlobalUniformBuffer.bind();
+    m_GlobalUniformBuffer.update(0, sizeof(m_GlobalUniform), &m_GlobalUniform);
     glBindBufferBase(GL_UNIFORM_BUFFER, GLOBAL_UNIFORM_BIND, m_GlobalUniformBuffer.getId());
 
     // Bind lightmap - will be used for world and brush ents
@@ -1157,9 +1147,6 @@ void SceneRenderer::drawWorldSurfaces() {
 }
 
 void SceneRenderer::drawWorldSurfacesVao() {
-    Shaders::world.enable();
-    Shaders::world.setupUniforms();
-
     auto &textureChain = m_Data.viewContext.getWorldTextureChain();
     auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
     unsigned frame = m_Data.viewContext.getWorldTextureChainFrame();
@@ -1174,15 +1161,11 @@ void SceneRenderer::drawWorldSurfacesVao() {
 
         // Bind material
         const Material &mat = *m_Data.surfaces[textureChain[i][0]].m_pMat;
-        mat.bindSurfaceTextures();
+        mat.activateTextures();
+        mat.enableShader(SHADER_TYPE_WORLD_IDX);
 
         for (unsigned j : textureChain[i]) {
             Surface &surf = m_Data.surfaces[j];
-
-            if (r_texture.getValue() == 1) {
-                Shaders::world.setColor(surf.m_Color);
-            }
-
             glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
         }
 
@@ -1190,7 +1173,6 @@ void SceneRenderer::drawWorldSurfacesVao() {
     }
 
     glBindVertexArray(0);
-    Shaders::world.disable();
 
     m_Stats.uRenderedWorldPolys = drawnSurfs;
     m_Stats.uDrawCallCount += drawnSurfs;
@@ -1206,12 +1188,9 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 
     // Bind buffers
     glBindVertexArray(m_Data.surfVao);
-    m_Data.surfEbo.bind(GL_ELEMENT_ARRAY_BUFFER);
+    m_Data.surfEbo.bind();
     glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
     glEnable(GL_PRIMITIVE_RESTART);
-
-    Shaders::world.enable();
-    Shaders::world.setupUniforms();
 
     for (size_t i = 0; i < textureChain.size(); i++) {
         if (textureChainFrames[i] != frame) {
@@ -1220,7 +1199,8 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 
         // Bind material
         const Material &mat = *m_Data.surfaces[textureChain[i][0]].m_pMat;
-        mat.bindSurfaceTextures();
+        mat.activateTextures();
+        mat.enableShader(SHADER_TYPE_WORLD_IDX);
 
         // Fill the EBO
         unsigned eboIdx = 0;
@@ -1242,7 +1222,7 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
         eboIdx--;
 
         // Update EBO
-        glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
+        m_Data.surfEbo.update(0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
 
         // Draw elements
         glDrawElements(GL_TRIANGLE_FAN, eboIdx, GL_UNSIGNED_SHORT, nullptr);
@@ -1250,8 +1230,6 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
         drawnSurfs += (unsigned)textureChain[i].size();
         m_Stats.uDrawCallCount++;
     }
-
-    Shaders::world.disable();
 
     if (r_wireframe.getValue()) {
         unsigned eboIdx = 0;
@@ -1280,13 +1258,16 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
             // Decrement EBO size to remove last PRIMITIVE_RESTART_IDX
             eboIdx--;
 
-            Shaders::brushent.enable();
-            Shaders::brushent.m_uRenderMode.set(kRenderTransColor);
-            Shaders::brushent.m_uFxAmount.set(1.0);
-            Shaders::brushent.m_uFxColor.set({1.0, 1.0, 1.0});
+            ShaderInstance *shaderInstance =
+                Shaders::brushent.getShaderInstance(SHADER_TYPE_BRUSH_MODEL);
+            auto &shaderInfo = shaderInstance->getShader<BrushEntityShader>();
+            shaderInstance->enable();
+            shaderInfo.m_uRenderMode.set(kRenderTransColor);
+            shaderInfo.m_uFxAmount.set(1.0);
+            shaderInfo.m_uFxColor.set({1.0, 1.0, 1.0});
 
             // Update EBO
-            glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
+            m_Data.surfEbo.update(0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
 
             // Draw elements
             glEnable(GL_POLYGON_OFFSET_LINE);
@@ -1296,8 +1277,6 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
             glDisable(GL_POLYGON_OFFSET_LINE);
             m_Stats.uDrawCallCount++;
-
-            Shaders::brushent.disable();
         }
     }
 
@@ -1310,6 +1289,7 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 void SceneRenderer::drawSkySurfaces() {
     appfw::Prof prof("Draw sky");
 
+    /*
     if (!m_Data.viewContext.getSkySurfaces().empty()) {
         glDepthFunc(GL_LEQUAL);
 
@@ -1329,9 +1309,11 @@ void SceneRenderer::drawSkySurfaces() {
 
         glDepthFunc(GL_LESS);
     }
+    */
 }
 
 void SceneRenderer::drawSkySurfacesVao() {
+    /*
     glBindVertexArray(m_Data.surfVao);
 
     for (unsigned i : m_Data.viewContext.getSkySurfaces()) {
@@ -1342,11 +1324,13 @@ void SceneRenderer::drawSkySurfacesVao() {
     glBindVertexArray(0);
     m_Stats.uRenderedSkyPolys = (unsigned)m_Data.viewContext.getSkySurfaces().size();
     m_Stats.uDrawCallCount += m_Stats.uRenderedSkyPolys;
+    */
 }
 
 void SceneRenderer::drawSkySurfacesIndexed() {
     AFW_ASSERT(!m_Data.surfEboData.empty());
 
+    /*
     // Bind buffers
     glBindVertexArray(m_Data.surfVao);
     m_Data.surfEbo.bind(GL_ELEMENT_ARRAY_BUFFER);
@@ -1384,14 +1368,11 @@ void SceneRenderer::drawSkySurfacesIndexed() {
     glDisable(GL_PRIMITIVE_RESTART);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+    */
 }
 
 void SceneRenderer::drawSolidEntities() {
     appfw::Prof prof("Solid");
-
-    Shaders::brushent.enable();
-    Shaders::brushent.setupUniforms();
-    Shaders::brushent.m_uFxAmount.set(1);
 
     // Sort opaque entities
     auto sortFn = [this](ClientEntity *const &lhs, ClientEntity *const &rhs) {
@@ -1430,9 +1411,6 @@ void SceneRenderer::drawSolidTriangles() {
 
 void SceneRenderer::drawTransEntities() {
     appfw::Prof prof("Trans");
-
-    Shaders::brushent.enable();
-    Shaders::brushent.setupUniforms();
 
     if (!r_nosort.getValue()) {
         // Sort entities based on render mode and distance
@@ -1487,9 +1465,12 @@ void SceneRenderer::drawTransTriangles() {
 }
 
 void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
-    Shaders::brushent.enable();
-
     Model *model = clent->getModel();
+
+    ShaderInstance *shaderInstance =
+        Shaders::brushent.getShaderInstance(SHADER_TYPE_BRUSH_MODEL_IDX);
+    auto &shader = shaderInstance->getShader<BrushEntityShader>();
+    shaderInstance->enable();
 
     // Frustum culling
     glm::vec3 mins, maxs;
@@ -1513,12 +1494,12 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
     modelMat = glm::translate(modelMat, clent->getOrigin());
-    Shaders::brushent.m_uModelMat.set(modelMat);
+    shader.m_uModelMat.set(modelMat);
 
     // Render mode
     AFW_ASSERT(clent->getRenderMode() == kRenderNormal || clent->getRenderMode() == kRenderTransAlpha);
     setRenderMode(clent->getRenderMode());
-    Shaders::brushent.m_uRenderMode.set(clent->getRenderMode());
+    shader.m_uRenderMode.set(clent->getRenderMode());
 
     // Draw surfaces
     auto &surfs = m_Data.optBrushModels[model->getOptModelIdx()].surfs;
@@ -1538,8 +1519,8 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
         } else if (r_texture.getValue() == 2) {
             // Bind material
             if (lastMat != surf.m_pMat) {
-                surf.m_pMat->bindSurfaceTextures();
                 lastMat = surf.m_pMat;
+                lastMat->activateTextures();
             }
         }
 
@@ -1551,9 +1532,12 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
 }
 
 void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
-    Shaders::brushent.enable();
-
     Model *model = clent->getModel();
+
+    ShaderInstance *shaderInstance =
+        Shaders::brushent.getShaderInstance(SHADER_TYPE_BRUSH_MODEL_IDX);
+    auto &shader = shaderInstance->getShader<BrushEntityShader>();
+    shaderInstance->enable();
 
     // Frustum culling
     glm::vec3 mins, maxs;
@@ -1577,17 +1561,17 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
     modelMat = glm::translate(modelMat, clent->getOrigin());
-    Shaders::brushent.m_uModelMat.set(modelMat);
+    shader.m_uModelMat.set(modelMat);
 
     // Render mode
     if (!r_notrans.getValue()) {
         setRenderMode(clent->getRenderMode());
-        Shaders::brushent.m_uRenderMode.set(clent->getRenderMode());
-        Shaders::brushent.m_uFxAmount.set(clent->getFxAmount() / 255.f);
-        Shaders::brushent.m_uFxColor.set(glm::vec3(clent->getFxColor()) / 255.f);
+        shader.m_uRenderMode.set(clent->getRenderMode());
+        shader.m_uFxAmount.set(clent->getFxAmount() / 255.f);
+        shader.m_uFxColor.set(glm::vec3(clent->getFxColor()) / 255.f);
     } else {
         setRenderMode(kRenderNormal);
-        Shaders::brushent.m_uRenderMode.set(kRenderNormal);
+        shader.m_uRenderMode.set(kRenderNormal);
     }
 
     bool needSort = false;
@@ -1643,12 +1627,7 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
 
 void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
     // Bind material
-    surf.m_pMat->bindSurfaceTextures();
-
-    if (r_texture.getValue() == 1) {
-        Shaders::brushent.setColor(surf.m_Color);
-    }
-
+    surf.m_pMat->activateTextures();
     glBindVertexArray(m_Data.surfVao);
     glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
     m_Stats.uDrawCallCount++;
@@ -1657,30 +1636,32 @@ void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
 
 void SceneRenderer::drawPatches() {
     appfw::Prof prof("Patches");
-    Shaders::patches.enable();
-    Shaders::patches.setupSceneUniforms(*this);
+
+    ShaderInstance *shaderInstance =
+        Shaders::patches.getShaderInstance(SHADER_TYPE_CUSTOM_IDX);
+    auto &shader = shaderInstance->getShader<PatchesShader>();
+    shaderInstance->enable();
+    shader.setupSceneUniforms(*this);
+
     glBindVertexArray(m_Data.patchesVao);
     glPointSize(5);
     glDrawArrays(GL_LINES, 0, m_Data.patchesVerts);
     m_Stats.uDrawCallCount++;
     glBindVertexArray(0);
-    Shaders::patches.disable();
 }
 
 void SceneRenderer::doPostProcessing() {
     appfw::Prof prof("Post-Processing");
 
-    Shaders::postprocess.enable();
+    ShaderInstance *shaderInstance = Shaders::postprocess.getShaderInstance(SHADER_TYPE_BLIT_IDX);
+    shaderInstance->enable();
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_nColorBuffer.getId());
-
-    Shaders::postprocess.setupUniforms();
 
     glBindVertexArray(m_nQuadVao);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
-
-    Shaders::postprocess.disable();
 }
 
 void SceneRenderer::setRenderMode(RenderMode mode) {

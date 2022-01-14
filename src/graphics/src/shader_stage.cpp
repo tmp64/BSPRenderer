@@ -40,7 +40,7 @@ void ShaderStage::createVertexShader() {
 
 void ShaderStage::createFragmentShader() {
     destroy();
-    m_Id = glCreateShader(GL_VERTEX_SHADER);
+    m_Id = glCreateShader(GL_FRAGMENT_SHADER);
 }
 
 bool ShaderStage::compile(const std::string &sourceCode) {

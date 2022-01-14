@@ -1,29 +1,16 @@
 set(RNDR_PUBLIC_HEADERS
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/base_shader.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/client_entity.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/const.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/gpu_managed_objects.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/gpu_resource_manager.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/material_manager.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/model.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/raii.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/renderer_engine_interface.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_renderer.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/shader_definitions.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/shader_manager.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/surface_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/utils.h
 )
 
 set(RNDR_PRIVATE_SOURCES
-	${CMAKE_CURRENT_SOURCE_DIR}/src/base_shader.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/gpu_managed_objects.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/gpu_resource_manager.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/material_manager.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_renderer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_shaders.h
-	${CMAKE_CURRENT_SOURCE_DIR}/src/shader_definitions.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/shader_manager.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/surface_renderer.cpp
 )
 
@@ -45,11 +32,10 @@ target_compile_definitions(renderer PUBLIC
 target_link_libraries(renderer
 	appfw
 	bsp
-	glad
-	glm::glm
 	gui_app_base
 	imgui
 	stb
+	material_system
 )
 
 target_precompile_headers(renderer PRIVATE

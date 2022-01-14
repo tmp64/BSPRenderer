@@ -277,7 +277,7 @@ void SurfaceEditMode::showInspector() {
                 height = width / material->getWide() * material->getTall();
             }
 
-            ImGui::Image(reinterpret_cast<ImTextureID>((size_t)material->getColorTextureId()),
+            ImGui::Image(reinterpret_cast<ImTextureID>((size_t)material->getTexture(0)->getId()),
                          ImVec2(width, height));
 
             ImGui::TableNextColumn();

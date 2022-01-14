@@ -3,11 +3,13 @@
 #include <material_system/shader.h>
 #include <material_system/shader_instance.h>
 
+ConVar<bool> mat_ui("mat_ui", false, "");
+
 namespace {
 
 class FallbackShader : public ShaderT<FallbackShader> {
 public:
-    FallbackShader(unsigned typeIdx)
+    FallbackShader(unsigned typeIdx = 0)
         : BaseClass(typeIdx) {
         setTitle("MaterialSystem::FallbackShader");
         setVert("assets:shaders/fallback.vert");
@@ -22,6 +24,10 @@ FallbackShader s_FallbackShader;
 
 MaterialSystem::MaterialSystem() {
     setTickEnabled(true);
+
+    addVertexShaderDef("IFACE_VF", "out");
+    addFragmentShaderDef("IFACE_VF", "in");
+
     reloadShaders();
     createNullMaterial();
 }

@@ -1,5 +1,5 @@
-layout (location = 0) in vec3 inPosition;
+out vec4 outColor;
 
 void main(void) {
-	gl_Position = vec4(inPosition, 1);
+    outColor = vec4(1, 0, 1, 1);
 }
