@@ -36,8 +36,9 @@ void Texture::setFilter(TextureFilter filter) {
         minFilter = minFilterToGL(filter);
     }
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilterToGL(filter));
+    glTexParameteri(m_Target, GL_TEXTURE_MIN_FILTER, minFilter);
+    glTexParameteri(m_Target, GL_TEXTURE_MAG_FILTER, magFilterToGL(filter));
+    m_Filter = filter;
 }
 
 void Texture::setWrapMode(TextureWrapMode wrap) {
@@ -48,11 +49,13 @@ void Texture::setWrapMode(TextureWrapMode wrap) {
 void Texture::setWrapModeS(TextureWrapMode wrap) {
     bind();
     glTexParameteri(m_Target, GL_TEXTURE_WRAP_S, wrapToGL(wrap));
+    m_WrapS = wrap;
 }
 
 void Texture::setWrapModeT(TextureWrapMode wrap) {
     bind();
     glTexParameteri(m_Target, GL_TEXTURE_WRAP_T, wrapToGL(wrap));
+    m_WrapT = wrap;
 }
 
 void Texture::setAnisoLevel(int level) {
