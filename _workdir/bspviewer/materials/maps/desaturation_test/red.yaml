@@ -1,0 +1,6 @@
+light_intensity_scale: 1
+light_color:
+  - 255
+  - 0
+  - 0
+light_intensity: 30
