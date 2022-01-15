@@ -27,6 +27,7 @@ target_include_directories(material_system PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/s
 target_link_libraries(material_system
 	graphics
 	stb
+	imgui
 )
 
 target_precompile_headers(material_system PRIVATE

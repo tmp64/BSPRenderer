@@ -20,6 +20,9 @@ void Texture2D::initTexture(GraphicsFormat internalFormat, int wide, int tall, b
     }
 
     updateMemUsage(calcTextureMemUsage(internalFormat, wide, tall, generateMipmaps));
+
+    // Enable/disable trilinear filtering based on whether there are mipmaps or not.
+    setFilter(getFilter());
 }
 
 int64_t Texture2D::calcTextureMemUsage(GraphicsFormat internalFormat, int wide, int tall,

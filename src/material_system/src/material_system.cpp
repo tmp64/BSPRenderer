@@ -2,8 +2,15 @@
 #include <material_system/material_system.h>
 #include <material_system/shader.h>
 #include <material_system/shader_instance.h>
+#include <imgui.h>
+
+static constexpr int DEFAULT_FILTER = 2;
+static constexpr int DEFAULT_ANISO = 16;
 
 ConVar<bool> mat_ui("mat_ui", false, "");
+
+ConVar<int> mat_filter("mat_filter", 2, "Default filtering mode: nearest, bilinear, trilinear");
+ConVar<int> mat_aniso("mat_aniso", 16, "Default anisotropy level (1-16)");
 
 ConCommand
     cmd_mat_reloadshaders("mat_reloadshaders",
@@ -22,13 +29,81 @@ MaterialSystem::MaterialSystem() {
     createNullMaterial();
 
     cmd_mat_reloadshaders.setCallback([&]() { reloadShaders(); });
+
+    mat_filter.setCallback([&](const int &, const int &newVal) {
+        TextureFilter filter = (TextureFilter)std::clamp(newVal, 0, 2);
+        m_Settings.setFilter(filter);
+        return true;
+    });
+
+    mat_aniso.setCallback([&](const int &, const int &newVal) {
+        m_Settings.setAniso(newVal);
+        return true;
+    });
+
+    mat_filter.setValue(DEFAULT_FILTER);
+    mat_aniso.setValue(DEFAULT_ANISO);
 }
 
 MaterialSystem::~MaterialSystem() {
     unloadShaders();
 }
 
-void MaterialSystem::tick() {}
+void MaterialSystem::tick() {
+    if (mat_ui.getValue()) {
+        bool isOpen = true;
+        ImGui::SetNextWindowBgAlpha(0.2f);
+        if (ImGui::Begin("Material System", &isOpen)) {
+            ImGui::Text("Count: %d", (int)m_Materials.size());
+
+            const char *filters[] = {"Nearest", "Bilinear", "Trilinear"};
+            int curFilter = (int)m_Settings.getFilter();
+
+            if (ImGui::BeginCombo("Filtering", filters[curFilter])) {
+                for (int i = 0; i < 3; i++) {
+                    bool isSelected = i == curFilter;
+
+                    if (ImGui::Selectable(filters[i], isSelected)) {
+                        mat_filter.setValue(i);
+                    }
+
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
+            int aniso = m_Settings.getAniso();
+            if (ImGui::SliderInt("Anisotropic filtering", &aniso, 1, GraphicsSettings::MAX_ANISOTROPY)) {
+                mat_aniso.setValue(aniso);
+            }
+        }
+
+        ImGui::End();
+
+        if (!isOpen) {
+            mat_ui.setValue(isOpen);
+        }
+    }
+}
+
+void MaterialSystem::lateTick() {
+    if (m_Settings.isDirty()) {
+        m_Settings.resetDirty();
+
+        for (Material &mat : m_Materials) {
+            if (mat.getUsesGraphicalSettings()) {
+                for (int i = 0; i < Material::MAX_TEXTURES; i++) {
+                    Texture *texture = mat.getTexture(i);
+                    if (texture) {
+                        applyGraphicsSettings(*texture);
+                    }
+                }
+            }
+        }
+    }
+}
 
 Material *MaterialSystem::getNullMaterial() {
     return &(*m_Materials.begin());
@@ -55,6 +130,11 @@ bool MaterialSystem::reloadShaders() {
     }
 
     return success;
+}
+
+void MaterialSystem::applyGraphicsSettings(Texture &texture) {
+    texture.setFilter(m_Settings.getFilter());
+    texture.setAnisoLevel(m_Settings.getAniso());
 }
 
 void MaterialSystem::unloadShaders() {

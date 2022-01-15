@@ -28,7 +28,15 @@ void Texture::resetProperties() {
 
 void Texture::setFilter(TextureFilter filter) {
     bind();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilterToGL(filter));
+    GLenum minFilter;
+
+    if (filter == TextureFilter::Trilinear && !m_bHasMipmaps) {
+        minFilter = minFilterToGL(TextureFilter::Bilinear);
+    } else {
+        minFilter = minFilterToGL(filter);
+    }
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilterToGL(filter));
 }
 

@@ -77,10 +77,20 @@ void Material::setWadName(std::string_view wadName) {
 void Material::setTexture(int idx, std::unique_ptr<Texture> &&pTexture) {
     AFW_ASSERT(idx >= 0 && idx < MAX_TEXTURES);
     m_pOwnTextures[idx] = std::move(pTexture);
+
+    if (m_bUseGraphicalSettings) {
+        MaterialSystem::get().applyGraphicsSettings(*m_pOwnTextures[idx]);
+    }
 }
 
 void Material::setUsesGraphicalSettings(bool value) {
     m_bUseGraphicalSettings = value;
+
+    for (auto &pTex : m_pOwnTextures) {
+        if (pTex) {
+            MaterialSystem::get().applyGraphicsSettings(*pTex);
+        }
+    }
 }
 
 void Material::setShader(unsigned typeIdx, Shader *shader) {
