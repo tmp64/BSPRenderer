@@ -389,8 +389,8 @@ void rad::RadSimImpl::samplePatchReflectivity() {
             float patchSize = patch.getSize();
             texPos.s = glm::dot(patch.getOrigin(), texInfo.vS) + texInfo.fSShift;
             texPos.t = glm::dot(patch.getOrigin(), texInfo.vT) + texInfo.fTShift;
-            texScale.s = std::max(patchSize / glm::length(texInfo.vS), 1.0f);
-            texScale.t = std::max(patchSize / glm::length(texInfo.vT), 1.0f);
+            texScale.s = std::max(patchSize * glm::length(texInfo.vS), 1.0f);
+            texScale.t = std::max(patchSize * glm::length(texInfo.vT), 1.0f);
 
             patch.getReflectivity() *= material.sampleColor(texPos, texScale);
         }
