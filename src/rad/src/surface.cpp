@@ -232,9 +232,9 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace, int faceIn
     }
 
     // Convert the props
-    float textureLightDivisor = glm::length(texInfo.vS) * glm::length(texInfo.vT); // Intensity is brightness per square texel
+    float textureLightMult = glm::length(texInfo.vS) * glm::length(texInfo.vT); // Intensity is brightness per square texel
     vLightColor = radSim.gammaToLinear(props.vLightColor) *
-                  (props.flLightIntensity * props.flLightIntensityScale / textureLightDivisor);
+                  (props.flLightIntensity * props.flLightIntensityScale * textureLightMult);
 
     flPatchSize = (float)radSim.m_Profile.iBasePatchSize / props.flLightmapScale;
     flLightmapScale = props.flLightmapScale;
