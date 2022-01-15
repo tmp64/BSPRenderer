@@ -5,6 +5,7 @@
 #include <app_base/texture_block.h>
 #include <graphics/raii.h>
 #include <graphics/texture2d.h>
+#include <graphics/texture_cube.h>
 #include <graphics/gpu_buffer.h>
 #include <graphics/render_buffer.h>
 #include <material_system/material_system.h>
@@ -184,7 +185,6 @@ private:
         SurfaceRenderer::Context viewContext;
         std::vector<Surface> surfaces;
         bool bCustomLMLoaded = false;
-        GLTexture skyboxCubemap;
         
         // Lightmaps
         Texture2D bspLightmapBlockTex;
@@ -245,6 +245,7 @@ private:
     RenderingStats m_Stats;
     LoadingStatus m_LoadingStatus;
     std::unique_ptr<LoadingState> m_pLoadingState;
+    Material *m_pSkyboxMaterial = nullptr;
 
     // Entities
     std::vector<ClientEntity *> m_SolidEntityList;

@@ -8,6 +8,7 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/shader_program.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/shader_stage.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/texture.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/texture_cube.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/texture2d.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/vram_tracker.h
 	
@@ -18,6 +19,7 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/shader_program.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/shader_stage.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/texture.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/texture_cube.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/texture2d.cpp
 )
 

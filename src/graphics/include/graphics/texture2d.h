@@ -10,7 +10,7 @@ public:
     //! @param  internalFormat      Format in the GPU
     //! @param  wide                Width
     //! @param  tall                Height
-    //! @param  generateMipmaps     Create mipmaps for hte texture
+    //! @param  generateMipmaps     Create mipmaps for the texture
     //! @param  inputFormat         Format of the input data
     //! @param  inputType           Type of the input data
     //! @param  inputData           Pointer to input image data. Can be null.

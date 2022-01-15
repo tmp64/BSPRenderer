@@ -42,6 +42,8 @@ public:
     }
 
     //! Sets the size of the material in hammer units.
+    //! It has nothing to do with actual texture size.
+    //! Can be set to 1x1 if isn't used in scene renderer.
     void setSize(int wide, int tall);
 
     //! Sets the name of the WAD (if any).

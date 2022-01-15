@@ -51,9 +51,17 @@ SceneRenderer::SceneRenderer() {
 
     m_SolidEntityList.reserve(MAX_VISIBLE_ENTS);
     m_SortBuffer.reserve(MAX_TRANS_SURFS_PER_MODEL);
+
+    m_pSkyboxMaterial = MaterialSystem::get().createMaterial("Skybox");
+    m_pSkyboxMaterial->setSize(1, 1);
+    m_pSkyboxMaterial->setUsesGraphicalSettings(true);
+    m_pSkyboxMaterial->setShader(SHADER_TYPE_WORLD_IDX, &Shaders::skybox);
 }
 
-SceneRenderer::~SceneRenderer() {}
+SceneRenderer::~SceneRenderer() {
+    MaterialSystem::get().destroyMaterial(m_pSkyboxMaterial);
+    m_pSkyboxMaterial = nullptr;
+}
 
 void SceneRenderer::beginLoading(const bsp::Level *level, std::string_view path) {
     AFW_ASSERT(level);
@@ -935,8 +943,8 @@ void SceneRenderer::loadTextures() {
 }
 
 void SceneRenderer::loadSkyBox() {
-    m_Data.skyboxCubemap.create();
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_Data.skyboxCubemap);
+    auto texture = std::make_unique<TextureCube>();
+    texture->create("Skybox");
 
     // Filename suffix for side
     constexpr const char *suffixes[] = {"rt", "lf", "up", "dn", "bk", "ft"};
@@ -946,6 +954,10 @@ void SceneRenderer::loadSkyBox() {
     std::string skyname = worldspawn.getValue<std::string>("skyname", "desert");
 
     // Load images
+    int loadedSidesCount = 0;
+    std::vector<uint8_t> sidesData[6];
+    int cubeWide = 0, cubeTall = 0;
+
     for (int i = 0; i < 6; i++) {
         // Try TGA first
         fs::path path = getFileSystem().findExistingFile(
@@ -957,47 +969,72 @@ void SceneRenderer::loadSkyBox() {
                 "assets:gfx/env/" + skyname + suffixes[i] + ".bmp", std::nothrow);
         }
 
-        if (!path.empty()) {
-            int width, height, channelNum;
-            uint8_t *data = stbi_load(path.u8string().c_str(), &width, &height, &channelNum, 3);
-
-            if (data) {
-                if (i == 2) {
-                    // Top sky texture needs to be rotated CCW
-                    std::vector<uint8_t> rot = rotateImage90CCW(data, width, height);
-                    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, height, width, 0, GL_RGB,
-                                 GL_UNSIGNED_BYTE, rot.data());
-                } else if (i == 3) {
-                    // Bottom sky texture needs to be rotated CW
-                    std::vector<uint8_t> rot = rotateImage90CW(data, width, height);
-                    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, height, width, 0, GL_RGB,
-                                 GL_UNSIGNED_BYTE, rot.data());
-                } else {
-                    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB,
-                                 GL_UNSIGNED_BYTE, data);
-                }
-
-                stbi_image_free(data);
-                continue;
-            } else {
-                printe("Failed to load {}: ", path.u8string(), stbi_failure_reason());
-            }
-        } else {
+        if (path.empty()) {
             printe("Sky {}{} not found", skyname, suffixes[i]);
+            continue;
         }
 
-        // Set purple checkerboard sky
-        const CheckerboardImage &img = CheckerboardImage::get();
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, img.size, img.size, 0, GL_RGB, GL_UNSIGNED_BYTE,
-                     img.data.data());
+        int width, height, channelNum;
+        uint8_t *data = stbi_load(path.u8string().c_str(), &width, &height, &channelNum, 3);
+
+        if (!data) {
+            printe("Failed to load {}: ", path.u8string(), stbi_failure_reason());
+            continue;
+        }
+
+        // Validate size
+        if (width != height) {
+            printe("{}: image is not square", path.u8string());
+            continue;
+        } else if (cubeWide == 0 || cubeTall == 0) {
+            // Set the cubemap size
+            cubeWide = width;
+            cubeTall = height;
+        } else if (cubeWide != width) {
+            printe("{}: image size is different ({} vs {})", path.u8string(), width,
+                    cubeWide);
+            continue;
+        }
+
+        // Save the data
+        if (i == 2) {
+            // Top sky texture needs to be rotated CCW
+            sidesData[i] = rotateImage90CCW(data, width, height);
+        } else if (i == 3) {
+            // Bottom sky texture needs to be rotated CW
+            sidesData[i] = rotateImage90CW(data, width, height);
+        } else {
+            sidesData[i].resize(width * height * 3);
+            std::copy(data, data + sidesData[i].size(), sidesData[i].begin());
+        }
+
+        stbi_image_free(data);
+        loadedSidesCount++;
     }
 
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    if (loadedSidesCount == 6) {
+        // Load the cubemap
+        const void *datas[6];
+
+        for (int i = 0; i < 6; i++) {
+            datas[i] = sidesData[i].data();
+        }
+
+        texture->initTexture(GraphicsFormat::RGB8, cubeWide, cubeTall, true, GL_RGB,
+                             GL_UNSIGNED_BYTE, datas);
+    } else {
+        // Load error cubemap
+        int size = CheckerboardImage::get().size;
+        const void *data = CheckerboardImage::get().data.data();
+        const void *datas[6];
+        std::fill(datas, datas + 6, data);
+
+        texture->initTexture(GraphicsFormat::RGB8, size, size, true, GL_RGB, GL_UNSIGNED_BYTE,
+                             datas);
+    }
+
+    texture->setWrapMode(TextureWrapMode::Clamp);
+    m_pSkyboxMaterial->setTexture(0, std::move(texture));
 }
 
 void SceneRenderer::finishLoading() {
@@ -1289,15 +1326,11 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
 void SceneRenderer::drawSkySurfaces() {
     appfw::Prof prof("Draw sky");
 
-    /*
     if (!m_Data.viewContext.getSkySurfaces().empty()) {
         glDepthFunc(GL_LEQUAL);
 
-        Shaders::skybox.enable();
-        Shaders::skybox.setupUniforms();
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, m_Data.skyboxCubemap);
+        m_pSkyboxMaterial->activateTextures();
+        m_pSkyboxMaterial->enableShader(SHADER_TYPE_WORLD_IDX);
 
         if (r_ebo.getValue()) {
             drawSkySurfacesIndexed();
@@ -1305,15 +1338,11 @@ void SceneRenderer::drawSkySurfaces() {
             drawSkySurfacesVao();
         }
 
-        Shaders::skybox.disable();
-
         glDepthFunc(GL_LESS);
     }
-    */
 }
 
 void SceneRenderer::drawSkySurfacesVao() {
-    /*
     glBindVertexArray(m_Data.surfVao);
 
     for (unsigned i : m_Data.viewContext.getSkySurfaces()) {
@@ -1323,17 +1352,14 @@ void SceneRenderer::drawSkySurfacesVao() {
 
     glBindVertexArray(0);
     m_Stats.uRenderedSkyPolys = (unsigned)m_Data.viewContext.getSkySurfaces().size();
-    m_Stats.uDrawCallCount += m_Stats.uRenderedSkyPolys;
-    */
-}
+    m_Stats.uDrawCallCount += m_Stats.uRenderedSkyPolys;}
 
 void SceneRenderer::drawSkySurfacesIndexed() {
     AFW_ASSERT(!m_Data.surfEboData.empty());
 
-    /*
     // Bind buffers
     glBindVertexArray(m_Data.surfVao);
-    m_Data.surfEbo.bind(GL_ELEMENT_ARRAY_BUFFER);
+    m_Data.surfEbo.bind();
     glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
     glEnable(GL_PRIMITIVE_RESTART);
 
@@ -1368,7 +1394,6 @@ void SceneRenderer::drawSkySurfacesIndexed() {
     glDisable(GL_PRIMITIVE_RESTART);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    */
 }
 
 void SceneRenderer::drawSolidEntities() {
