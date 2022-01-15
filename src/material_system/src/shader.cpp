@@ -34,7 +34,9 @@ void Shader::addUniform(UniformBlock &uniform, const char *name, GLuint bindingP
 
 void Shader::onShaderCompiled() {}
 
-void Shader::createShaderInstances() {
+bool Shader::createShaderInstances() {
+    bool success = true;
+
     for (unsigned i = 0; i < MAX_SHADER_TYPE_COUNT; i++) {
         if (m_uShaderTypes & (1u << i)) {
             std::unique_ptr<Shader> shaderInfo = createShaderInfoInstance(1u << i);
@@ -44,9 +46,12 @@ void Shader::createShaderInstances() {
                 m_pInstances[i] = std::move(shader);
             } else {
                 printe("Shader {} type {} failed to compile", m_Title, SHADER_TYPE_NAMES[i]);
+                success = false;
             }
         }
     }
+
+    return success;
 }
 
 void Shader::freeShaderInstances() {

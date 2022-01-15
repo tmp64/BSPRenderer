@@ -61,18 +61,7 @@ void Material::activateTextures() const {
 }
 
 void Material::enableShader(unsigned typeIdx) const {
-    ShaderInstance *shaderInstance = nullptr;
-
-    if (m_pShader) {
-        shaderInstance = m_pShader->getShaderInstance(typeIdx);
-    }
-
-    if (!shaderInstance) {
-        shaderInstance = MaterialSystem::get().getFallbackShader()->getShaderInstance(typeIdx);
-    }
-    
-    AFW_ASSERT_MSG(shaderInstance, "Fallback shader is invalid");
-    shaderInstance->enable();
+    getShader(typeIdx)->enable();
 }
 
 void Material::setSize(int wide, int tall) {
@@ -94,6 +83,7 @@ void Material::setUsesGraphicalSettings(bool value) {
     m_bUseGraphicalSettings = value;
 }
 
-void Material::setShader(Shader *shader) {
-    m_pShader = shader;
+void Material::setShader(unsigned typeIdx, Shader *shader) {
+    AFW_ASSERT(typeIdx < MAX_SHADER_TYPE_COUNT);
+    m_pShaders[typeIdx] = shader;
 }

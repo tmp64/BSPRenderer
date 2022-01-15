@@ -5,22 +5,9 @@
 
 ConVar<bool> mat_ui("mat_ui", false, "");
 
-namespace {
-
-class FallbackShader : public ShaderT<FallbackShader> {
-public:
-    FallbackShader(unsigned typeIdx = 0)
-        : BaseClass(typeIdx) {
-        setTitle("MaterialSystem::FallbackShader");
-        setVert("assets:shaders/fallback.vert");
-        setFrag("assets:shaders/fallback.frag");
-        setTypes(SHADER_TYPE_ALL);
-    }
-};
-
-FallbackShader s_FallbackShader;
-
-}
+ConCommand
+    cmd_mat_reloadshaders("mat_reloadshaders",
+                          "Reloads all shaders. If any fail to compile, they won't be reloaded.");
 
 MaterialSystem::MaterialSystem() {
     setTickEnabled(true);
@@ -28,8 +15,13 @@ MaterialSystem::MaterialSystem() {
     addVertexShaderDef("IFACE_VF", "out");
     addFragmentShaderDef("IFACE_VF", "in");
 
-    reloadShaders();
+    if (!reloadShaders()) {
+        throw std::runtime_error("Some shaders failed to compile. Check the log ofr details.");
+    }
+
     createNullMaterial();
+
+    cmd_mat_reloadshaders.setCallback([&]() { reloadShaders(); });
 }
 
 MaterialSystem::~MaterialSystem() {
@@ -37,10 +29,6 @@ MaterialSystem::~MaterialSystem() {
 }
 
 void MaterialSystem::tick() {}
-
-Shader *MaterialSystem::getFallbackShader() {
-    return &s_FallbackShader;
-}
 
 Material *MaterialSystem::getNullMaterial() {
     return &(*m_Materials.begin());
@@ -56,14 +44,17 @@ void MaterialSystem::destroyMaterial(Material *mat) {
     m_Materials.erase(mat->m_Iter);
 }
 
-void MaterialSystem::reloadShaders() {
-    unloadShaders();
-
+bool MaterialSystem::reloadShaders() {
     auto &prototypes = Shader::getPrototypeList();
+    bool success = true;
 
     for (Shader *pShader : prototypes) {
-        pShader->createShaderInstances();
+        if (!pShader->createShaderInstances()) {
+            success = false;
+        }
     }
+
+    return success;
 }
 
 void MaterialSystem::unloadShaders() {

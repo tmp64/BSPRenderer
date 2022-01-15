@@ -123,7 +123,7 @@ MainViewRenderer::MainViewRenderer() {
 
     m_pBoxMaterial = MaterialSystem::get().createMaterial("Entity Box");
     m_pBoxMaterial->setSize(1, 1);
-    m_pBoxMaterial->setShader(&s_EntityBoxShader);
+    m_pBoxMaterial->setShader(SHADER_TYPE_CUSTOM_IDX, &s_EntityBoxShader);
 }
 
 MainViewRenderer::~MainViewRenderer() {

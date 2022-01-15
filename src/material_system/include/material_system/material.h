@@ -2,9 +2,10 @@
 #define MATERIAL_SYSTEM_MATERIAL_H
 #include <appfw/utils.h>
 #include <graphics/texture.h>
+#include <material_system/shader.h>
+#include <material_system/shader_instance.h>
 
 class MaterialSystem;
-class Shader;
 
 //! A checkerboard pattern of black and purple pixels.
 struct CheckerboardImage : appfw::NoCopy {
@@ -36,6 +37,9 @@ public:
     inline const std::string &getWadName() const { return m_WadName; }
     inline Texture *getTexture(int idx) const { return m_pOwnTextures[idx].get(); }
     inline bool getUsesGraphicalSettings() const { return m_bUseGraphicalSettings; }
+    inline ShaderInstance *getShader(unsigned typeIdx) const {
+        return m_pShaders[typeIdx]->getShaderInstance(typeIdx);
+    }
 
     //! Sets the size of the material in hammer units.
     void setSize(int wide, int tall);
@@ -50,7 +54,7 @@ public:
     void setUsesGraphicalSettings(bool value);
 
     //! Sets the material's shader.
-    void setShader(Shader *shader);
+    void setShader(unsigned typeIdx, Shader *shader);
 
 private:
     int m_iWide = 0;
@@ -60,7 +64,7 @@ private:
     std::string m_WadName;
     std::unique_ptr<Texture> m_pOwnTextures[MAX_TEXTURES];
     bool m_bUseGraphicalSettings = false;
-    Shader *m_pShader = nullptr;
+    Shader *m_pShaders[MAX_SHADER_TYPE_COUNT] = {nullptr};
 
     friend class MaterialSystem;
 };

@@ -20,7 +20,10 @@ WADMaterialAsset::UploadTask WADMaterialAsset::init(std::string_view name, std::
         m_pMaterial->setSize(wide, tall);
         m_pMaterial->setWadName(wadName);
         m_pMaterial->setUsesGraphicalSettings(true);
-        m_pMaterial->setShader(SceneRenderer::getDefaultSurfaceShader());
+        m_pMaterial->setShader(SHADER_TYPE_WORLD_IDX,
+                               SceneRenderer::getDefaultSurfaceShader());
+        m_pMaterial->setShader(SHADER_TYPE_BRUSH_MODEL_IDX,
+                               SceneRenderer::getDefaultSurfaceShader());
 
         auto texture = std::make_unique<Texture2D>();
         texture->create(name);

@@ -111,7 +111,8 @@ private:
     virtual std::unique_ptr<Shader> createShaderInfoInstance(unsigned typeIdx) = 0;
 
     //! Creates necessary shader instances.
-    void createShaderInstances();
+    //! @returns true if there were no errors
+    bool createShaderInstances();
 
     //! Frees all shader instances.
     void freeShaderInstances();

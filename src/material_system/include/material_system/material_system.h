@@ -13,9 +13,6 @@ public:
 
     void tick() override;
 
-    //! @returns the fallback shader (used if no other is available).
-    Shader *getFallbackShader();
-
     //! Returns the default black-purple material.
     Material *getNullMaterial();
 
@@ -26,7 +23,7 @@ public:
     void destroyMaterial(Material *mat);
 
     //! Reloads all shaders.
-    void reloadShaders();
+    bool reloadShaders();
 
     //! Adds a definition to all shaders.
     template <typename T>
