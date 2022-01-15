@@ -1,6 +1,7 @@
 #include <appfw/str_utils.h>
 #include <graphics/texture2d.h>
 #include <renderer/scene_renderer.h>
+#include <renderer/scene_shaders.h>
 #include "wad_material_asset.h"
 
 WADMaterialAsset::~WADMaterialAsset() {
@@ -20,10 +21,8 @@ WADMaterialAsset::UploadTask WADMaterialAsset::init(std::string_view name, std::
         m_pMaterial->setSize(wide, tall);
         m_pMaterial->setWadName(wadName);
         m_pMaterial->setUsesGraphicalSettings(true);
-        m_pMaterial->setShader(SHADER_TYPE_WORLD_IDX,
-                               SceneRenderer::getDefaultSurfaceShader());
-        m_pMaterial->setShader(SHADER_TYPE_BRUSH_MODEL_IDX,
-                               SceneRenderer::getDefaultSurfaceShader());
+        m_pMaterial->setShader(SHADER_TYPE_WORLD_IDX, &SceneShaders::Shaders::brush);
+        m_pMaterial->setShader(SHADER_TYPE_BRUSH_MODEL_IDX, &SceneShaders::Shaders::brush);
 
         auto texture = std::make_unique<Texture2D>();
         texture->create(name);

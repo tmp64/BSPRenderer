@@ -279,6 +279,7 @@ void MainViewRenderer::renderMainView() {
     fovx = glm::degrees(2 * atan(xtan));
 
     m_flLastFOV = fovx;
+    m_uFrameCount++;
 
     m_SceneRenderer.setPerspective(fovx, aspect, 4, 8192);
     m_SceneRenderer.setPerspViewOrigin(m_vPosition, m_vRotation);
@@ -306,7 +307,7 @@ Material *MainViewRenderer::getMaterial(const bsp::BSPMipTex &tex) {
 void MainViewRenderer::drawNormalTriangles(unsigned &drawcallCount) {
     if (m_uBoxCount > 0) {
         m_pBoxMaterial->activateTextures();
-        m_pBoxMaterial->enableShader(SHADER_TYPE_CUSTOM_IDX);
+        m_pBoxMaterial->enableShader(SHADER_TYPE_CUSTOM_IDX, m_uFrameCount);
         glBindVertexArray(m_BoxVao);
         glDrawArraysInstanced(GL_TRIANGLES, 0, BOX_VERT_COUNT, m_uBoxCount);
         drawcallCount++;

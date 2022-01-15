@@ -60,8 +60,9 @@ void Material::activateTextures() const {
     }
 }
 
-void Material::enableShader(unsigned typeIdx) const {
-    getShader(typeIdx)->enable();
+ShaderInstance *Material::enableShader(unsigned typeIdx, unsigned curFrame) const {
+    getShader(typeIdx)->enable(curFrame);
+    return getShader(typeIdx);
 }
 
 void Material::setSize(int wide, int tall) {

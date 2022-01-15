@@ -29,7 +29,7 @@ public:
     void activateTextures() const;
 
     //! Enables the shader.
-    void enableShader(unsigned typeIdx) const;
+    ShaderInstance *enableShader(unsigned typeIdx, unsigned curFrame) const;
 
     inline int getWide() const { return m_iWide; }
     inline int getTall() const { return m_iTall; }

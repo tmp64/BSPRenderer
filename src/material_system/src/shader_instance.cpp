@@ -7,9 +7,14 @@ ShaderInstance::ShaderInstance(std::unique_ptr<Shader> &shader) {
     m_pShader = std::move(shader);
 }
 
-void ShaderInstance::enable() {
+void ShaderInstance::enable(unsigned curFrame) {
     glUseProgram(m_Prog.getId());
     m_spCurrentInstance = this;
+
+    if (curFrame != m_uLastEnableFrame) {
+        m_pShader->onEnabledOnce();
+        m_uLastEnableFrame = curFrame;
+    }
 }
 
 void ShaderInstance::disable() {
@@ -52,7 +57,7 @@ bool ShaderInstance::compile() {
     // Load uniforms
     m_pShader->loadUniformLocations(m_Prog.getId());
     
-    enable();
+    enable(std::numeric_limits<unsigned>::max());
     m_pShader->onShaderCompiled();
     disable();
 

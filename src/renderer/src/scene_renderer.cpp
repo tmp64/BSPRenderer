@@ -8,7 +8,7 @@
 #include <renderer/renderer_engine_interface.h>
 #include <imgui.h>
 #include <gui_app_base/imgui_controls.h>
-#include "scene_shaders.h"
+#include <renderer/scene_shaders.h>
 
 ConVar<int> r_cull("r_cull", 1,
                    "Backface culling:\n"
@@ -55,7 +55,15 @@ SceneRenderer::SceneRenderer() {
     m_pSkyboxMaterial = MaterialSystem::get().createMaterial("Skybox");
     m_pSkyboxMaterial->setSize(1, 1);
     m_pSkyboxMaterial->setUsesGraphicalSettings(true);
-    m_pSkyboxMaterial->setShader(SHADER_TYPE_WORLD_IDX, &Shaders::skybox);
+    m_pSkyboxMaterial->setShader(SHADER_TYPE_WORLD_IDX, &SceneShaders::Shaders::skybox);
+
+    m_pPatchesMaterial = MaterialSystem::get().createMaterial("Patches");
+    m_pPatchesMaterial->setSize(1, 1);
+    m_pPatchesMaterial->setShader(SHADER_TYPE_CUSTOM_IDX, &SceneShaders::Shaders::patches);
+
+    m_pWireframeMaterial = MaterialSystem::get().createMaterial("Wireframe");
+    m_pWireframeMaterial->setSize(1, 1);
+    m_pWireframeMaterial->setShader(SHADER_TYPE_BRUSH_MODEL_IDX, &SceneShaders::Shaders::brush);
 }
 
 SceneRenderer::~SceneRenderer() {
@@ -218,6 +226,7 @@ void SceneRenderer::renderScene(GLint targetFb, float flSimTime, float flTimeDel
 
     // Reset stats
     m_Stats = RenderingStats();
+    m_uFrameCount++;
 
     LightmapType newLmType = (LightmapType)std::clamp(r_lightmap.getValue(), 0, 1);
 
@@ -384,9 +393,6 @@ void SceneRenderer::setSurfaceTint(int surface, glm::vec4 color) {
     m_Data.surfTintBuf.update(sizeof(glm::vec4) * surf.m_nFirstVertex,
                               sizeof(glm::vec4) * colors.size(), colors.data());
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-Shader *SceneRenderer::getDefaultSurfaceShader() {
-    return &Shaders::world;
 }
 #endif
 
@@ -1199,7 +1205,7 @@ void SceneRenderer::drawWorldSurfacesVao() {
         // Bind material
         const Material &mat = *m_Data.surfaces[textureChain[i][0]].m_pMat;
         mat.activateTextures();
-        mat.enableShader(SHADER_TYPE_WORLD_IDX);
+        mat.enableShader(SHADER_TYPE_WORLD_IDX, m_uFrameCount);
 
         for (unsigned j : textureChain[i]) {
             Surface &surf = m_Data.surfaces[j];
@@ -1237,7 +1243,7 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
         // Bind material
         const Material &mat = *m_Data.surfaces[textureChain[i][0]].m_pMat;
         mat.activateTextures();
-        mat.enableShader(SHADER_TYPE_WORLD_IDX);
+        mat.enableShader(SHADER_TYPE_WORLD_IDX, m_uFrameCount);
 
         // Fill the EBO
         unsigned eboIdx = 0;
@@ -1295,13 +1301,12 @@ void SceneRenderer::drawWorldSurfacesIndexed() {
             // Decrement EBO size to remove last PRIMITIVE_RESTART_IDX
             eboIdx--;
 
-            ShaderInstance *shaderInstance =
-                Shaders::brushent.getShaderInstance(SHADER_TYPE_BRUSH_MODEL);
-            auto &shaderInfo = shaderInstance->getShader<BrushEntityShader>();
-            shaderInstance->enable();
-            shaderInfo.m_uRenderMode.set(kRenderTransColor);
-            shaderInfo.m_uFxAmount.set(1.0);
-            shaderInfo.m_uFxColor.set({1.0, 1.0, 1.0});
+            // Enable shader
+            auto &shaderInfo =
+                m_pWireframeMaterial->enableShader(SHADER_TYPE_BRUSH_MODEL_IDX, m_uFrameCount)
+                    ->getShader<SceneShaders::BrushShader>();
+            shaderInfo.setRenderMode(kRenderTransColor);
+            shaderInfo.setRenderFx(1.0, {1.0, 1.0, 1.0});
 
             // Update EBO
             m_Data.surfEbo.update(0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
@@ -1330,7 +1335,7 @@ void SceneRenderer::drawSkySurfaces() {
         glDepthFunc(GL_LEQUAL);
 
         m_pSkyboxMaterial->activateTextures();
-        m_pSkyboxMaterial->enableShader(SHADER_TYPE_WORLD_IDX);
+        m_pSkyboxMaterial->enableShader(SHADER_TYPE_WORLD_IDX, m_uFrameCount);
 
         if (r_ebo.getValue()) {
             drawSkySurfacesIndexed();
@@ -1492,11 +1497,6 @@ void SceneRenderer::drawTransTriangles() {
 void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
     Model *model = clent->getModel();
 
-    ShaderInstance *shaderInstance =
-        Shaders::brushent.getShaderInstance(SHADER_TYPE_BRUSH_MODEL_IDX);
-    auto &shader = shaderInstance->getShader<BrushEntityShader>();
-    shaderInstance->enable();
-
     // Frustum culling
     glm::vec3 mins, maxs;
 
@@ -1519,12 +1519,10 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
     modelMat = glm::translate(modelMat, clent->getOrigin());
-    shader.m_uModelMat.set(modelMat);
 
     // Render mode
     AFW_ASSERT(clent->getRenderMode() == kRenderNormal || clent->getRenderMode() == kRenderTransAlpha);
     setRenderMode(clent->getRenderMode());
-    shader.m_uRenderMode.set(clent->getRenderMode());
 
     // Draw surfaces
     auto &surfs = m_Data.optBrushModels[model->getOptModelIdx()].surfs;
@@ -1538,15 +1536,15 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
         //    continue;
         //}
 
-        if (r_texture.getValue() == 1) {
-            // Set color
-            Shaders::brushent.setColor(surf.m_Color);
-        } else if (r_texture.getValue() == 2) {
-            // Bind material
-            if (lastMat != surf.m_pMat) {
-                lastMat = surf.m_pMat;
-                lastMat->activateTextures();
-            }
+        // Bind material
+        if (lastMat != surf.m_pMat) {
+            lastMat = surf.m_pMat;
+            lastMat->activateTextures();
+            auto &shader = lastMat->enableShader(SHADER_TYPE_BRUSH_MODEL_IDX, m_uFrameCount)
+                               ->getShader<SceneShaders::BrushShader>();
+            shader.setModelMatrix(modelMat);
+            shader.setRenderMode(clent->getRenderMode());
+            shader.setRenderFx(clent->getFxAmount() / 255.f, {0, 0, 0});
         }
 
         glBindVertexArray(m_Data.surfVao);
@@ -1558,11 +1556,6 @@ void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
 
 void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
     Model *model = clent->getModel();
-
-    ShaderInstance *shaderInstance =
-        Shaders::brushent.getShaderInstance(SHADER_TYPE_BRUSH_MODEL_IDX);
-    auto &shader = shaderInstance->getShader<BrushEntityShader>();
-    shaderInstance->enable();
 
     // Frustum culling
     glm::vec3 mins, maxs;
@@ -1586,17 +1579,19 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
     modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
     modelMat = glm::translate(modelMat, clent->getOrigin());
-    shader.m_uModelMat.set(modelMat);
+
+    RenderMode renderMode = kRenderNormal;
+    float fxAmount = 1;
+    glm::vec3 fxColor = glm::vec3(0, 0, 0);
 
     // Render mode
     if (!r_notrans.getValue()) {
         setRenderMode(clent->getRenderMode());
-        shader.m_uRenderMode.set(clent->getRenderMode());
-        shader.m_uFxAmount.set(clent->getFxAmount() / 255.f);
-        shader.m_uFxColor.set(glm::vec3(clent->getFxColor()) / 255.f);
+        renderMode = clent->getRenderMode();
+        fxAmount = clent->getFxAmount() / 255.f;
+        fxColor = glm::vec3(clent->getFxColor()) / 255.f;
     } else {
         setRenderMode(kRenderNormal);
-        shader.m_uRenderMode.set(kRenderNormal);
     }
 
     bool needSort = false;
@@ -1613,6 +1608,19 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
     unsigned from = model->getFirstFace();
     unsigned to = from + model->getFaceNum();
 
+    Material *pLastMaterial = nullptr;
+    auto fnActivateMaterial = [&](Material *mat) {
+        if (pLastMaterial != mat) {
+            pLastMaterial = mat;
+            mat->activateTextures();
+            auto &shader = mat->enableShader(SHADER_TYPE_BRUSH_MODEL_IDX, m_uFrameCount)
+                               ->getShader<SceneShaders::BrushShader>();
+            shader.setModelMatrix(modelMat);
+            shader.setRenderMode(renderMode);
+            shader.setRenderFx(fxAmount, fxColor);
+        }
+    };
+
     for (unsigned i = from; i < to; i++) {
         Surface &surf = m_Data.surfaces[i];
 
@@ -1626,6 +1634,7 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
             m_SortBuffer.push_back(i);
         } else {
             // Draw now
+            fnActivateMaterial(surf.m_pMat);
             drawBrushEntitySurface(surf);
         }
     }
@@ -1645,14 +1654,13 @@ void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
 
         for (size_t i : m_SortBuffer) {
             Surface &surf = m_Data.surfaces[i];
+            fnActivateMaterial(surf.m_pMat);
             drawBrushEntitySurface(surf);
         }
     }
 }
 
 void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
-    // Bind material
-    surf.m_pMat->activateTextures();
     glBindVertexArray(m_Data.surfVao);
     glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
     m_Stats.uDrawCallCount++;
@@ -1662,11 +1670,8 @@ void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
 void SceneRenderer::drawPatches() {
     appfw::Prof prof("Patches");
 
-    ShaderInstance *shaderInstance =
-        Shaders::patches.getShaderInstance(SHADER_TYPE_CUSTOM_IDX);
-    auto &shader = shaderInstance->getShader<PatchesShader>();
-    shaderInstance->enable();
-    shader.setupSceneUniforms(*this);
+    m_pPatchesMaterial->activateTextures();
+    m_pPatchesMaterial->enableShader(SHADER_TYPE_CUSTOM_IDX, m_uFrameCount);
 
     glBindVertexArray(m_Data.patchesVao);
     glPointSize(5);
@@ -1678,8 +1683,9 @@ void SceneRenderer::drawPatches() {
 void SceneRenderer::doPostProcessing() {
     appfw::Prof prof("Post-Processing");
 
-    ShaderInstance *shaderInstance = Shaders::postprocess.getShaderInstance(SHADER_TYPE_BLIT_IDX);
-    shaderInstance->enable();
+    ShaderInstance *shaderInstance =
+        SceneShaders::Shaders::postprocess.getShaderInstance(SHADER_TYPE_BLIT_IDX);
+    shaderInstance->enable(m_uFrameCount);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_nColorBuffer.getId());

@@ -75,6 +75,7 @@ private:
 
     glm::ivec2 m_vViewportSize = glm::ivec2(0, 0);
     SceneRenderer m_SceneRenderer;
+    unsigned m_uFrameCount = 0;
 
     // Entities to render
     std::vector<ClientEntity> m_VisEnts;

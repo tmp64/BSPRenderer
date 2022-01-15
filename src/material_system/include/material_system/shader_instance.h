@@ -16,7 +16,7 @@ public:
     }
 
     //! Enables this shader.
-    void enable();
+    void enable(unsigned curFrame);
 
     //! Disable any enabled shader.
     static void disable();
@@ -30,6 +30,7 @@ public:
 private:
     std::unique_ptr<Shader> m_pShader;
     ShaderProgram m_Prog;
+    unsigned m_uLastEnableFrame = 0; //! Last frame that the shader was enabled.
 
     bool compileShader(ShaderStage &stage, std::string_view vpath,
                        std::string_view globalDefines, std::string_view defines);

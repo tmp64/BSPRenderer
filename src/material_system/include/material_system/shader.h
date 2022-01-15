@@ -36,24 +36,6 @@ protected:
     //! Sets the shader types that this shader supports.
     inline void setTypes(unsigned types) { m_uShaderTypes = types; }
 
-    /*//! Adds a shared definition to shader of specified types.
-    template <typename T>
-    void addSharedDef(unsigned type, const T &value) {
-        forEachShaderTypeDef(type, [&](ShaderProgramDefinitions &d) { d.addSharedDef(value); });
-    }
-
-    //! Adds a vertex definition to shader of specified types.
-    template <typename T>
-    void addVertexDef(unsigned type, const T &value) {
-        forEachShaderTypeDef(type, [&](ShaderProgramDefinitions &d) { d.addVertexDef(value); });
-    }
-
-    //! Adds a fragment definition to shader of specified types.
-    template <typename T>
-    void addFragmentDef(unsigned type, const T &value) {
-        forEachShaderTypeDef(type, [&](ShaderProgramDefinitions &d) { d.addFragmentDef(value); });
-    }*/
-
     //! Adds a shared definition to the shader.
     template <typename T>
     void addSharedDef(std::string_view key, const T &value) {
@@ -80,14 +62,21 @@ protected:
     //! @param  name    Name of the uniform, must be a constant string
     void addUniform(UniformBlock &uniform, const char *name, GLuint bindingPoint);
 
+    //! @returns the type of the instance.
+    inline unsigned getCurrentType() { return m_uCurrentType; }
+
     //! Called when the shader was compiled. It will be enabled in this call.
     virtual void onShaderCompiled();
+
+    //! Called once per frame when enabled.
+    virtual void onEnabledOnce();
 
 private:
     // Prototype information
     unsigned m_uShaderTypes = 0;
 
     // Shader information (set in constructor)
+    unsigned m_uCurrentType = 0;
     std::string_view m_Title;
     std::string_view m_VertexFilePath;
     std::string_view m_FragmentFilePath;
@@ -97,15 +86,6 @@ private:
 
     // Shader instances (actual OpenGL shaders)
     std::unique_ptr<ShaderInstance> m_pInstances[MAX_SHADER_TYPE_COUNT];
-
-    /*template <typename F>
-    void forEachShaderTypeDef(unsigned type, F func) {
-        for (unsigned i = 0; i < MAX_SHADER_TYPE_COUNT; i++) {
-            if (type & (1 << i)) {
-                func(m_Defs[i]);
-            }
-        }
-    }*/
 
     //! Creates an instance of shader info of specified type.
     virtual std::unique_ptr<Shader> createShaderInfoInstance(unsigned typeIdx) = 0;

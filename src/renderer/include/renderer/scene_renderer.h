@@ -115,21 +115,12 @@ public:
     void setSurfaceTint(int surface, glm::vec4 color);
 #endif
 
-    //! @returns shader used by surface materials.
-    static Shader *getDefaultSurfaceShader();
-
 private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
     static constexpr int BSP_LIGHTMAP_BLOCK_SIZE = 1024;
     static constexpr int BSP_LIGHTMAP_PADDING = 2;
     static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
     static constexpr int MAX_TRANS_SURFS_PER_MODEL = 512; //!< Maximum number of surfaces per transparent model
-
-    class WorldShader;
-    class SkyBoxShader;
-    class BrushEntityShader;
-    class PatchesShader;
-    class PostProcessShader;
 
     enum class LoadingStatus
     {
@@ -246,6 +237,9 @@ private:
     LoadingStatus m_LoadingStatus;
     std::unique_ptr<LoadingState> m_pLoadingState;
     Material *m_pSkyboxMaterial = nullptr;
+    Material *m_pPatchesMaterial = nullptr;
+    Material *m_pWireframeMaterial = nullptr;
+    unsigned m_uFrameCount = 0;
 
     // Entities
     std::vector<ClientEntity *> m_SolidEntityList;

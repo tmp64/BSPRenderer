@@ -5,6 +5,8 @@ Shader::Shader(unsigned type) {
     if (type == 0) {
         getPrototypeList().push_back(this);
     }
+
+    m_uCurrentType = type;
 }
 
 Shader::~Shader() {
@@ -33,6 +35,8 @@ void Shader::addUniform(UniformBlock &uniform, const char *name, GLuint bindingP
 }
 
 void Shader::onShaderCompiled() {}
+
+void Shader::onEnabledOnce() {}
 
 bool Shader::createShaderInstances() {
     bool success = true;
