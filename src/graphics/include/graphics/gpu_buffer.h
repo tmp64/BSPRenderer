@@ -7,9 +7,9 @@
 class GPUBuffer {
 public:
     GPUBuffer() = default;
-    GPUBuffer(GPUBuffer &&) = default;
+    GPUBuffer(GPUBuffer &&other) noexcept;
     ~GPUBuffer();
-    GPUBuffer &operator=(GPUBuffer &&) = default;
+    GPUBuffer &operator=(GPUBuffer &&other) noexcept;
 
     //! Creates an OpenGL buffer name.
     void create(GLenum target, std::string_view name);

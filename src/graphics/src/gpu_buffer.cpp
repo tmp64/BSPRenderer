@@ -1,10 +1,26 @@
 #include <graphics/gpu_buffer.h>
 
+GPUBuffer::GPUBuffer(GPUBuffer &&other) noexcept {
+    *this = std::move(other);
+}
+
 GPUBuffer::~GPUBuffer() {
     destroy();
 }
 
+GPUBuffer &GPUBuffer::operator=(GPUBuffer &&other) noexcept {
+    if (this != &other) {
+        destroy();
+        m_Buf = std::move(other.m_Buf);
+        updateMemUsage(other.m_MemUsage.get());
+        other.updateMemUsage(0);
+    }
+
+    return *this;
+}
+
 void GPUBuffer::create(GLenum target, std::string_view name) {
+    destroy();
     m_Target = target;
     m_Buf.create();
     m_Target = target;
