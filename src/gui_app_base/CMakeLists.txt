@@ -38,6 +38,7 @@ target_link_libraries(gui_app_base
 	graphics
 	material_system
 	imgui
+	imgui_impl
 	input_system
 	SDL2::SDL2
 	SDL2::SDL2main

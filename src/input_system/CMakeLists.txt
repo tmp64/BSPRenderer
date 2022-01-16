@@ -19,6 +19,7 @@ target_include_directories(input_system PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(input_system
 	app_base
 	imgui
+	imgui_impl
 	SDL2::SDL2
 )
 

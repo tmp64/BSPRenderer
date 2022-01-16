@@ -12,20 +12,6 @@ add_library(imgui STATIC
 	${CMAKE_CURRENT_SOURCE_DIR}/src/imstb_rectpack.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/imstb_textedit.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/imstb_truetype.h
-	
-	${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_impl_opengl3.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_impl_opengl3.h
-	${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_impl_sdl.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_impl_sdl.h
 )
 
 target_include_directories(imgui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-
-target_compile_definitions(imgui PRIVATE
-	IMGUI_IMPL_OPENGL_LOADER_CUSTOM
-)
-
-target_link_libraries(imgui
-	glad
-	SDL2::SDL2
-)
