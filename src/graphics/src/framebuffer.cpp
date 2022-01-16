@@ -33,7 +33,8 @@ FramebufferStatus Framebuffer::checkStatus() const {
 }
 
 bool Framebuffer::isComplete() const {
-    return glCheckFramebufferStatus(m_Fb) == GL_FRAMEBUFFER_COMPLETE;
+    bind(GL_FRAMEBUFFER);
+    return glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 }
 
 void Framebuffer::attachColor(IRenderTarget *pTarget, int attachmentIdx) {

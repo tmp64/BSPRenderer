@@ -2,6 +2,7 @@
 #define RENDERER_H
 #include <appfw/utils.h>
 #include <graphics/texture2d.h>
+#include <graphics/framebuffer.h>
 #include <renderer/scene_renderer.h>
 #include <renderer/renderer_engine_interface.h>
 #include "assets/level_asset.h"
@@ -89,8 +90,8 @@ private:
     Material *m_pBoxMaterial = nullptr;
 
     // Backbuffer
-    GLFramebuffer m_Framebuffer;
-    Texture2D m_ColorBuffer;
+    Material *m_pBackbufferMat = nullptr;
+    Framebuffer m_Framebuffer;
 
     // Main view
     glm::vec3 m_vPosition = {0.f, 0.f, 0.f};

@@ -1,6 +1,7 @@
 #include <appfw/str_utils.h>
 #include <material_system/shader.h>
 #include <renderer/utils.h>
+#include <imgui_impl_shaders.h>
 #include "main_view_renderer.h"
 #include "world_state.h"
 #include "bspviewer.h"
@@ -35,6 +36,21 @@ static ConCommand cmd_setpos("setpos", "", [](const CmdString &cmd) {
     }
 });
 
+class MainViewShader : public ImGuiShader {
+public:
+    MainViewShader(unsigned type = 0)
+        : ImGuiShader(type) {
+        setVert("assets:shaders/imgui/gamma.vert");
+        setFrag("assets:shaders/imgui/gamma.frag");
+        setFramebufferSRGB(false);
+    }
+
+private:
+    std::unique_ptr<Shader> createShaderInfoInstance(unsigned typeIdx) override {
+        return std::make_unique<MainViewShader>(typeIdx);
+    }
+};
+
 class EntityBoxShader : public ShaderT<EntityBoxShader> {
 public:
     EntityBoxShader(unsigned type = 0)
@@ -51,6 +67,7 @@ private:
     UniformBlock m_uGlobalUniform;
 };
 
+static MainViewShader s_MainViewShader;
 static EntityBoxShader s_EntityBoxShader;
 
 static ImVec2 imVecFloor(ImVec2 vec) {
@@ -124,6 +141,13 @@ MainViewRenderer::MainViewRenderer() {
     m_pBoxMaterial = MaterialSystem::get().createMaterial("Entity Box");
     m_pBoxMaterial->setSize(1, 1);
     m_pBoxMaterial->setShader(SHADER_TYPE_CUSTOM_IDX, &s_EntityBoxShader);
+
+    // Backbuffer
+    m_pBackbufferMat = MaterialSystem::get().createMaterial("Main View");
+    m_pBackbufferMat->setSize(1, 1);
+    m_pBackbufferMat->setShader(SHADER_TYPE_IMGUI_IDX, &s_MainViewShader);
+    m_pBackbufferMat->setShader(SHADER_TYPE_IMGUI_LINEAR_IDX, &s_MainViewShader);
+    m_pBackbufferMat->setTexture(0, std::make_unique<Texture2D>());
 }
 
 MainViewRenderer::~MainViewRenderer() {
@@ -131,6 +155,10 @@ MainViewRenderer::~MainViewRenderer() {
     m_spInstance = nullptr;
     MaterialSystem::get().destroyMaterial(m_pBoxMaterial);
     m_pBoxMaterial = nullptr;
+
+    m_Framebuffer.destroy();
+    MaterialSystem::get().destroyMaterial(m_pBackbufferMat);
+    m_pBackbufferMat = nullptr;
 }
 
 bool MainViewRenderer::isWorldRenderingEnabled() {
@@ -196,8 +224,7 @@ void MainViewRenderer::tick() {
                 }
 
                 ImVec2 oldCursor = ImGui::GetCursorPos();
-                ImGui::Image(nullptr, vSize,
-                             ImVec2(0, 1), ImVec2(1, 0));
+                ImGui::Image(m_pBackbufferMat, vSize, ImVec2(0, 1), ImVec2(1, 0));
 
                 ImGui::SetCursorPos(oldCursor);
                 topLeftScreenPos = ImGui::GetCursorScreenPos();
@@ -284,7 +311,7 @@ void MainViewRenderer::renderMainView() {
     m_SceneRenderer.setPerspective(fovx, aspect, 4, 8192);
     m_SceneRenderer.setPerspViewOrigin(m_vPosition, m_vRotation);
     updateVisibleEnts();
-    m_SceneRenderer.renderScene(m_Framebuffer, 0, 0);
+    m_SceneRenderer.renderScene(m_Framebuffer.getId(), 0, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -375,18 +402,21 @@ void MainViewRenderer::updateVisibleEnts() {
 
 void MainViewRenderer::refreshFramebuffer() {
     // Create color buffer
-    m_ColorBuffer.create("Main View FB");
-    m_ColorBuffer.initTexture(GraphicsFormat::RGB8, m_vViewportSize.x, m_vViewportSize.y, false,
+    Texture2D *colorBuffer = static_cast<Texture2D *>(m_pBackbufferMat->getTexture(0));
+    colorBuffer->create("Main View");
+    colorBuffer->setFilter(TextureFilter::Bilinear);
+    colorBuffer->setWrapMode(TextureWrapMode::Clamp);
+    colorBuffer->initTexture(GraphicsFormat::RGB8, m_vViewportSize.x, m_vViewportSize.y, false,
                               GL_RGB, GL_UNSIGNED_BYTE, nullptr);
 
     // Attach buffers
-    m_Framebuffer.create();
-    glBindFramebuffer(GL_FRAMEBUFFER, m_Framebuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                           m_ColorBuffer.getId(), 0);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        throw std::runtime_error(
-            "MainViewRenderer::refreshFramebuffer(): framebuffer not complete");
+    m_Framebuffer.create("Main View");
+    m_Framebuffer.attachColor(colorBuffer, 0);
+
+    if (!m_Framebuffer.isComplete()) {
+        throw std::logic_error("Main view framebuffer not complete");
+    }
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
