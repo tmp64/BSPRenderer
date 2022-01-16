@@ -36,6 +36,9 @@ protected:
     //! Sets the shader types that this shader supports.
     inline void setTypes(unsigned types) { m_uShaderTypes = types; }
 
+    //! Whether to enable GL_FRAMEBUFFER_SRGB for this shader.
+    inline void setFramebufferSRGB(bool state) { m_bFramebufferSRGB = state; }
+
     //! Adds a shared definition to the shader.
     template <typename T>
     void addSharedDef(std::string_view key, const T &value) {
@@ -71,6 +74,12 @@ protected:
     //! Called once per frame when enabled.
     virtual void onEnabledOnce();
 
+    //! Called every time the shader is enabled
+    virtual void onEnabled();
+
+    //! Called every time the shader is disabled.
+    virtual void onDisabled();
+
 private:
     // Prototype information
     unsigned m_uShaderTypes = 0;
@@ -83,6 +92,7 @@ private:
     std::vector<ShaderUniform *> m_Uniforms;
     std::vector<UniformBlock *> m_UniformBlocks;
     ShaderProgramDefinitions m_Defs;
+    bool m_bFramebufferSRGB = false;
 
     // Shader instances (actual OpenGL shaders)
     std::unique_ptr<ShaderInstance> m_pInstances[MAX_SHADER_TYPE_COUNT];
@@ -141,6 +151,11 @@ public:
     };
 
     class TextureVar : public Var<int> {};
+
+    class CustomVar : public ShaderUniform {
+    public:
+        inline GLint getLocation() { return m_nLocation; }
+    };
 
     class UniformBlock : appfw::NoCopy {
     public:

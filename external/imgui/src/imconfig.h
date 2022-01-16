@@ -114,6 +114,11 @@
 //---- Debug Tools: Enable slower asserts
 //#define IMGUI_DEBUG_PARANOID
 
+class Material;
+
+using ImTextureMat = Material *;
+#define ImTextureID ImTextureMat
+
 //---- Tip: You can add extra functions within the ImGui:: namespace, here or in your own headers files.
 /*
 namespace ImGui

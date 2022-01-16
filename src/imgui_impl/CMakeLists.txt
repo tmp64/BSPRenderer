@@ -1,6 +1,7 @@
 set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/imgui_impl_opengl3.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/imgui_impl_sdl.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/imgui_impl_shaders.h
 	
 	${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_impl_opengl3.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/imgui_impl_sdl.cpp

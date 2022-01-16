@@ -196,7 +196,7 @@ void MainViewRenderer::tick() {
                 }
 
                 ImVec2 oldCursor = ImGui::GetCursorPos();
-                ImGui::Image(reinterpret_cast<ImTextureID>((uintptr_t)m_ColorBuffer.getId()), vSize,
+                ImGui::Image(nullptr, vSize,
                              ImVec2(0, 1), ImVec2(1, 0));
 
                 ImGui::SetCursorPos(oldCursor);

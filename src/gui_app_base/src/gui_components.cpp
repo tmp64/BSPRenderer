@@ -13,6 +13,8 @@ static ConfigItem<int> cfg_window_x("window_x", WIN_POS_UNDEFINED,
 static ConfigItem<int> cfg_window_y("window_y", WIN_POS_UNDEFINED,
                                     "Position Y of the main window.");
 
+static ConVar<bool> imgui_linear("imgui_linear", true, "Use linear (gamma-correct) rendering");
+
 SDLComponent::SDLComponent() {
     SDL_Init(SDL_INIT_EVERYTHING);
 }
@@ -127,6 +129,13 @@ ImGuiComponent::ImGuiComponent() {
     ImGui_ImplOpenGL3_Init();
 
     setupScale();
+
+    imgui_linear.setCallback([](const bool &, const bool &val) {
+        ImGui_ImplOpenGL3_SetLinearMode(val);
+        return true;
+    });
+
+    imgui_linear.setValue(imgui_linear.getValue());
 }
 
 void ImGuiComponent::beginTick() {

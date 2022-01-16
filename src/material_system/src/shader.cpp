@@ -38,6 +38,18 @@ void Shader::onShaderCompiled() {}
 
 void Shader::onEnabledOnce() {}
 
+void Shader::onEnabled() {
+    if (m_bFramebufferSRGB) {
+        glEnable(GL_FRAMEBUFFER_SRGB);
+    }
+}
+
+void Shader::onDisabled() {
+    if (m_bFramebufferSRGB) {
+        glDisable(GL_FRAMEBUFFER_SRGB);
+    }
+}
+
 bool Shader::createShaderInstances() {
     bool success = true;
 

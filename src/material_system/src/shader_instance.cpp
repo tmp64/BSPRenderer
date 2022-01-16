@@ -8,6 +8,10 @@ ShaderInstance::ShaderInstance(std::unique_ptr<Shader> &shader) {
 }
 
 void ShaderInstance::enable(unsigned curFrame) {
+    if (m_spCurrentInstance) {
+        m_spCurrentInstance->m_pShader->onDisabled();
+    }
+
     glUseProgram(m_Prog.getId());
     m_spCurrentInstance = this;
 
@@ -15,9 +19,15 @@ void ShaderInstance::enable(unsigned curFrame) {
         m_pShader->onEnabledOnce();
         m_uLastEnableFrame = curFrame;
     }
+
+    m_pShader->onEnabled();
 }
 
 void ShaderInstance::disable() {
+    if (m_spCurrentInstance) {
+        m_spCurrentInstance->m_pShader->onDisabled();
+    }
+
     glUseProgram(0);
     m_spCurrentInstance = nullptr;
 }
