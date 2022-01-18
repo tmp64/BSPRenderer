@@ -20,83 +20,6 @@ public:
 
 class Level {
 public:
-    class EntityList;
-
-    class EntityListItem {
-    public:
-        inline bool hasValue(const std::string &key) const { return m_Keys.find(key) != m_Keys.end(); }
-
-        template <typename T>
-        inline T getValue(const std::string &key, const std::optional<T> &defVal = std::nullopt) const {
-            auto it = m_Keys.find(key);
-
-            if (it == m_Keys.end()) {
-                if (defVal.has_value()) {
-                    return defVal.value();
-                } else {
-                    throw std::runtime_error(std::string("key '") + key + "' not found");
-                }
-            } else {
-                T ret;
-                if (appfw::convertStringToVal(it->second, ret)) {
-                    return ret;
-                } else {
-                    throw std::runtime_error(std::string("key '") + key + "' is in wrong format");
-                }
-            }
-        }
-
-    private:
-        std::map<std::string, std::string> m_Keys;
-
-        friend class Level::EntityList;
-    };
-
-    class EntityList {
-    public:
-        EntityList() = default;
-
-        /**
-         * Initializes entity list from entity lump.
-         */
-        EntityList(const std::vector<char> &entityLump);
-
-        /**
-         * Returns "worldspawn" entity.
-         */
-        inline const EntityListItem &getWorldspawn() const { return *m_pWorldspawn; }
-
-        /**
-         * Returns pointer to an entity with specified targetname or nullptr.
-         */
-        const EntityListItem *findEntityByName(const std::string &targetname, const EntityListItem *pPrev = nullptr) const;
-
-        /**
-         * Returns pointer to an entity with specified classname or nullptr.
-         */
-        const EntityListItem *findEntityByClassname(const std::string &classname,
-                                                    const EntityListItem *pPrev = nullptr) const;
-
-        inline auto begin() { return m_Items.begin(); }
-        inline auto end() { return m_Items.end(); }
-        inline auto begin() const { return m_Items.begin(); }
-        inline auto end() const { return m_Items.end(); }
-
-        inline auto rbegin() { return m_Items.rbegin(); }
-        inline auto rend() { return m_Items.rend(); }
-        inline auto rbegin() const { return m_Items.rbegin(); }
-        inline auto rend() const { return m_Items.rend(); }
-
-        inline size_t size() const { return m_Items.size(); }
-
-        inline EntityListItem &operator[](size_t idx) { return m_Items[idx]; }
-        inline const EntityListItem &operator[](size_t idx) const { return m_Items[idx]; }
-
-    private:
-        std::vector<EntityListItem> m_Items;
-        EntityListItem *m_pWorldspawn = nullptr;
-    };
-
     /**
      * Constructs an empty level.
      */
@@ -158,7 +81,7 @@ public:
     inline const std::vector<BSPEdge> &getEdges() const { return m_Edges; }
     inline const std::vector<BSPSurfEdge> &getSurfEdges() const { return m_SurfEdges; }
     inline const std::vector<BSPModel> &getModels() const { return m_Models; }
-    inline const EntityList &getEntities() const { return m_Entities; }
+    inline const std::string &getEntitiesLump() const { return m_Entities; }
     inline const std::vector<uint8_t> &getRawTextures() const { return m_RawTextureLump; }
 
 private:
@@ -175,8 +98,8 @@ private:
     std::vector<BSPEdge> m_Edges;
     std::vector<BSPSurfEdge> m_SurfEdges;
     std::vector<BSPModel> m_Models;
-    EntityList m_Entities;
     std::vector<uint8_t> m_RawTextureLump;
+    std::string m_Entities;
 
     int recursiveTraceLine(int node, const glm::vec3 &from, const glm::vec3 &to) const;
 };

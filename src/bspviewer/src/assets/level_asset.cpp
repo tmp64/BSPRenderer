@@ -1,4 +1,5 @@
 #include <bsp/utils.h>
+#include <bsp/entity_key_values.h>
 #include "asset_manager.h"
 #include "level_asset.h"
 
@@ -127,8 +128,10 @@ void LevelAsset::loadFromFile(AssetManager &assMgr, std::string_view path, Share
 }
 
 std::vector<std::string> LevelAsset::getRequiredWads() {
-    auto &ws = m_Level.getEntities().getWorldspawn();
-    std::string wads = ws.getValue<std::string>("wad", "");
+    bsp::EntityKeyValuesDict entities(m_Level.getEntitiesLump());
+    const bsp::EntityKeyValues &worldspawn = entities[0];
+    int wadIdx = worldspawn.indexOf("wad");
+    std::string wads = wadIdx != -1 ? worldspawn.get(wadIdx).asString() : "";
 
     if (wads.empty()) {
         printw("Level doesn't reference any WAD files.");

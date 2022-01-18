@@ -19,138 +19,6 @@ NoVis s_NoVis;
 
 }
 
-bsp::Level::EntityList::EntityList(const std::vector<char> &entityLump) {
-    size_t i = 0;
-
-    auto fnSkipWhitespace = [&]() {
-        auto &c = entityLump;
-        while (c[i] == ' ' || c[i] == '\r' || c[i] == '\n' || c[i] == '\t') {
-            i++;
-        }
-    };
-
-    auto fnCheckEOF = [&]() {
-        if (i >= entityLump.size()) {
-            throw LevelFormatException("Entity lump: unexpected end of file at position " + std::to_string(i));
-        }
-    };
-
-    while (i < entityLump.size()) {
-        fnSkipWhitespace();
-
-        if (entityLump[i] == '\0') {
-            // Finished parsing
-            break;
-        }
-
-        if (entityLump[i] != '{') {
-            throw LevelFormatException("Entity lump: expected '{' at position " + std::to_string(i));
-        }
-        i++;
-
-        EntityListItem item;
-
-        while (i < entityLump.size()) {
-            fnSkipWhitespace();
-
-            // "key"
-            if (entityLump[i] != '}' && entityLump[i] != '"') {
-                throw LevelFormatException("Entity lump: expected '\"' at position " + std::to_string(i));
-            }
-
-            if (entityLump[i] == '}') {
-                break;
-            }
-
-            i++;
-            size_t keyBegin = i;
-
-            while (entityLump[i] != '"' && i < entityLump.size()) {
-                i++;
-            }
-
-            fnCheckEOF();
-            size_t keyEnd = i;
-            i++;
-            
-            // "value"
-            fnSkipWhitespace();
-            if (entityLump[i] != '"') {
-                throw LevelFormatException("Entity lump: expected '\"' at position " + std::to_string(i));
-            }
-
-            i++;
-            size_t valueBegin = i;
-
-            while (entityLump[i] != '"' && i < entityLump.size()) {
-                i++;
-            }
-
-            fnCheckEOF();
-            size_t valueEnd = i;
-            i++;
-
-            // Add into the item
-            std::string_view key(&entityLump[keyBegin], keyEnd - keyBegin);
-            std::string_view value(&entityLump[valueBegin], valueEnd - valueBegin);
-            item.m_Keys.insert({std::string(key), std::string(value)});
-        }
-
-        fnCheckEOF();
-
-        if (entityLump[i] != '}') {
-            throw LevelFormatException("Entity lump: expected '}' at position " + std::to_string(i));
-        }
-        i++;
-
-        // Add item into the list
-        m_Items.push_back(std::move(item));
-    }
-
-    // Find worldspawn
-    for (EntityListItem &item : m_Items) {
-        if (item.getValue<std::string>("classname") == "worldspawn") {
-            if (m_pWorldspawn) {
-                throw LevelFormatException("Multiple worldspawns found");
-            } else {
-                m_pWorldspawn = &item;
-            }
-        }
-    }
-
-    if (!m_pWorldspawn) {
-        throw LevelFormatException("Entity lump: no worldspawn found");
-    }
-}
-
-const bsp::Level::EntityListItem *bsp::Level::EntityList::findEntityByName(const std::string &targetname,
-                                                                           const EntityListItem *pPrev) const {
-    const EntityListItem *pFirst = pPrev ? (pPrev + 1) : m_Items.data();
-    const EntityListItem *pEnd = m_Items.data() + m_Items.size();
-
-    for (const EntityListItem *pItem = pFirst; pItem != pEnd; pItem++) {
-        if (pItem->getValue<std::string>("targetname") == targetname) {
-            return pItem;
-        }
-    }
-
-    return nullptr;
-}
-
-const bsp::Level::EntityListItem *bsp::Level::EntityList::findEntityByClassname(const std::string &classname,
-                                                                                const EntityListItem *pPrev) const {
-    const EntityListItem *pFirst = pPrev ? (pPrev + 1) : m_Items.data();
-    const EntityListItem *pEnd = m_Items.data() + m_Items.size();
-
-    for (const EntityListItem *pItem = pFirst; pItem != pEnd; pItem++) {
-        if (pItem->getValue<std::string>("classname") == classname) {
-            return pItem;
-        }
-    }
-
-    return nullptr;
-}
-
 bsp::Level::Level(appfw::span<uint8_t> data) { loadFromBytes(data); }
 
 bsp::Level::Level(const std::string &filename) { loadFromFile(filename); }
@@ -283,8 +151,12 @@ void bsp::Level::loadFromBytes(appfw::span<uint8_t> data) {
     // Load entities
     std::vector<char> entLump;
     fnLoadLump(LUMP_ENTITIES, entLump);
-    entLump.push_back('\0');
-    m_Entities = EntityList(entLump);
+
+    if (entLump[entLump.size() - 1] == '\0') {
+        m_Entities = std::string(entLump.data(), entLump.size() - 1);
+    } else {
+        m_Entities = std::string(entLump.data(), entLump.size());
+    }
 }
 
 std::vector<glm::vec3> bsp::Level::getFaceVertices(const bsp::BSPFace &face) const {

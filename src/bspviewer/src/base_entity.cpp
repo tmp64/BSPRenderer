@@ -3,16 +3,17 @@
 
 BaseEntity::BaseEntity() {}
 
-void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) {
-    if (item.hasValue("classname")) {
-        m_ClassName = item.getValue<std::string>("classname");
-    } else {
+void BaseEntity::loadKeyValues(const bsp::EntityKeyValues &item, int idx) {
+    m_ClassName = item.getClassName();
+
+    if (m_ClassName.empty()) {
         printe("Entity {}: no classname set", idx);
         m_ClassName = "< none >";
     }
 
-    if (item.hasValue("model")) {
-        std::string model = item.getValue<std::string>("model");
+    int kvModelIdx = item.indexOf("model");
+    if (kvModelIdx != -1) {
+        std::string model = item.get(kvModelIdx).asString();
         if (model[0] == '*') {
             // Brush model
             int modelidx = std::stoi(model.substr(1), nullptr, 10);
@@ -27,8 +28,9 @@ void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) 
         }
     }
 
-    if (item.hasValue("origin")) {
-        std::string originstr = item.getValue<std::string>("origin");
+    int kvOriginIdx = item.indexOf("origin");
+    if (kvOriginIdx != -1) {
+        std::string originstr = item.get(kvOriginIdx).asString();
         glm::vec3 origin;
 
         if (sscanf(originstr.c_str(), "%f %f %f", &origin.x, &origin.y, &origin.z) != 3) {
@@ -38,8 +40,9 @@ void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) 
         m_vOrigin = origin;
     }
 
-    if (item.hasValue("angles")) {
-        std::string anglesstr = item.getValue<std::string>("angles");
+    int kvAnglesIdx = item.indexOf("angles");
+    if (kvAnglesIdx != -1) {
+        std::string anglesstr = item.get(kvAnglesIdx).asString();
         glm::vec3 angles;
 
         if (sscanf(anglesstr.c_str(), "%f %f %f", &angles.x, &angles.y, &angles.z) != 3) {
@@ -49,12 +52,13 @@ void BaseEntity::loadKeyValues(const bsp::Level::EntityListItem &item, int idx) 
         m_vAngles = angles;
     }
 
-    m_iRenderMode = item.getValue<int>("rendermode", 0);
-    m_iRenderFx = item.getValue<int>("renderfx", 0);
-    m_iFxAmount = item.getValue<int>("renderamt", 0);
+    m_iRenderMode = getKVInt(item, "rendermode", 0);
+    m_iRenderFx = getKVInt(item, "renderfx", 0);
+    m_iFxAmount = getKVInt(item, "renderamt", 0);
 
-    if (item.hasValue("rendercolor")) {
-        std::string colorstr = item.getValue<std::string>("rendercolor");
+    int kvRendercolorIdx = item.indexOf("rendercolor");
+    if (kvRendercolorIdx != -1) {
+        std::string colorstr = item.get(kvRendercolorIdx).asString();
         glm::ivec3 color;
 
         if (sscanf(colorstr.c_str(), "%d %d %d", &color.x, &color.y, &color.z) != 3) {

@@ -29,6 +29,12 @@ void rad::RadSimImpl::setLevel(const bsp::Level *pLevel, const std::string &name
     m_PatchHash = appfw::SHA256::Digest();
     appfw::SHA256 hash;
 
+    m_Entities.loadFromString(pLevel->getEntitiesLump());
+
+    if (m_Entities.empty()) {
+        throw std::runtime_error("Map has no entities");
+    }
+
     // Create build directory
     fs::create_directories(getFileSystem().getFilePath(getBuildDirPath()));
 
@@ -171,8 +177,8 @@ void rad::RadSimImpl::loadBuildProfile(const std::string &profileName) {
 }
 
 void rad::RadSimImpl::loadWADs() {
-    auto &ws = m_pLevel->getEntities().getWorldspawn();
-    std::string wads = ws.getValue<std::string>("wad", "");
+    auto &ws = m_Entities[0];
+    std::string wads = ws.get("wad").asString();
     std::vector<std::string> wadList = bsp::parseWadListString(wads);
 
     for (const std::string &wadName : wadList) {
@@ -317,8 +323,8 @@ void rad::RadSimImpl::loadLevelEntities() {
     bool wasEnvLightSet = m_LevelConfig.sunLight.bIsSet;
     bool isEnvLightFound = false;
 
-    for (auto &ent : m_pLevel->getEntities()) {
-        std::string classname = ent.getValue<std::string>("classname", "");
+    for (auto &ent : m_Entities) {
+        std::string_view classname = ent.getClassName();
 
         if (classname.empty()) {
             continue;
@@ -333,11 +339,11 @@ void rad::RadSimImpl::loadLevelEntities() {
 
                     // Read color
                     int color[4];
-                    if (sscanf(ent.getValue<std::string>("_light").c_str(), "%d %d %d %d",
-                               &color[0], &color[1], &color[2], &color[3]) != 4) {
+                    const std::string &lightValue = ent.get("_light").asString();
+                    if (sscanf(lightValue.c_str(), "%d %d %d %d", &color[0], &color[1], &color[2],
+                               &color[3]) != 4) {
                         throw std::runtime_error(
-                            fmt::format("light_environment _light = {} is invalid",
-                                        ent.getValue<std::string>("_light")));
+                            fmt::format("light_environment _light = {} is invalid", lightValue));
                     }
 
                     m_LevelConfig.sunLight.vColor.r = color[0] / 255.f;
@@ -350,8 +356,9 @@ void rad::RadSimImpl::loadLevelEntities() {
                     m_LevelConfig.sunLight.flBrightness = color[3] / m_Config.flEnvLightDiv;
 
                     // Read angle
-                    if (ent.hasValue("angles")) {
-                        std::string angles = ent.getValue<std::string>("angles");
+                    int anglesIdx = ent.indexOf("angles");
+                    if (anglesIdx != -1) {
+                        std::string angles = ent.get(anglesIdx).asString();
                         int pitch, yaw, roll;
                         if (sscanf(angles.c_str(), "%d %d %d", &pitch, &yaw, &roll) != 3) {
                             throw std::runtime_error(
@@ -361,8 +368,8 @@ void rad::RadSimImpl::loadLevelEntities() {
                         m_LevelConfig.sunLight.flYaw = (float)yaw;
                         m_LevelConfig.sunLight.flPitch = (float)pitch;
                     } else {
-                        m_LevelConfig.sunLight.flYaw = ent.getValue<float>("angle");
-                        m_LevelConfig.sunLight.flPitch = ent.getValue<float>("pitch");
+                        m_LevelConfig.sunLight.flYaw = ent.get("angle").asFloat();
+                        m_LevelConfig.sunLight.flPitch = ent.get("pitch").asFloat();
                     }
                 }
 

@@ -8,6 +8,7 @@
 #include <appfw/utils.h>
 #include <bsp/level.h>
 #include <bsp/wad_file.h>
+#include <bsp/entity_key_values.h>
 #include <material_props/material_prop_loader.h>
 #include <rad/rad_sim.h>
 
@@ -33,6 +34,7 @@ public:
 
     // Level data
     const bsp::Level *m_pLevel = nullptr;
+    bsp::EntityKeyValuesDict m_Entities;
     std::string m_LevelName;
     LevelConfig m_LevelConfig;
     YAML::Node m_SurfaceConfig;

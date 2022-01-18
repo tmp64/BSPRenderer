@@ -1,11 +1,13 @@
 set(BSP_PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/bsp_types.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/entity_key_values.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/level.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/utils.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/bsp/wad_file.h
 )
 
 set(BSP_PRIVATE_SOURCES
+	${CMAKE_CURRENT_SOURCE_DIR}/src/entity_key_values.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/level.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/wad_file.cpp
 )

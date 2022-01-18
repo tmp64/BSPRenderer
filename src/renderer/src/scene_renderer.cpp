@@ -1,6 +1,7 @@
 #include <appfw/binary_file.h>
 #include <appfw/timer.h>
 #include <appfw/prof.h>
+#include <bsp/entity_key_values.h>
 #include <app_base/lightmap.h>
 #include <stb_image.h>
 #include <material_system/shader_instance.h>
@@ -956,8 +957,10 @@ void SceneRenderer::loadSkyBox() {
     constexpr const char *suffixes[] = {"rt", "lf", "up", "dn", "bk", "ft"};
 
     // Get sky name
-    const bsp::Level::EntityListItem &worldspawn = m_pLevel->getEntities().getWorldspawn();
-    std::string skyname = worldspawn.getValue<std::string>("skyname", "desert");
+    bsp::EntityKeyValuesDict entities(m_pLevel->getEntitiesLump());
+    const bsp::EntityKeyValues &worldspawn = entities[0];
+    int skynameIdx = worldspawn.indexOf("skyname");
+    std::string skyname = skynameIdx != -1 ? worldspawn.get(skynameIdx).asString() : "desert";
 
     // Load images
     int loadedSidesCount = 0;

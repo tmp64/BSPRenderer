@@ -85,12 +85,12 @@ void WorldState::loadBrushModels() {
 }
 
 void WorldState::loadEntities() {
-    auto ents = m_pLevel->getEntities();
+    m_LevelEntityDict.loadFromString(m_pLevel->getEntitiesLump());
 
-    for (size_t i = 0; i < ents.size(); i++) {
+    for (int i = 0; i < m_LevelEntityDict.size(); i++) {
         std::unique_ptr<BaseEntity> pEnt = std::make_unique<BaseEntity>();
         try {
-            pEnt->loadKeyValues(ents[i], (int)i);
+            pEnt->loadKeyValues(m_LevelEntityDict[i], i);
             m_EntityList.push_back(std::move(pEnt));
         } catch (const std::exception &e) {
             printe("Entity {}: {}", i, e.what());
@@ -99,7 +99,7 @@ void WorldState::loadEntities() {
 
     printi("Loaded {} entities.", m_EntityList.size());
     
-    size_t fail = ents.size() - m_EntityList.size();
+    size_t fail = m_LevelEntityDict.size() - m_EntityList.size();
 
     if (fail > 0) {
         printw("{} entities failed to load", fail);
