@@ -3,73 +3,104 @@
 
 BaseEntity::BaseEntity() {}
 
-void BaseEntity::loadKeyValues(const bsp::EntityKeyValues &item, int idx) {
-    m_ClassName = item.getClassName();
+BaseEntity::~BaseEntity() {}
 
-    if (m_ClassName.empty()) {
-        printe("Entity {}: no classname set", idx);
-        m_ClassName = "< none >";
-    }
+void BaseEntity::initialize(int entIdx, std::string_view className, bsp::EntityKeyValues *kv) {
+    m_iEntIndex = entIdx;
+    m_ClassName = className;
 
-    int kvModelIdx = item.indexOf("model");
-    if (kvModelIdx != -1) {
-        std::string model = item.get(kvModelIdx).asString();
-        if (model[0] == '*') {
-            // Brush model
-            int modelidx = std::stoi(model.substr(1), nullptr, 10);
-            BrushModel *pModel = WorldState::get()->getBrushModel(modelidx);
+    if (kv) {
+        m_pLevelKeyValues = kv;
 
-            if (!pModel) {
-                printe("Entity {}: invalid model index '{}'", idx, model);
+        for (int i = 0; i < kv->size(); i++) {
+            try {
+                parseKeyValue(kv->getKeyName(i), kv->get(i));
+            } catch (const std::exception &e) {
+                printe("Entity {}: key-values error: {}", entindex(), e.what());
             }
-
-            m_pModel = pModel;
-            m_vOrigin = pModel->m_vOrigin;
         }
     }
+    
+    onKeyValuesUpdated();
+}
 
-    int kvOriginIdx = item.indexOf("origin");
-    if (kvOriginIdx != -1) {
-        std::string originstr = item.get(kvOriginIdx).asString();
-        glm::vec3 origin;
+void BaseEntity::spawn() {}
 
-        if (sscanf(originstr.c_str(), "%f %f %f", &origin.x, &origin.y, &origin.z) != 3) {
-            printe("Entity {}: invalid origin string '{}'", idx, originstr);
+bool BaseEntity::parseKeyValue(const std::string &key, const bsp::EntityValue &value) {
+    if (key == "targetname") {
+        
+        return true;
+    } else if (key == "model") {
+        setModel(value.asString());
+        return true;
+    } else if (key == "origin") {
+        setOrigin(value.asFloat3());
+        return true;
+    } else if (key == "angles") {
+        setAngles(value.asFloat3());
+        return true;
+    } else if (key == "rendermode") {
+        setRenderMode((RenderMode)value.asInt());
+        return true;
+    } else if (key == "renderfx") {
+        setRenderFx((RenderFx)value.asInt());
+        return true;
+    } else if (key == "renderamt") {
+        setFxAmount(value.asInt());
+        return true;
+    } else if (key == "rendercolor") {
+        setFxColor(value.asInt3());
+        return true;
+    }
+
+    return false;
+}
+
+void BaseEntity::onKeyValuesUpdated() {}
+
+void BaseEntity::setTargetName(std::string_view str) {
+    m_TargetName = str;
+}
+
+void BaseEntity::setOrigin(glm::vec3 origin) {
+    m_vOrigin = origin;
+}
+
+void BaseEntity::setAngles(glm::vec3 angles) {
+    m_vAngles = angles;
+}
+
+void BaseEntity::setModel(std::string_view model) {
+    if (model[0] == '*') {
+        // Brush model
+        int modelidx = std::stoi(std::string(model.substr(1)), nullptr, 10);
+        BrushModel *pModel = WorldState::get()->getBrushModel(modelidx);
+
+        if (!pModel) {
+            printe("Entity {}: invalid brush model index '{}'", entindex(), model);
         }
 
-        m_vOrigin = origin;
+        m_pModel = pModel;
+        m_vOrigin = pModel->m_vOrigin;
     }
+}
 
-    int kvAnglesIdx = item.indexOf("angles");
-    if (kvAnglesIdx != -1) {
-        std::string anglesstr = item.get(kvAnglesIdx).asString();
-        glm::vec3 angles;
+void BaseEntity::setModel(Model *model) {
+    m_pModel = model;
+}
 
-        if (sscanf(anglesstr.c_str(), "%f %f %f", &angles.x, &angles.y, &angles.z) != 3) {
-            printe("Entity {}: invalid angles string '{}'", idx, anglesstr);
-        }
+void BaseEntity::setRenderMode(RenderMode mode) {
+    m_nRenderMode = mode;
+}
 
-        m_vAngles = angles;
-    }
+void BaseEntity::setRenderFx(RenderFx fx) {
+    m_nRenderFx = fx;
+}
 
-    m_iRenderMode = getKVInt(item, "rendermode", 0);
-    m_iRenderFx = getKVInt(item, "renderfx", 0);
-    m_iFxAmount = getKVInt(item, "renderamt", 0);
+void BaseEntity::setFxAmount(int amount) {
+    m_iFxAmount = amount;
+}
 
-    int kvRendercolorIdx = item.indexOf("rendercolor");
-    if (kvRendercolorIdx != -1) {
-        std::string colorstr = item.get(kvRendercolorIdx).asString();
-        glm::ivec3 color;
-
-        if (sscanf(colorstr.c_str(), "%d %d %d", &color.x, &color.y, &color.z) != 3) {
-            printe("Entity {}: invalid rendercolor string '{}'", idx, colorstr);
-        }
-
-        m_vFxColor = color;
-    }
-
-    if (m_ClassName.substr(0, 8) == "trigger_" || m_ClassName == "func_ladder") {
-        m_iRenderMode = kRenderTransTexture;
-        m_iFxAmount = 127;
-    }
+void BaseEntity::setFxColor(glm::ivec3 color) {
+    m_vFxColor = color;
 }

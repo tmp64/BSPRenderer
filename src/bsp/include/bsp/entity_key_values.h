@@ -37,7 +37,7 @@ public:
     inline int size() const { return (int)m_Keys.size(); }
 
     //! @returns key name of key idx (must be valid).
-    inline std::string_view getKeyName(int idx) const { return m_Keys[idx].key; }
+    inline const std::string &getKeyName(int idx) const { return m_Keys[idx].key; }
 
     //! @returns a value with specified key. If not found, throws std::invalid_argument.
     EntityValue &get(std::string_view key);

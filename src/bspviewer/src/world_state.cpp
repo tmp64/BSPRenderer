@@ -2,6 +2,8 @@
 #include "main_view_renderer.h"
 #include "bspviewer.h"
 
+#include "trigger_entity.h"
+
 WorldState::WorldState(LevelAssetRef level) {
     AFW_ASSERT(!m_spInstance);
     m_spInstance = this;
@@ -30,6 +32,28 @@ BrushModel *WorldState::getBrushModel(size_t idx) {
     } else {
         return nullptr;
     }
+}
+
+BaseEntity *WorldState::createEntity(std::string_view className, bsp::EntityKeyValues *kv) {
+    std::unique_ptr<BaseEntity> pUniqueEnt;
+
+    if (className == "func_ladder") {
+        pUniqueEnt = std::make_unique<TriggerEntity>();
+    } else if (className.substr(0, 8) == "trigger_") {
+        pUniqueEnt = std::make_unique<TriggerEntity>();
+    } else {
+        pUniqueEnt = std::make_unique<BaseEntity>();
+    }
+
+    // Allocate idx
+    int idx = (int)m_EntityList.size();
+    m_EntityList.push_back(std::move(pUniqueEnt));
+
+    // Spawn the entity
+    BaseEntity *pEnt = m_EntityList[idx].get();
+    pEnt->initialize(idx, className, kv);
+    pEnt->spawn();
+    return pEnt;
 }
 
 void WorldState::loadBrushModels() {
@@ -88,13 +112,8 @@ void WorldState::loadEntities() {
     m_LevelEntityDict.loadFromString(m_pLevel->getEntitiesLump());
 
     for (int i = 0; i < m_LevelEntityDict.size(); i++) {
-        std::unique_ptr<BaseEntity> pEnt = std::make_unique<BaseEntity>();
-        try {
-            pEnt->loadKeyValues(m_LevelEntityDict[i], i);
-            m_EntityList.push_back(std::move(pEnt));
-        } catch (const std::exception &e) {
-            printe("Entity {}: {}", i, e.what());
-        }
+        bsp::EntityKeyValues &kv = m_LevelEntityDict[i];
+        createEntity(kv.getClassName(), &kv);
     }
 
     printi("Loaded {} entities.", m_EntityList.size());

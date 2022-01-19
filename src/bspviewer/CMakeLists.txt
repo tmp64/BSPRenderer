@@ -32,6 +32,8 @@ set(SOURCE_FILES
 	src/level_loader.h
 	src/main_view_renderer.cpp
 	src/main_view_renderer.h
+	src/trigger_entity.cpp
+	src/trigger_entity.h
 	src/vis.cpp
 	src/vis.h
 	src/world_state.cpp

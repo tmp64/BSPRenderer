@@ -29,12 +29,17 @@ public:
     //! @returns the material properties loader.
     inline MaterialPropLoader &getMaterialLoader() { return m_MaterialLoader; }
 
+    //! Creates a new entity.
+    BaseEntity *createEntity(std::string_view className, bsp::EntityKeyValues *kv = nullptr);
+
 private:
     // Level info
     LevelAssetRef m_pLevelAsset;
     bsp::Level *m_pLevel;
+
     bsp::EntityKeyValuesDict m_LevelEntityDict;
     std::vector<std::unique_ptr<BaseEntity>> m_EntityList;
+
     std::vector<BrushModel> m_BrushModels;
     Vis m_Vis;
     MaterialPropLoader m_MaterialLoader;
