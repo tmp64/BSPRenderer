@@ -3,16 +3,14 @@
 // Normal vector
 in vec3 gNormal;
 
+// color
+in vec4 gColor;
+
 // Output color
 out vec4 outColor;
 
+
 void main(void) {
-	// Hardcoded color
-	vec3 color = vec3(0.980392, 0.623529, 0.184314); // #fa9f2f orange
-
-	// Gamma correction
-	color.rgb = pow(color.rgb, vec3(u_Global.uflTexGamma));
-
     // Shaded lighting
     // Ambient lighting
     vec3 ambient = vec3(1, 1, 1) * 0.75;
@@ -29,5 +27,5 @@ void main(void) {
     vec3 ligtmapColor = ambient + diffuse;
 
 	// Final color
-	outColor = vec4(color * ligtmapColor, 1.0);
+	outColor = vec4(gColor.rgb * ligtmapColor, 1.0);
 }

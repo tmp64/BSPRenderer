@@ -105,7 +105,7 @@ MainViewRenderer::MainViewRenderer() {
 
     m_BoxInstances.create(GL_ARRAY_BUFFER, "Entity Box Instances");
     m_BoxInstances.bind();
-    m_BoxInstances.init(sizeof(glm::mat4) * MAX_VISIBLE_ENTS, nullptr, GL_DYNAMIC_DRAW);
+    m_BoxInstances.init(sizeof(BoxInstance) * MAX_VISIBLE_ENTS, nullptr, GL_DYNAMIC_DRAW);
 
     m_BoxVao.create();
     glBindVertexArray(m_BoxVao);
@@ -116,26 +116,35 @@ MainViewRenderer::MainViewRenderer() {
     glVertexAttribPointer(1, 3, GL_FLOAT, false, 2 * sizeof(glm::vec3),
                           (void *)sizeof(glm::vec3)); // normal
 
-    // transformations attribute
+
+    // Colors and transformations attribute
     m_BoxInstances.bind();
+
+    // Colors
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 4, GL_FLOAT, false, sizeof(glm::mat4),
+    glVertexAttribPointer(2, 4, GL_FLOAT, false, sizeof(BoxInstance),
                           (void *)(0 * sizeof(glm::vec4)));
+
+    // Transforms
     glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 4, GL_FLOAT, false, sizeof(glm::mat4),
+    glVertexAttribPointer(3, 4, GL_FLOAT, false, sizeof(BoxInstance),
                           (void *)(1 * sizeof(glm::vec4)));
     glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 4, GL_FLOAT, false, sizeof(glm::mat4),
+    glVertexAttribPointer(4, 4, GL_FLOAT, false, sizeof(BoxInstance),
                           (void *)(2 * sizeof(glm::vec4)));
     glEnableVertexAttribArray(5);
-    glVertexAttribPointer(5, 4, GL_FLOAT, false, sizeof(glm::mat4),
+    glVertexAttribPointer(5, 4, GL_FLOAT, false, sizeof(BoxInstance),
                           (void *)(3 * sizeof(glm::vec4)));
+    glEnableVertexAttribArray(6);
+    glVertexAttribPointer(6, 4, GL_FLOAT, false, sizeof(BoxInstance),
+                          (void *)(4 * sizeof(glm::vec4)));
     glVertexAttribDivisor(2, 1);
     glVertexAttribDivisor(3, 1);
     glVertexAttribDivisor(4, 1);
     glVertexAttribDivisor(5, 1);
+    glVertexAttribDivisor(6, 1);
 
-    m_BoxTransforms.resize(MAX_VISIBLE_ENTS);
+    m_BoxInstancesData.resize(MAX_VISIBLE_ENTS);
     glBindVertexArray(0);
 
     m_pBoxMaterial = MaterialSystem::get().createMaterial("Entity Box");
@@ -354,17 +363,20 @@ void MainViewRenderer::updateVisibleEnts() {
     for (size_t i = 0; i < ents.size(); i++) {
         BaseEntity *pEnt = ents[i].get();
 
-        if (!pEnt->getModel()) {
-            // Draw a box for this model
+        if (pEnt->useAABB()) {
+            // Draw a box for this entity
             if (m_uBoxCount == MAX_VISIBLE_ENTS) {
                 continue;
             }
 
-            glm::mat4 scale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(16.0f));
-            glm::mat4 translate = glm::translate(glm::identity<glm::mat4>(), pEnt->getOrigin());
-            m_BoxTransforms[m_uBoxCount] = translate * scale;
+            glm::mat4 scale = glm::scale(glm::identity<glm::mat4>(), pEnt->getAABBHalfExtents() * 2.0f);
+            glm::mat4 translate = glm::translate(glm::identity<glm::mat4>(), pEnt->getOrigin() + pEnt->getAABBPos());
+            m_BoxInstancesData[m_uBoxCount].color = glm::vec4(pEnt->getAABBColor(), 255) / 255.0f;
+            m_BoxInstancesData[m_uBoxCount].transform = translate * scale;
             m_uBoxCount++;
-        } else if (pEnt->getModel() && pEnt->getModel()->getType() == ModelType::Brush) {
+        }
+
+        if (pEnt->getModel() && pEnt->getModel()->getType() == ModelType::Brush) {
             if (entCount == MAX_VISIBLE_ENTS) {
                 continue;
             }
@@ -396,7 +408,7 @@ void MainViewRenderer::updateVisibleEnts() {
     // Update box buffer
     if (m_uBoxCount > 0) {
         m_BoxInstances.bind();
-        m_BoxInstances.update(0, m_uBoxCount * sizeof(glm::mat4), m_BoxTransforms.data());
+        m_BoxInstances.update(0, m_uBoxCount * sizeof(BoxInstance), m_BoxInstancesData.data());
     }
 }
 

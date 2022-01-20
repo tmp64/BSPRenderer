@@ -2,6 +2,7 @@
 #include "main_view_renderer.h"
 #include "bspviewer.h"
 
+#include "player_start_entity.h"
 #include "trigger_entity.h"
 
 WorldState::WorldState(LevelAssetRef level) {
@@ -37,7 +38,12 @@ BrushModel *WorldState::getBrushModel(size_t idx) {
 BaseEntity *WorldState::createEntity(std::string_view className, bsp::EntityKeyValues *kv) {
     std::unique_ptr<BaseEntity> pUniqueEnt;
 
-    if (className == "func_ladder") {
+
+    if (className == "info_player_start"
+        || className == "info_player_deathmatch"
+        || className == "info_player_coop") {
+        pUniqueEnt = std::make_unique<PlayerStartEntity>();
+    } else if (className == "func_ladder") {
         pUniqueEnt = std::make_unique<TriggerEntity>();
     } else if (className.substr(0, 8) == "trigger_") {
         pUniqueEnt = std::make_unique<TriggerEntity>();

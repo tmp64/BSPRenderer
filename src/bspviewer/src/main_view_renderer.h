@@ -74,13 +74,18 @@ private:
     static constexpr int BOX_VERT_COUNT = 6 * 2 * 3; // 6 sides * 2 triangles * 3 verts
     static constexpr float MAX_PITCH = 89.9f;
 
+    struct BoxInstance {
+        glm::vec4 color;
+        glm::mat4 transform;
+    };
+
     glm::ivec2 m_vViewportSize = glm::ivec2(0, 0);
     SceneRenderer m_SceneRenderer;
     unsigned m_uFrameCount = 0;
 
     // Entities to render
     std::vector<ClientEntity> m_VisEnts;
-    std::vector<glm::mat4> m_BoxTransforms;
+    std::vector<BoxInstance> m_BoxInstancesData;
     unsigned m_uBoxCount = 0;
 
     // Entity boxes
