@@ -2,8 +2,8 @@
 #include "main_view_renderer.h"
 #include "bspviewer.h"
 
-#include "player_start_entity.h"
-#include "trigger_entity.h"
+#include "entities/player_start_entity.h"
+#include "entities/trigger_entity.h"
 
 WorldState::WorldState(LevelAssetRef level) {
     AFW_ASSERT(!m_spInstance);
@@ -30,6 +30,15 @@ WorldState::~WorldState() {
 BrushModel *WorldState::getBrushModel(size_t idx) {
     if (idx < m_BrushModels.size()) {
         return &m_BrushModels[idx];
+    } else {
+        return nullptr;
+    }
+}
+
+BaseEntity *WorldState::getEntity(int entIdx) {
+    AFW_ASSERT(entIdx >= 0);
+    if (entIdx < m_EntityList.size()) {
+        return m_EntityList[entIdx].get();
     } else {
         return nullptr;
     }

@@ -51,7 +51,12 @@ bool BaseEntity::parseKeyValue(const std::string &key, const bsp::EntityValue &v
         setFxAmount(value.asInt());
         return true;
     } else if (key == "rendercolor") {
-        setFxColor(value.asInt3());
+        try {
+            setFxColor(value.asInt3());
+        } catch (const std::invalid_argument &) {
+            // Some old maps (e.g. the HL campaign) have color set to "0"
+            setFxColor(glm::ivec3(value.asInt()));
+        }
         return true;
     }
 
@@ -59,6 +64,29 @@ bool BaseEntity::parseKeyValue(const std::string &key, const bsp::EntityValue &v
 }
 
 void BaseEntity::onKeyValuesUpdated() {}
+
+void BaseEntity::showInspector() {
+    ImGui::PushID("BaseEntity");
+    if (ImGui::CollapsingHeader("Entity", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Text("%s", getClassName().c_str());
+        ImGui::Text("Name: %s", getTargetName().c_str());
+
+        ImGui::BeginDisabled();
+
+        glm::vec3 origin = getOrigin();
+        if (ImGui::InputFloat3("Origin", &origin.x, "%.1f")) {
+            setOrigin(origin);
+        }
+
+        glm::vec3 angles = getAngles();
+        if (ImGui::InputFloat3("Angles", &angles.x, "%.1f")) {
+            setAngles(angles);
+        }
+
+        ImGui::EndDisabled();
+    }
+    ImGui::PopID();
+}
 
 void BaseEntity::setTargetName(std::string_view str) {
     m_TargetName = str;
@@ -91,6 +119,10 @@ void BaseEntity::setAABBHalfExtents(glm::vec3 halfExtents) {
 
 void BaseEntity::setAABBColor(glm::ivec3 color) {
     m_BaseAABBColor = color;
+}
+
+void BaseEntity::setAABBTintColor(glm::vec4 color) {
+    m_AABBTintColor = color;
 }
 
 void BaseEntity::setModel(std::string_view model) {

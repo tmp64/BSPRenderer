@@ -24,6 +24,9 @@ public:
     //! Called after keyvalues were loaded or updated.
     virtual void onKeyValuesUpdated();
 
+    //! Shows info in the inpector.
+    virtual void showInspector();
+
     //! Sets the targetname of the entity.
     virtual void setTargetName(std::string_view str);
 
@@ -44,6 +47,9 @@ public:
 
     //! Sets color of the AABB.
     virtual void setAABBColor(glm::ivec3 color);
+
+    //! Sets tint color of the AABB in gamma-space.
+    virtual void setAABBTintColor(glm::vec4 color);
 
     //! Sets the model from string.
     virtual void setModel(std::string_view model);
@@ -67,6 +73,7 @@ public:
     inline int entindex() { return m_iEntIndex; }
     inline const std::string &getClassName() { return m_ClassName; }
     inline const std::string &getTargetName() { return m_TargetName; }
+    inline bsp::EntityKeyValues *getKeyValues() { return m_pLevelKeyValues; }
 
     inline const glm::vec3 &getOrigin() { return m_vOrigin; }
     inline const glm::vec3 &getAngles() { return m_vAngles; }
@@ -77,6 +84,7 @@ public:
     inline const glm::ivec3 &getAABBColor() { return m_BaseAABBColor; }
     inline const glm::vec3 &getAABBPos() { return m_AABBPos; }
     inline const glm::vec3 &getAABBHalfExtents() { return m_AABBHalfExtents; }
+    inline const glm::vec4 &getAABBTintColor() { return m_AABBTintColor; }
 
     inline Model *getModel() { return m_pModel; }
 
@@ -106,6 +114,7 @@ private:
     // AABB for rendering and raycasting
     glm::vec3 m_AABBPos = glm::vec3(0, 0, 0);
     glm::vec3 m_AABBHalfExtents = glm::vec3(0);
+    glm::vec4 m_AABBTintColor = glm::vec4(0);
 
     // Model
     Model *m_pModel = nullptr;

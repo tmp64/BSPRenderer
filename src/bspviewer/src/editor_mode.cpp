@@ -14,7 +14,7 @@ void EditorMode::onLevelLoaded() {
 
 void EditorMode::onLevelUnloaded() {
     for (EditorTool *tool : m_Tools) {
-        tool->onLevelLoaded();
+        tool->onLevelUnloaded();
     }
 }
 

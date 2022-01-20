@@ -12,14 +12,24 @@ set(SOURCE_FILES
 	src/assets/wad_material_asset.cpp
 	src/assets/wad_material_asset.h
 	
+	src/entities/base_entity.cpp
+	src/entities/base_entity.h
+	src/entities/player_start_entity.cpp
+	src/entities/player_start_entity.h
+	src/entities/trigger_entity.cpp
+	src/entities/trigger_entity.h
+
+	src/entity_editor/entity_edit_mode.cpp
+	src/entity_editor/entity_edit_mode.h
+	src/entity_editor/entity_select_tool.cpp
+	src/entity_editor/entity_select_tool.h
+
 	src/surface_editor/files.h
 	src/surface_editor/surface_edit_mode.cpp
 	src/surface_editor/surface_edit_mode.h
 	src/surface_editor/surface_select_tool.cpp
 	src/surface_editor/surface_select_tool.h
 
-	src/base_entity.cpp
-	src/base_entity.h
 	src/brush_model.cpp
 	src/brush_model.h
 	src/bspviewer.cpp
@@ -32,10 +42,6 @@ set(SOURCE_FILES
 	src/level_loader.h
 	src/main_view_renderer.cpp
 	src/main_view_renderer.h
-	src/player_start_entity.cpp
-	src/player_start_entity.h
-	src/trigger_entity.cpp
-	src/trigger_entity.h
 	src/vis.cpp
 	src/vis.h
 	src/world_state.cpp
@@ -50,7 +56,7 @@ add_executable(bspviewer
 appfw_module(bspviewer)
 
 target_include_directories(bspviewer PRIVATE
-	${CMAKE_CURRENT_SOURCE_DIR}
+	src
 )
 
 target_link_libraries(bspviewer

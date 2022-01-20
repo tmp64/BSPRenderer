@@ -15,6 +15,12 @@ struct SurfaceRaycastHit {
     int entIndex = -1;
 };
 
+struct EntityRaycastHit {
+    int entity = -1;
+    glm::vec3 point = glm::vec3(0, 0, 0);
+    float distance = INFINITY;
+};
+
 static constexpr float MAX_RAYCAST_DIST = 8192;
 
 class Vis : appfw::NoMove {
@@ -49,6 +55,19 @@ public:
     //! @returns whether hit something or not
     bool raycastToEntitySurface(const Ray &ray, SurfaceRaycastHit &hit,
                                 float maxDist = MAX_RAYCAST_DIST);
+
+    //! Casts a ray to an entity.
+    //! @param  hit     The closest entity hit
+    //! @returns whether hit something or not
+    bool raycastToEntity(const Ray &ray, EntityRaycastHit &hit, float maxDist = MAX_RAYCAST_DIST);
+
+    //! Casts a ray to an AABB.
+    //! @param  ray         The ray
+    //! @param  mins        Min bounds
+    //! @param  maxs        Max bounds
+    //! @param  hitpoint    Intersection point if hit
+    //! @returns whether hit the AABB or not.
+    static bool raycastToAABB(const Ray &ray, glm::vec3 mins, glm::vec3 maxs, glm::vec3 &hitpoint);
 
 private:
     static constexpr int MAX_BOX_LEAFS = 256;

@@ -8,6 +8,7 @@
 #include "level_loader.h"
 #include "editor_mode.h"
 #include "surface_editor/surface_edit_mode.h"
+#include "entity_editor/entity_edit_mode.h"
 
 class BSPViewer : public GuiAppBase {
 public:
@@ -51,6 +52,7 @@ private:
     EditorMode *m_pActiveMode = nullptr;
 
     SurfaceEditMode m_SurfaceEditor;
+    EntityEditMode m_EntityEditor;
 
     void showDockSpace();
     void showMainMenuBar();

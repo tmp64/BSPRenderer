@@ -208,6 +208,121 @@ bool Vis::raycastToEntitySurface(const Ray &inputRay, SurfaceRaycastHit &hit, fl
     return hit.entIndex != -1;
 }
 
+bool Vis::raycastToEntity(const Ray &inputRay, EntityRaycastHit &hit, float maxDist) {
+    hit = EntityRaycastHit();
+    hit.distance = maxDist;
+    auto &ents = WorldState::get()->getEntList();
+
+    for (size_t i = 0; i < ents.size(); i++) {
+        BaseEntity *pEnt = ents[i].get();
+
+        if (pEnt->useAABB()) {
+            glm::vec3 mins = pEnt->getOrigin() + pEnt->getAABBPos() - pEnt->getAABBHalfExtents();
+            glm::vec3 maxs = pEnt->getOrigin() + pEnt->getAABBPos() + pEnt->getAABBHalfExtents();
+            glm::vec3 hitpoint = glm::vec3(0, 0, 0);
+
+            if (raycastToAABB(inputRay, mins, maxs, hitpoint)) {
+                float dist = glm::length(hitpoint - inputRay.origin);
+
+                if (dist < hit.distance) {
+                    hit.entity = (int)i;
+                    hit.point = hitpoint;
+                    hit.distance = dist;
+                }
+            }
+        } else if (pEnt->getModel()) {
+            Model &baseModel = *pEnt->getModel();
+
+            if (baseModel.getType() == ModelType::Brush) {
+                BrushModel &model = static_cast<BrushModel &>(*pEnt->getModel());
+
+                SurfaceRaycastHit testHit;
+                testHit.distance = hit.distance; // limit the distance
+
+                Ray ray = inputRay;
+                ray.origin -= pEnt->getOrigin();
+
+                raycastRecursiveWorldNodes(model.m_iHeadnodes[0], ray, testHit);
+
+                if (testHit.surface != -1) {
+                    hit.point = testHit.point + pEnt->getOrigin();
+                    hit.distance = testHit.distance;
+                    hit.entity = (int)i;
+                }
+            } else {
+                AFW_ASSERT_MSG(false, "Unknown model type");
+            }
+        }
+    }
+
+    return hit.entity != -1;
+}
+
+//! Fast Ray-Box Intersection
+//! by Andrew Woo
+//! from "Graphics Gems", Academic Press, 1990
+//! https://github.com/erich666/GraphicsGems/blob/master/gems/RayBox.c
+bool Vis::raycastToAABB(const Ray &ray, glm::vec3 minB, glm::vec3 maxB, glm::vec3 &coord) {
+    constexpr int NUMDIM = 3;
+    constexpr int RIGHT = 0;
+    constexpr int LEFT = 1;
+    constexpr int MIDDLE = 2;
+
+    bool inside = true;
+    char quadrant[NUMDIM];
+    int i;
+    int whichPlane;
+    float maxT[NUMDIM];
+    float candidatePlane[NUMDIM];
+
+    /* Find candidate planes; this loop can be avoided if
+    rays cast all from the eye(assume perpsective view) */
+    for (i = 0; i < NUMDIM; i++)
+        if (ray.origin[i] < minB[i]) {
+            quadrant[i] = LEFT;
+            candidatePlane[i] = minB[i];
+            inside = false;
+        } else if (ray.origin[i] > maxB[i]) {
+            quadrant[i] = RIGHT;
+            candidatePlane[i] = maxB[i];
+            inside = false;
+        } else {
+            quadrant[i] = MIDDLE;
+        }
+
+    /* Ray origin inside bounding box */
+    if (inside) {
+        coord = ray.origin;
+        return true;
+    }
+
+    /* Calculate T distances to candidate planes */
+    for (i = 0; i < NUMDIM; i++)
+        if (quadrant[i] != MIDDLE && ray.direction[i] != 0.)
+            maxT[i] = (candidatePlane[i] - ray.origin[i]) / ray.direction[i];
+        else
+            maxT[i] = -1.;
+
+    /* Get largest of the maxT's for final choice of intersection */
+    whichPlane = 0;
+    for (i = 1; i < NUMDIM; i++)
+        if (maxT[whichPlane] < maxT[i])
+            whichPlane = i;
+
+    /* Check final candidate actually inside box */
+    if (maxT[whichPlane] < 0.)
+        return false;
+    for (i = 0; i < NUMDIM; i++)
+        if (whichPlane != i) {
+            coord[i] = ray.origin[i] + maxT[whichPlane] * ray.direction[i];
+            if (coord[i] < minB[i] || coord[i] > maxB[i])
+                return false;
+        } else {
+            coord[i] = candidatePlane[i];
+        }
+    return true; /* ray hits box */
+}
+
 bool Vis::isBoxVisible(const glm::vec3 &mins, const glm::vec3 &maxs, const uint8_t *visbits) {
     short leafList[MAX_BOX_LEAFS];
 

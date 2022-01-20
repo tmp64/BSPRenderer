@@ -62,6 +62,7 @@ BSPViewer::BSPViewer() {
 
     setAutoClearEnabled(true);
     registerMode(&m_SurfaceEditor);
+    registerMode(&m_EntityEditor);
     activateMode(&m_SurfaceEditor);
 }
 

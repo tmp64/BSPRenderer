@@ -6,7 +6,7 @@
 #include <bsp/level.h>
 #include <material_props/material_prop_loader.h>
 #include "assets/level_asset.h"
-#include "base_entity.h"
+#include "entities/base_entity.h"
 #include "brush_model.h"
 #include "vis.h"
 
@@ -25,6 +25,9 @@ public:
 
     //! Returns the list of all entities.
     inline auto &getEntList() { return m_EntityList; }
+
+    //! @returns entity at index or nullptr.
+    BaseEntity *getEntity(int entIdx);
 
     //! @returns the material properties loader.
     inline MaterialPropLoader &getMaterialLoader() { return m_MaterialLoader; }

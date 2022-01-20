@@ -371,7 +371,12 @@ void MainViewRenderer::updateVisibleEnts() {
 
             glm::mat4 scale = glm::scale(glm::identity<glm::mat4>(), pEnt->getAABBHalfExtents() * 2.0f);
             glm::mat4 translate = glm::translate(glm::identity<glm::mat4>(), pEnt->getOrigin() + pEnt->getAABBPos());
-            m_BoxInstancesData[m_uBoxCount].color = glm::vec4(pEnt->getAABBColor(), 255) / 255.0f;
+
+            glm::vec4 color = glm::vec4(pEnt->getAABBColor(), 255) / 255.0f;
+            glm::vec4 tintColor = pEnt->getAABBTintColor();
+            color = glm::mix(color, tintColor, tintColor.a);
+            color.a = 1;
+            m_BoxInstancesData[m_uBoxCount].color = color;
             m_BoxInstancesData[m_uBoxCount].transform = translate * scale;
             m_uBoxCount++;
         }
