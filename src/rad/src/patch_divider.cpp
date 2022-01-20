@@ -61,16 +61,18 @@ rad::PatchIndex rad::PatchDivider::createPatches(RadSimImpl *pRadSim, Face &face
     face.iFirstPatch = offset;
     face.iNumPatches = patchCount;
 
-    if (m_pPatches) {
-        AFW_ASSERT(m_pLastPatch);
-        AFW_ASSERT(!m_pLastPatch->pNext);
-        AFW_ASSERT(!pPrevPatch->pNext);
-        m_pLastPatch->pNext = emptyPatch.pNext;
-    } else {
-        m_pPatches = emptyPatch.pNext;
-    }
+    if (patchCount > 0) {
+        if (m_pPatches) {
+            AFW_ASSERT(m_pLastPatch);
+            AFW_ASSERT(!m_pLastPatch->pNext);
+            AFW_ASSERT(!pPrevPatch->pNext);
+            m_pLastPatch->pNext = emptyPatch.pNext;
+        } else {
+            m_pPatches = emptyPatch.pNext;
+        }
 
-    m_pLastPatch = pPrevPatch;
+        m_pLastPatch = pPrevPatch;
+    }
 
     return patchCount;
 }
