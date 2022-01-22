@@ -1118,8 +1118,9 @@ void SceneRenderer::frameSetup(float flSimTime, float flTimeDelta) {
     m_GlobalUniform.viParams1.x = r_texture.getValue();
     m_GlobalUniform.viParams1.y = r_shading.getValue();
 
+    // Lightmap gamma
     if (m_Data.lightmapType == LightmapType::BSP) {
-        m_GlobalUniform.vflParams2.x = 1.5f;
+        m_GlobalUniform.vflParams2.x = 2.0f;
     } else {
         m_GlobalUniform.vflParams2.x = 1.0f;
     }
