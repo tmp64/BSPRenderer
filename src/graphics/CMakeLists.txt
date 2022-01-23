@@ -10,6 +10,7 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/texture.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/texture_cube.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/texture2d.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/texture2d_array.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/graphics/vram_tracker.h
 	
 	${CMAKE_CURRENT_SOURCE_DIR}/src/framebuffer.cpp
@@ -21,6 +22,7 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/texture.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/texture_cube.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/texture2d.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/texture2d_array.cpp
 )
 
 add_library(graphics STATIC

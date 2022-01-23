@@ -2,6 +2,7 @@
 #include "main_view_renderer.h"
 #include "bspviewer.h"
 
+#include "entities/light_entity.h"
 #include "entities/player_start_entity.h"
 #include "entities/trigger_entity.h"
 
@@ -18,6 +19,8 @@ WorldState::WorldState(LevelAssetRef level) {
     m_Vis.setLevel(m_pLevel);
     m_MaterialLoader.init(BSPViewer::get().getMapName(), "assets:sound/materials.txt",
                           "assets:materials");
+
+    initLightStyles();
 }
 
 WorldState::~WorldState() {
@@ -25,6 +28,13 @@ WorldState::~WorldState() {
     m_spInstance = nullptr;
     m_Vis.setLevel(nullptr);
     MainViewRenderer::get().unloadLevel();
+}
+
+void WorldState::tick() {
+    m_flTimeDelta = BSPViewer::get().getTimeDelta();
+    m_flTime += m_flTimeDelta;
+
+    animateLights();
 }
 
 BrushModel *WorldState::getBrushModel(size_t idx) {
@@ -47,8 +57,11 @@ BaseEntity *WorldState::getEntity(int entIdx) {
 BaseEntity *WorldState::createEntity(std::string_view className, bsp::EntityKeyValues *kv) {
     std::unique_ptr<BaseEntity> pUniqueEnt;
 
-
-    if (className == "info_player_start"
+    if (className == "light"
+        || className == "light_spot"
+        || className == "light_environment") {
+        pUniqueEnt = std::make_unique<LightEntity>();
+    } else if (className == "info_player_start"
         || className == "info_player_deathmatch"
         || className == "info_player_coop") {
         pUniqueEnt = std::make_unique<PlayerStartEntity>();
@@ -69,6 +82,23 @@ BaseEntity *WorldState::createEntity(std::string_view className, bsp::EntityKeyV
     pEnt->initialize(idx, className, kv);
     pEnt->spawn();
     return pEnt;
+}
+
+void WorldState::setLightStyle(int style, const char *pattern, float animTime) {
+    style = std::clamp(style, 0, MAX_LIGHTSTYLES - 1);
+    LightStyle &ls = m_LightStyles[style];
+
+    // Pattern string
+    ls.patternLength = (int)std::min(strlen(pattern), sizeof(ls.pattern) - 1);
+    memcpy(ls.pattern, pattern, ls.patternLength + 1);
+    ls.pattern[sizeof(ls.pattern) - 1] = '\0';
+
+    // Pattern floats
+    for (int i = 0; i < ls.patternLength; i++) {
+        ls.scale[i] = (pattern[i] - 'a') / 12.0f;
+    }
+
+    ls.startTime = m_flTime + animTime;
 }
 
 void WorldState::loadBrushModels() {
@@ -143,5 +173,72 @@ void WorldState::loadEntities() {
 void WorldState::optimizeBrushModels() {
     for (auto &i : m_BrushModels) {
         MainViewRenderer::get().optimizeBrushModel(&i);
+    }
+}
+
+void WorldState::initLightStyles() {
+    // 0 normal
+    setLightStyle(0, "m");
+
+    // 1 FLICKER (first variety)
+    setLightStyle(1, "mmnmmommommnonmmonqnmmo");
+
+    // 2 SLOW STRONG PULSE
+    setLightStyle(2, "abcdefghijklmnopqrstuvwxyzyxwvutsrqponmlkjihgfedcba");
+
+    // 3 CANDLE (first variety)
+    setLightStyle(3, "mmmmmaaaaammmmmaaaaaabcdefgabcdefg");
+
+    // 4 FAST STROBE
+    setLightStyle(4, "mamamamamama");
+
+    // 5 GENTLE PULSE 1
+    setLightStyle(5, "jklmnopqrstuvwxyzyxwvutsrqponmlkj");
+
+    // 6 FLICKER (second variety)
+    setLightStyle(6, "nmonqnmomnmomomno");
+
+    // 7 CANDLE (second variety)
+    setLightStyle(7, "mmmaaaabcdefgmmmmaaaammmaamm");
+
+    // 8 CANDLE (third variety)
+    setLightStyle(8, "mmmaaammmaaammmabcdefaaaammmmabcdefmmmaaaa");
+
+    // 9 SLOW STROBE (fourth variety)
+    setLightStyle(9, "aaaaaaaazzzzzzzz");
+
+    // 10 FLUORESCENT FLICKER
+    setLightStyle(10, "mmamammmmammamamaaamammma");
+
+    // 11 SLOW PULSE NOT FADE TO BLACK
+    setLightStyle(11, "abcdefghijklmnopqrrqponmlkjihgfedcba");
+
+    // 12 UNDERWATER LIGHT MUTATION
+    // this light only distorts the lightmap - no contribution
+    // is made to the brightness of affected surfaces
+    setLightStyle(12, "mmnnmmnnnmmnn");
+
+    // styles 32-62 are assigned by the light program for switchable lights
+
+    // 63 testing
+    setLightStyle(63, "a");
+}
+
+void WorldState::animateLights() {
+    for (int i = 0; i < MAX_LIGHTSTYLES; i++) {
+        LightStyle &ls = m_LightStyles[i];
+        float scale = 0;
+
+        if (ls.patternLength == 0) {
+            scale = 0;
+        } else if (ls.patternLength == 1) {
+            scale = ls.scale[0];
+        } else {
+            float time = m_flTime - ls.startTime;
+            int frame = (int)(time * LIGHT_ANIM_FREQ);
+            scale = ls.scale[frame % ls.patternLength];
+        }
+
+        MainViewRenderer::get().setLightstyleScale(i, scale);
     }
 }

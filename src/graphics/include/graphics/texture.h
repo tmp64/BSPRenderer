@@ -8,6 +8,7 @@ enum class TextureDimension
 {
     None,
     Tex2D,
+    Tex2DArray,
     Cube,
 };
 

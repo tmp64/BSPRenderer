@@ -293,6 +293,10 @@ void SurfaceEditMode::showInspector() {
             ImGui::Text("Material %s\n%d x %d", material->getName().c_str(), material->getWide(),
                         material->getTall());
 
+            const bsp::BSPFace &face = WorldState::get()->getLevel().getFaces()[surfIdx];
+            ImGui::Text("Lightstyles: %d %d %d %d", face.nStyles[0], face.nStyles[1],
+                        face.nStyles[2], face.nStyles[3]);
+
             ImGui::EndTable();
         }
         ImGui::PopID();

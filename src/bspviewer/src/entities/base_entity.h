@@ -36,6 +36,12 @@ public:
     //! Updates entity's rotation angles (pitch, yaw, roll in degrees).
     virtual void setAngles(glm::vec3 angles);
     
+    //! Updates spawn flags.
+    virtual void updateSpawnFlags(unsigned flags);
+
+    inline void setSpawnFlag(unsigned flag) { updateSpawnFlags(m_uSpawnFlags | flag); }
+    inline void clearSpawnFlag(unsigned flag) { updateSpawnFlags(m_uSpawnFlags & (~flag)); }
+
     //! Sets whether to use AABB for raycasting.
     virtual void setUseAABB(bool state);
 
@@ -74,6 +80,8 @@ public:
     inline const std::string &getClassName() { return m_ClassName; }
     inline const std::string &getTargetName() { return m_TargetName; }
     inline bsp::EntityKeyValues *getKeyValues() { return m_pLevelKeyValues; }
+    inline unsigned getSpawnFlags() { return m_uSpawnFlags; }
+    inline bool isSpawnFlagSet(unsigned flag) { return m_uSpawnFlags & flag; }
 
     inline const glm::vec3 &getOrigin() { return m_vOrigin; }
     inline const glm::vec3 &getAngles() { return m_vAngles; }
@@ -104,6 +112,7 @@ private:
     glm::vec3 m_vAngles = glm::vec3(0, 0, 0);
     int m_iEntIndex = 0;
     bsp::EntityKeyValues *m_pLevelKeyValues = nullptr;
+    unsigned m_uSpawnFlags = 0;
 
     // Base bounding box (without rotation)
     glm::vec3 m_BaseAABBPos = glm::vec3(0, 0, 0);

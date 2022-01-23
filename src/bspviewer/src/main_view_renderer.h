@@ -59,6 +59,10 @@ public:
      */
     void optimizeBrushModel(Model *model);
 
+    inline void setLightstyleScale(int lightstyle, float scale) {
+        m_SceneRenderer.setLightstyleScale(lightstyle, scale);
+    }
+
     inline glm::vec3 getCameraPos() { return m_vPosition; }
     inline glm::vec3 getCameraRot() { return m_vRotation; }
 

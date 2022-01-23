@@ -7,7 +7,7 @@ out vec4 outColor;
 // Uniforms
 uniform vec3 u_Color;
 uniform sampler2D u_Texture;
-uniform sampler2D u_LMTexture;
+uniform sampler2DArray u_LMTexture;
 
 #ifdef ENTITY_SHADER
 uniform int u_iRenderMode;
@@ -22,10 +22,15 @@ uniform vec3 u_vFxColor;
 #define kRenderTransAdd		5
 #endif
 
+vec3 sampleLightmap(int i, float scale) {
+	vec3 lightmapColor = texture(u_LMTexture, vec3(vsOut.vLMTexCoord, i)).rgb;
+	return pow(lightmapColor.rgb, vec3(u_Global.uflLMGamma)) * scale;
+}
+
 void main(void) {
 	vec4 textureColor = texture(u_Texture, vsOut.vTexCoord).rgba;
 	vec4 objectColor = vec4(1, 0, 1, 1);
-	vec3 ligtmapColor = vec3(1, 1, 1);
+	vec3 lightmapColor = vec3(1, 1, 1);
 
 	//--------------------------------------------------
 	// Surface texture
@@ -57,7 +62,7 @@ void main(void) {
 	// Surface lighting
 	if (u_Global.uiLightingType == 0) {
 		// Fullbright
-		ligtmapColor = vec3(1, 1, 1);
+		lightmapColor = vec3(1, 1, 1);
 	} else if (u_Global.uiLightingType == 1) {
 		// Shaded lighting
 		// Ambient lighting
@@ -72,12 +77,14 @@ void main(void) {
 		vec3 diffuse = diff * diffuseLightColor;
 		
 		// Result
-		ligtmapColor = ambient + diffuse;
+		lightmapColor = ambient + diffuse;
 	} else if (u_Global.uiLightingType == 2) {
 		// Lightmaps
-		ligtmapColor = texture(u_LMTexture, vsOut.vLMTexCoord).rgb;
-		// Gamma correction
-		ligtmapColor.rgb = pow(ligtmapColor.rgb, vec3(u_Global.uflLMGamma));
+		lightmapColor = vec3(0, 0, 0);
+		lightmapColor += sampleLightmap(0, vsOut.vLightstyleScale.x);
+		lightmapColor += sampleLightmap(1, vsOut.vLightstyleScale.y);
+		lightmapColor += sampleLightmap(2, vsOut.vLightstyleScale.z);
+		lightmapColor += sampleLightmap(3, vsOut.vLightstyleScale.w);
 	}
 
 #ifdef ENTITY_SHADER
@@ -95,7 +102,7 @@ void main(void) {
 		objectColor.a = u_flFxAmount;
 		
 		// Also disable lightmapping
-		ligtmapColor = vec3(1, 1, 1);
+		lightmapColor = vec3(1, 1, 1);
 		break;
 	case kRenderGlow:
 		// Glow
@@ -121,7 +128,7 @@ void main(void) {
 
 	//--------------------------------------------------
 	// Final color
-	outColor = objectColor * vec4(ligtmapColor, 1.0);
+	outColor = objectColor * vec4(lightmapColor, 1.0);
 	
 #ifdef SUPPORT_TINTING
 	outColor = vec4(mix(outColor.rgb, vsOut.vTintColor.rgb, vsOut.vTintColor.a), outColor.a);

@@ -4,6 +4,9 @@
 //! Maximum number of entities visible in one frame
 constexpr unsigned MAX_VISIBLE_ENTS = 512;
 
+//! Maximum number of lightstyles on a map. Byte limit.
+constexpr int MAX_LIGHTSTYLES = 256;
+
 enum RenderMode : int {
     kRenderNormal,       // src
     kRenderTransColor,   // c*a+dest*(1-a)

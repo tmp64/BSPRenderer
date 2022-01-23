@@ -80,6 +80,8 @@ public:
      */
     bool insert(const T *data, int wide, int tall, int &x, int &y, int padding = 0);
 
+    void copyTexture(const T *data, int wide, int tall, int x, int y, int padding = 0);
+
     /**
      * Returns pointer to pixel buffer.
      */

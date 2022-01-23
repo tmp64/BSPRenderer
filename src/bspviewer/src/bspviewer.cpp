@@ -98,6 +98,7 @@ void BSPViewer::tick() {
         AFW_ASSERT(!m_pWorldState);
         loadingTick();
     } else if (m_pWorldState) {
+        m_pWorldState->tick();
         tickModes();
     }
 }

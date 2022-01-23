@@ -14,6 +14,8 @@ set(SOURCE_FILES
 	
 	src/entities/base_entity.cpp
 	src/entities/base_entity.h
+	src/entities/light_entity.cpp
+	src/entities/light_entity.h
 	src/entities/player_start_entity.cpp
 	src/entities/player_start_entity.h
 	src/entities/trigger_entity.cpp

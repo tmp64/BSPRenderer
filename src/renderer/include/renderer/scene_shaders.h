@@ -31,11 +31,13 @@ public:
         addUniform(m_uGlobalUniform, "GlobalUniform", SceneRenderer::GLOBAL_UNIFORM_BIND);
         addUniform(m_uTexture, "u_Texture");
         addUniform(m_uLMTexture, "u_LMTexture");
+        addUniform(m_uLightstyleBuf, "u_LightstyleBuf");
     }
 
     void onShaderCompiled() override {
         m_uTexture.set(0);
         m_uLMTexture.set(SceneRenderer::TEX_LIGHTMAP);
+        m_uLightstyleBuf.set(SceneRenderer::TEX_LIGHTSTYLES);
     }
 
     void setModelMatrix(glm::mat4 mat) { m_uModelMat.set(mat); }
@@ -50,6 +52,7 @@ private:
     Var<glm::mat4> m_uModelMat;
     TextureVar m_uTexture;
     TextureVar m_uLMTexture;
+    TextureVar m_uLightstyleBuf;
     Var<int> m_uRenderMode;
     Var<float> m_uFxAmount;
     Var<glm::vec3> m_uFxColor;

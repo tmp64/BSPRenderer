@@ -85,9 +85,19 @@ bool TextureBlock<T>::insert(const T *data, int wide, int tall, int &xout, int &
     xout = x + padding;
     yout = y + padding;
 
-    // Copy texture
+    copyTexture(data, wide, tall, xout, yout, padding);
+
+    return true;
+}
+
+template <typename T>
+void TextureBlock<T>::copyTexture(const T *data, int wide, int tall, int xout, int yout, int padding) {
+    int x = xout - padding;
+    int y = yout - padding;
+
     for (int i = 0; i < tall; i++) {
-        std::copy(data + wide * i, data + wide * i + wide, m_Data.begin() + (yout + i) * m_iWide + xout);
+        std::copy(data + wide * i, data + wide * i + wide,
+                  m_Data.begin() + (yout + i) * m_iWide + xout);
     }
 
     // Fill padding
@@ -99,18 +109,20 @@ bool TextureBlock<T>::insert(const T *data, int wide, int tall, int &xout, int &
 
         // Bottom
         for (int i = yout + tall; i < yout + tall + padding; i++) {
-            std::copy(data + (tall - 1) * wide, data + tall * wide, m_Data.begin() + i * m_iWide + xout);
+            std::copy(data + (tall - 1) * wide, data + tall * wide,
+                      m_Data.begin() + i * m_iWide + xout);
         }
 
         // Left
         for (int i = 0; i < tall; i++) {
-            std::fill(m_Data.begin() + (yout + i) * m_iWide + x, m_Data.begin() + (yout + i) * m_iWide + x + padding,
-                      data[wide * i]);
+            std::fill(m_Data.begin() + (yout + i) * m_iWide + x,
+                      m_Data.begin() + (yout + i) * m_iWide + x + padding, data[wide * i]);
         }
 
         // Right
         for (int i = 0; i < tall; i++) {
-            std::fill(m_Data.begin() + (yout + i) * m_iWide + xout + wide, m_Data.begin() + (yout + i) * m_iWide + xout + wide + padding,
+            std::fill(m_Data.begin() + (yout + i) * m_iWide + xout + wide,
+                      m_Data.begin() + (yout + i) * m_iWide + xout + wide + padding,
                       data[wide * (i + 1) - 1]);
         }
 
@@ -123,8 +135,8 @@ bool TextureBlock<T>::insert(const T *data, int wide, int tall, int &xout, int &
         // Top right corner
         temp = data[wide - 1];
         for (int i = y; i < yout; i++) {
-            std::fill(m_Data.begin() + i * m_iWide + xout + wide, m_Data.begin() + i * m_iWide + xout + wide + padding,
-                      temp);
+            std::fill(m_Data.begin() + i * m_iWide + xout + wide,
+                      m_Data.begin() + i * m_iWide + xout + wide + padding, temp);
         }
 
         // Bottom left corner
@@ -136,12 +148,10 @@ bool TextureBlock<T>::insert(const T *data, int wide, int tall, int &xout, int &
         // Bottom right corner
         temp = data[wide * tall - 1];
         for (int i = yout + tall; i < yout + tall + padding; i++) {
-            std::fill(m_Data.begin() + i * m_iWide + xout + wide, m_Data.begin() + i * m_iWide + xout + wide + padding,
-                      temp);
+            std::fill(m_Data.begin() + i * m_iWide + xout + wide,
+                      m_Data.begin() + i * m_iWide + xout + wide + padding, temp);
         }
     }
-
-    return true;
 }
 
 template class TextureBlock<glm::vec3>;

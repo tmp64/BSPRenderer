@@ -5,6 +5,7 @@
 #include <app_base/texture_block.h>
 #include <graphics/raii.h>
 #include <graphics/texture2d.h>
+#include <graphics/texture2d_array.h>
 #include <graphics/texture_cube.h>
 #include <graphics/gpu_buffer.h>
 #include <graphics/render_buffer.h>
@@ -23,6 +24,7 @@ public:
     enum TextureBinds
     {
         TEX_LIGHTMAP = Material::MAX_TEXTURES,
+        TEX_LIGHTSTYLES,
     };
 
     SceneRenderer();
@@ -108,6 +110,11 @@ public:
     //! Can't be called during loading.
     void reloadCustomLightmaps();
 
+    //! Sets linear intensity scale of a lightstyle.
+    inline void setLightstyleScale(int lightstyle, float scale) {
+        m_Data.flLightstyleScale[lightstyle] = scale;
+    }
+
 #ifdef RENDERER_SUPPORT_TINTING
     //! Allows tinting world or entity surfaces.
     //! @param  surface The surface index
@@ -140,6 +147,7 @@ private:
         glm::vec3 position;
         glm::vec3 normal;
         glm::vec2 texture;
+        glm::ivec4 lightstyle;
     };
 
     struct Surface {
@@ -178,11 +186,14 @@ private:
         bool bCustomLMLoaded = false;
         
         // Lightmaps
-        Texture2D bspLightmapBlockTex;
-        Texture2D customLightmapBlockTex;
+        Texture2DArray bspLightmapBlockTex;
+        Texture2DArray customLightmapBlockTex;
         GPUBuffer bspLightmapCoords;
         GPUBuffer customLightmapCoords;
         LightmapType lightmapType = LightmapType::Custom;
+
+        // Surface lighting
+        float flLightstyleScale[MAX_LIGHTSTYLES] = {};
 
         // Brush geometry rendering
         GLVao surfVao;
@@ -215,7 +226,7 @@ private:
         bool loadCustomLightmapsFinished = false;
 
         // Lightmaps
-        TextureBlock<glm::u8vec3> bspLightmapBlock;
+        TextureBlock<glm::u8vec3> bspLightmapBlock[4];
         std::vector<glm::vec3> customLightmapTex;
         std::vector<glm::vec3> patchBuffer;
         glm::ivec2 customLightmapTexSize;
@@ -239,6 +250,9 @@ private:
     Material *m_pSkyboxMaterial = nullptr;
     Material *m_pPatchesMaterial = nullptr;
     Material *m_pWireframeMaterial = nullptr;
+    GPUBuffer m_LightstyleBuffer;
+    GLTexture m_LightstyleTexture;
+
     unsigned m_uFrameCount = 0;
 
     // Entities
@@ -263,6 +277,8 @@ private:
     GPUBuffer m_GlobalUniformBuffer;
     GlobalUniform m_GlobalUniform;
     void createGlobalUniform();
+
+    void createLightstyleBuffer();
 
     void recreateFramebuffer();
     void destroyFramebuffer();
@@ -296,6 +312,9 @@ private:
 
     //! Binds lightmap block texture
     void bindLightmapBlock();
+
+    //! Updates and binds lightstyle buffer.
+    void bindLightstyles();
 
     //! Draws solid BSP faces.
     void drawWorldSurfaces();

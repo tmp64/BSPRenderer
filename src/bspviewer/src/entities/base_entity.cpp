@@ -58,6 +58,9 @@ bool BaseEntity::parseKeyValue(const std::string &key, const bsp::EntityValue &v
             setFxColor(glm::ivec3(value.asInt()));
         }
         return true;
+    } else if (key == "spawnflags") {
+        m_uSpawnFlags = value.asInt();
+        return true;
     }
 
     return false;
@@ -100,6 +103,10 @@ void BaseEntity::setOrigin(glm::vec3 origin) {
 void BaseEntity::setAngles(glm::vec3 angles) {
     m_vAngles = angles;
     updateAABB();
+}
+
+void BaseEntity::updateSpawnFlags(unsigned flags) {
+    m_uSpawnFlags = flags;
 }
 
 void BaseEntity::setUseAABB(bool state) {

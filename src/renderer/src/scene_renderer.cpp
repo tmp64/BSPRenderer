@@ -49,6 +49,7 @@ static inline bool isVectorNull(const glm::vec3 &v) { return v.x == 0.f && v.y =
 SceneRenderer::SceneRenderer() {
     createScreenQuad();
     createGlobalUniform();
+    createLightstyleBuffer();
 
     m_SolidEntityList.reserve(MAX_VISIBLE_ENTS);
     m_SortBuffer.reserve(MAX_TRANS_SURFS_PER_MODEL);
@@ -428,6 +429,15 @@ void SceneRenderer::createGlobalUniform() {
     m_GlobalUniformBuffer.unbind();
 }
 
+void SceneRenderer::createLightstyleBuffer() {
+    m_LightstyleBuffer.create(GL_TEXTURE_BUFFER, "Lightstyles");
+    m_LightstyleBuffer.init(sizeof(LevelData::flLightstyleScale), nullptr, GL_DYNAMIC_DRAW);
+
+    m_LightstyleTexture.create();
+    glBindTexture(GL_TEXTURE_BUFFER, m_LightstyleTexture);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, m_LightstyleBuffer.getId());
+}
+
 void SceneRenderer::recreateFramebuffer() {
     destroyFramebuffer();
 
@@ -480,12 +490,15 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
     }
 
     printi("BSP lightmaps: loading...");
-    m_pLoadingState->bspLightmapBlock.resize(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
+    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+        m_pLoadingState->bspLightmapBlock[i].resize(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
+    }
 
     struct Lightmap {
-        unsigned surface;
-        int size;
-        uint32_t offset;
+        unsigned surface = 0;
+        int size = 0;
+        uint32_t offsets[bsp::NUM_LIGHTSTYLES] = {};
+        int lightmapCount = 0;
 
         inline bool operator<(const Lightmap &rhs) const {
             return size > rhs.size;
@@ -525,33 +538,38 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
         int tall = (int)((texmaxs - texmins).y + 1);
         surf.m_BSPLMSize = {wide, tall};
 
-        // Validate size
-        uint32_t offset = baseSurf.nLightmapOffset;
+        uint32_t baseOffset = baseSurf.nLightmapOffset;
 
-        if (offset == bsp::NO_LIGHTMAP_OFFSET) {
+        if (baseOffset == bsp::NO_LIGHTMAP_OFFSET) {
             continue;
         }
 
-        if (offset + wide * tall * 3 > m_pLevel->getLightMaps().size()) {
-            printw("BSP lightmaps: face {} has invalid lightmap offset", i);
-            continue;
-        }
+        Lightmap lightmap;
+        lightmap.surface = (unsigned)i;
+        lightmap.size = wide * tall;
 
-        // Combine all lightstyles
-        // TODO: need only combine what is needed
-        /*
         uint32_t lmBytesSize = wide * tall * 3;
         const bsp::BSPFace &face = m_pLevel->getFaces()[i];
-        std::vector<uint8_t> lm(lmBytesSize);
-        for (int j = 0; j < bsp::NUM_LIGHTSTYLES && face.nStyles[j] != 255; j++) {
-            for (int k = 0; k < lm.size(); k++) {
-                lm[k] += m_pLevel->getLightMaps()[offset + lmBytesSize * j + k];
+        uint32_t curOffset = baseOffset;
+
+        for (int j = 0; j < bsp::NUM_LIGHTSTYLES; j++) {
+            if (face.nStyles[j] == 255) {
+                // Read all lightmaps
+                break;
             }
+
+            if (curOffset + lmBytesSize > m_pLevel->getLightMaps().size()) {
+                printw("BSP lightmaps: face {}, lightstyle index has invalid lightmap offset", i, j);
+                continue;
+            }
+
+            lightmap.offsets[j] = curOffset;
+            lightmap.lightmapCount++;
+            curOffset += lmBytesSize;
         }
-        */
 
         // Add to sorting list
-        sortedLightmaps.push_back({(unsigned)i, wide * tall, offset});
+        sortedLightmaps.push_back(std::move(lightmap));
     }
 
     // Sort all lightmaps by size, large to small
@@ -563,16 +581,27 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
 
     for (auto &i : sortedLightmaps) {
         Surface &surf = m_Data.surfaces[i.surface];
-        const glm::u8vec3 *data = reinterpret_cast<const glm::u8vec3 *>(m_pLevel->getLightMaps().data() + i.offset);
-        int x, y;
-        
-        if (m_pLoadingState->bspLightmapBlock.insert(data, surf.m_BSPLMSize.x, surf.m_BSPLMSize.y, x, y,
-                                                     BSP_LIGHTMAP_PADDING)) {
-            surf.m_BSPLMOffset.x = x;
-            surf.m_BSPLMOffset.y = y;
-        } else {
-            printw("BSP lightmaps: no space for surface {} ({}x{})", i.surface, surf.m_BSPLMSize.x,
-                    surf.m_BSPLMSize.y);
+        const glm::u8vec3 *data[4];
+
+        int x = -1, y = -1;
+
+        for (int j = 0; j < i.lightmapCount; j++) {
+            data[j] = reinterpret_cast<const glm::u8vec3 *>(m_pLevel->getLightMaps().data() +
+                                                            i.offsets[j]);
+            if (x == -1) {
+                if (m_pLoadingState->bspLightmapBlock[j].insert(data[j], surf.m_BSPLMSize.x,
+                                                             surf.m_BSPLMSize.y, x, y,
+                                                             BSP_LIGHTMAP_PADDING)) {
+                    surf.m_BSPLMOffset.x = x;
+                    surf.m_BSPLMOffset.y = y;
+                } else {
+                    printw("BSP lightmaps: no space for surface {} ({}x{})", i.surface,
+                           surf.m_BSPLMSize.x, surf.m_BSPLMSize.y);
+                }
+            } else {
+                m_pLoadingState->bspLightmapBlock[j].copyTexture(
+                    data[j], surf.m_BSPLMSize.x, surf.m_BSPLMSize.y, x, y, BSP_LIGHTMAP_PADDING);
+            }
         }
     }
 
@@ -581,18 +610,32 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
 }
 
 void SceneRenderer::finishLoadBSPLightmaps() {
-    // Load the block into the GPU
-    Texture2D &texture = m_Data.bspLightmapBlockTex;
+    // Create the texture
+    Texture2DArray &texture = m_Data.bspLightmapBlockTex;
     TextureFilter filter =
         r_filter_lm.getValue() ? TextureFilter::Bilinear : TextureFilter::Nearest;
     texture.create("SceneRenderer: BSP lightmap block");
     texture.setWrapMode(TextureWrapMode::Clamp);
     texture.setFilter(filter);
-    texture.initTexture(GraphicsFormat::RGB8, BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE,
-                        false, GL_RGB, GL_UNSIGNED_BYTE,
-                        m_pLoadingState->bspLightmapBlock.getData());
 
-    m_pLoadingState->bspLightmapBlock.clear();
+    // Combine all 4 textures into one array
+    int layerSize = 3 * BSP_LIGHTMAP_BLOCK_SIZE * BSP_LIGHTMAP_BLOCK_SIZE;
+    std::vector<uint8_t> data(layerSize * bsp::NUM_LIGHTSTYLES);
+
+    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+        std::memcpy(data.data() + layerSize * i, m_pLoadingState->bspLightmapBlock[i].getData(),
+                    layerSize);
+    }
+
+    // Upload it to the GPU
+    texture.initTexture(GraphicsFormat::RGB8, BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE,
+                        bsp::NUM_LIGHTSTYLES, false, GL_RGB, GL_UNSIGNED_BYTE, data.data());
+
+    // Free memory
+    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+        m_pLoadingState->bspLightmapBlock[i].clear();
+    }
+    
     printi("BSP lightmaps: loaded.");
 }
 
@@ -725,15 +768,21 @@ void SceneRenderer::finishLoadCustomLightmaps() {
     auto &blockSize = m_pLoadingState->customLightmapTexSize;
     auto &blockData = m_pLoadingState->customLightmapTex;
 
-    // Load the block into the GPU
-    Texture2D &texture = m_Data.customLightmapBlockTex;
+    // Create the texture
+    Texture2DArray &texture = m_Data.customLightmapBlockTex;
     TextureFilter filter =
         r_filter_lm.getValue() ? TextureFilter::Bilinear : TextureFilter::Nearest;
     texture.create("SceneRenderer: custom lightmap block");
     texture.setWrapMode(TextureWrapMode::Clamp);
     texture.setFilter(filter);
-    texture.initTexture(GraphicsFormat::RGB16F, blockSize.x, blockSize.y, false, GL_RGB, GL_FLOAT,
-                        blockData.data());
+
+    // TODO: Add lightstyles to rad
+    int layerSize = 3 * sizeof(float) * blockSize.x * blockSize.y;
+    std::vector<uint8_t> data(layerSize * bsp::NUM_LIGHTSTYLES);
+    std::memcpy(data.data(), blockData.data(), layerSize);
+
+    texture.initTexture(GraphicsFormat::RGB16F, blockSize.x, blockSize.y, bsp::NUM_LIGHTSTYLES,
+                        false, GL_RGB, GL_FLOAT, data.data());
 
     blockData.clear();
 
@@ -781,6 +830,7 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
             normal = -normal;
         }
 
+        const bsp::BSPFace &face = m_pLevel->getFaces()[i];
         const bsp::BSPTextureInfo &texInfo = *baseSurf.pTexInfo;
         const Material &material = *surf.m_pMat;
 
@@ -799,6 +849,11 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
 
             v.texture.t = glm::dot(v.position, texInfo.vT) + texInfo.fTShift;
             v.texture.t /= material.getTall();
+
+            // Lightstyle
+            for (int k = 0; k < bsp::NUM_LIGHTSTYLES; k++) {
+                v.lightstyle[k] = face.nStyles[k];
+            }
 
             // BSP lightmap texture
             glm::vec2 bspLmCoord = glm::vec2(0, 0);
@@ -894,7 +949,7 @@ void SceneRenderer::finishCreateSurfaceObjects() {
 }
 
 void SceneRenderer::updateVao() {
-    static_assert(sizeof(SurfaceVertex) == sizeof(float) * 8, "Size of Vertex is invalid");
+    static_assert(sizeof(SurfaceVertex) == sizeof(float) * 12, "Size of Vertex is invalid");
 
     m_Data.surfVao.create();
     glBindVertexArray(m_Data.surfVao);
@@ -904,12 +959,15 @@ void SceneRenderer::updateVao() {
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
+    glEnableVertexAttribArray(3);
     glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(SurfaceVertex),
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, position)));
     glVertexAttribPointer(1, 3, GL_FLOAT, false, sizeof(SurfaceVertex),
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, normal)));
     glVertexAttribPointer(2, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, texture)));
+    glVertexAttribIPointer(3, 4, GL_INT, sizeof(SurfaceVertex),
+                           reinterpret_cast<void *>(offsetof(SurfaceVertex, lightstyle)));
 
     // Lightmap attributes
     if (m_Data.lightmapType == LightmapType::BSP) {
@@ -918,14 +976,14 @@ void SceneRenderer::updateVao() {
         m_Data.customLightmapCoords.bind();
     }
 
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 2, GL_FLOAT, false, sizeof(glm::vec2), reinterpret_cast<void *>(0));
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(glm::vec2), reinterpret_cast<void *>(0));
 
 #ifdef RENDERER_SUPPORT_TINTING
     // Tinting
     m_Data.surfTintBuf.bind();
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 4, GL_FLOAT, false, sizeof(glm::vec4), reinterpret_cast<void *>(0));
+    glEnableVertexAttribArray(5);
+    glVertexAttribPointer(5, 4, GL_FLOAT, false, sizeof(glm::vec4), reinterpret_cast<void *>(0));
 #endif
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -1131,6 +1189,7 @@ void SceneRenderer::frameSetup(float flSimTime, float flTimeDelta) {
 
     // Bind lightmap - will be used for world and brush ents
     bindLightmapBlock();
+    bindLightstyles();
 }
 
 void SceneRenderer::frameEnd() {
@@ -1164,15 +1223,21 @@ void SceneRenderer::bindLightmapBlock() {
     // Bind lightmap block texture
     if (m_Data.lightmapType == LightmapType::BSP) {
         if (m_Data.bspLightmapBlockTex.getId() != 0) {
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, m_Data.bspLightmapBlockTex.getId());
+            glActiveTexture(GL_TEXTURE0 + TEX_LIGHTMAP);
+            m_Data.bspLightmapBlockTex.bind();
         }
     } else {
         if (m_Data.customLightmapBlockTex.getId() != 0) {
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, m_Data.customLightmapBlockTex.getId());
+            glActiveTexture(GL_TEXTURE0 + TEX_LIGHTMAP);
+            m_Data.customLightmapBlockTex.bind();
         }
     }
+}
+
+void SceneRenderer::bindLightstyles() {
+    m_LightstyleBuffer.update(0, sizeof(m_Data.flLightstyleScale), m_Data.flLightstyleScale);
+    glActiveTexture(GL_TEXTURE0 + TEX_LIGHTSTYLES);
+    glBindTexture(GL_TEXTURE_BUFFER, m_LightstyleTexture);
 }
 
 void SceneRenderer::drawWorldSurfaces() {
