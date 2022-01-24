@@ -17,7 +17,6 @@ public:
      */
     inline int getTall() const { return m_iTall; }
 
-
 protected:
     int m_iWide = 0;
     int m_iTall = 0;
@@ -79,6 +78,7 @@ public:
      * @return  True if added successfully, false if not enough space.
      */
     bool insert(const T *data, int wide, int tall, int &x, int &y, int padding = 0);
+    bool insertNoCopy(int wide, int tall, int &x, int &y, int padding = 0);
 
     void copyTexture(const T *data, int wide, int tall, int x, int y, int padding = 0);
 

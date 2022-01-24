@@ -10,6 +10,7 @@
 #include <imgui.h>
 #include <gui_app_base/imgui_controls.h>
 #include <renderer/scene_shaders.h>
+#include <app_base/bitmap.h>
 
 ConVar<int> r_cull("r_cull", 1,
                    "Backface culling:\n"
@@ -490,9 +491,6 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
     }
 
     printi("BSP lightmaps: loading...");
-    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
-        m_pLoadingState->bspLightmapBlock[i].resize(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
-    }
 
     struct Lightmap {
         unsigned surface = 0;
@@ -579,30 +577,49 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
     appfw::Timer timer;
     timer.start();
 
+    TextureBlock<glm::u8vec3> lightmapBlock;
+    lightmapBlock.resize(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
+    Bitmap<glm::u8vec3> bitmaps[bsp::NUM_LIGHTSTYLES];
+    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+        bitmaps[i].init(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
+    }
+
     for (auto &i : sortedLightmaps) {
         Surface &surf = m_Data.surfaces[i.surface];
-        const glm::u8vec3 *data[4];
-
-        int x = -1, y = -1;
+        const glm::u8vec3 *data[4] = {};
 
         for (int j = 0; j < i.lightmapCount; j++) {
             data[j] = reinterpret_cast<const glm::u8vec3 *>(m_pLevel->getLightMaps().data() +
                                                             i.offsets[j]);
-            if (x == -1) {
-                if (m_pLoadingState->bspLightmapBlock[j].insert(data[j], surf.m_BSPLMSize.x,
-                                                             surf.m_BSPLMSize.y, x, y,
-                                                             BSP_LIGHTMAP_PADDING)) {
-                    surf.m_BSPLMOffset.x = x;
-                    surf.m_BSPLMOffset.y = y;
-                } else {
-                    printw("BSP lightmaps: no space for surface {} ({}x{})", i.surface,
-                           surf.m_BSPLMSize.x, surf.m_BSPLMSize.y);
-                }
-            } else {
-                m_pLoadingState->bspLightmapBlock[j].copyTexture(
-                    data[j], surf.m_BSPLMSize.x, surf.m_BSPLMSize.y, x, y, BSP_LIGHTMAP_PADDING);
-            }
         }
+
+        int x, y;
+        
+        if (lightmapBlock.insertNoCopy(surf.m_BSPLMSize.x + BSP_LIGHTMAP_PADDING,
+                                       surf.m_BSPLMSize.y + BSP_LIGHTMAP_PADDING, x, y,
+                                       BSP_LIGHTMAP_PADDING)) {
+            surf.m_BSPLMOffset.x = x;
+            surf.m_BSPLMOffset.y = y;
+
+            for (int j = 0; j < i.lightmapCount; j++) {
+                bitmaps[j].copyPixels(x - BSP_LIGHTMAP_PADDING, y - BSP_LIGHTMAP_PADDING,
+                                      surf.m_BSPLMSize.x, surf.m_BSPLMSize.y, data[j],
+                                      BSP_LIGHTMAP_PADDING);
+            }
+        } else {
+            printw("BSP lightmaps: no space for surface {} ({}x{})", i.surface, surf.m_BSPLMSize.x,
+                   surf.m_BSPLMSize.y);
+        }
+    }
+
+    // Combine bitmaps
+    std::vector<glm::u8vec3> &finalImage = m_pLoadingState->bspLightmapBlock;
+    size_t imageSize = BSP_LIGHTMAP_BLOCK_SIZE * BSP_LIGHTMAP_BLOCK_SIZE;
+    finalImage.resize(imageSize * bsp::NUM_LIGHTSTYLES);
+
+    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+        auto &pixels = bitmaps[i].getPixels();
+        std::copy(pixels.begin(), pixels.end(), finalImage.begin() + imageSize * i);
     }
 
     timer.stop();
@@ -618,23 +635,10 @@ void SceneRenderer::finishLoadBSPLightmaps() {
     texture.setWrapMode(TextureWrapMode::Clamp);
     texture.setFilter(filter);
 
-    // Combine all 4 textures into one array
-    int layerSize = 3 * BSP_LIGHTMAP_BLOCK_SIZE * BSP_LIGHTMAP_BLOCK_SIZE;
-    std::vector<uint8_t> data(layerSize * bsp::NUM_LIGHTSTYLES);
-
-    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
-        std::memcpy(data.data() + layerSize * i, m_pLoadingState->bspLightmapBlock[i].getData(),
-                    layerSize);
-    }
-
-    // Upload it to the GPU
+    // Upload to the GPU
     texture.initTexture(GraphicsFormat::RGB8, BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE,
-                        bsp::NUM_LIGHTSTYLES, false, GL_RGB, GL_UNSIGNED_BYTE, data.data());
-
-    // Free memory
-    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
-        m_pLoadingState->bspLightmapBlock[i].clear();
-    }
+                        bsp::NUM_LIGHTSTYLES, false, GL_RGB, GL_UNSIGNED_BYTE,
+                        m_pLoadingState->bspLightmapBlock.data());
     
     printi("BSP lightmaps: loaded.");
 }

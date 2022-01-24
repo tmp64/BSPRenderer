@@ -91,6 +91,23 @@ bool TextureBlock<T>::insert(const T *data, int wide, int tall, int &xout, int &
 }
 
 template <typename T>
+bool TextureBlock<T>::insertNoCopy(int wide, int tall, int &xout, int &yout, int padding) {
+    int x, y;
+
+    AFW_ASSERT(wide != 0 && tall != 0);
+
+    if (!findFreeBlock(wide + 2 * padding, tall + 2 * padding, x, y)) {
+        return false;
+    }
+
+    markBlock(x, y, wide + 2 * padding, tall + 2 * padding);
+    xout = x + padding;
+    yout = y + padding;
+
+    return true;
+}
+
+template <typename T>
 void TextureBlock<T>::copyTexture(const T *data, int wide, int tall, int xout, int yout, int padding) {
     int x = xout - padding;
     int y = yout - padding;

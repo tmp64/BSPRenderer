@@ -226,7 +226,7 @@ private:
         bool loadCustomLightmapsFinished = false;
 
         // Lightmaps
-        TextureBlock<glm::u8vec3> bspLightmapBlock[4];
+        std::vector<glm::u8vec3> bspLightmapBlock;
         std::vector<glm::vec3> customLightmapTex;
         std::vector<glm::vec3> patchBuffer;
         glm::ivec2 customLightmapTexSize;

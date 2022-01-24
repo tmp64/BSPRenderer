@@ -4,6 +4,7 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/app_base.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/app_component.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/app_config.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/bitmap.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/components.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/lightmap.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/app_base/texture_block.h
@@ -28,6 +29,7 @@ target_include_directories(app_base PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(app_base
 	appfw
 	glm::glm
+	stb
 	taskflow
 	yaml-cpp
 )

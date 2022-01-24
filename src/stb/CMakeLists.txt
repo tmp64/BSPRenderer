@@ -1,6 +1,7 @@
 set(PUBLIC_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/include/stb_image.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/stb_include.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/stb_rect_pack.h
 )
 
 set(PRIVATE_HEADERS
@@ -9,6 +10,7 @@ set(PRIVATE_HEADERS
 set(PRIVATE_SOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/stb_image.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/stb_include.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/stb_rect_pack.cpp
 )
 
 add_library(stb STATIC
