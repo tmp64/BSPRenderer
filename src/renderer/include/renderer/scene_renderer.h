@@ -124,7 +124,8 @@ public:
 
 private:
     static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
-    static constexpr int BSP_LIGHTMAP_BLOCK_SIZE = 1024;
+    static constexpr int MAX_BSP_LIGHTMAP_BLOCK_SIZE = 2048;
+    static constexpr float BSP_LIGHTMAP_BLOCK_WASTED = 0.40f; //!< How much area is assumed to be wasted due to packing
     static constexpr int BSP_LIGHTMAP_PADDING = 2;
     static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
     static constexpr int MAX_TRANS_SURFS_PER_MODEL = 512; //!< Maximum number of surfaces per transparent model
@@ -227,6 +228,7 @@ private:
 
         // Lightmaps
         std::vector<glm::u8vec3> bspLightmapBlock;
+        int iBspLightmapSize = 0;
         std::vector<glm::vec3> customLightmapTex;
         std::vector<glm::vec3> patchBuffer;
         glm::ivec2 customLightmapTexSize;

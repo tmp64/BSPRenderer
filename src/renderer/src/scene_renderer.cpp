@@ -4,6 +4,7 @@
 #include <bsp/entity_key_values.h>
 #include <app_base/lightmap.h>
 #include <stb_image.h>
+#include <stb_rect_pack.h>
 #include <material_system/shader_instance.h>
 #include <renderer/scene_renderer.h>
 #include <renderer/renderer_engine_interface.h>
@@ -491,20 +492,10 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
     }
 
     printi("BSP lightmaps: loading...");
-
-    struct Lightmap {
-        unsigned surface = 0;
-        int size = 0;
-        uint32_t offsets[bsp::NUM_LIGHTSTYLES] = {};
-        int lightmapCount = 0;
-
-        inline bool operator<(const Lightmap &rhs) const {
-            return size > rhs.size;
-        }
-    };
-
-    std::vector<Lightmap> sortedLightmaps;
-    sortedLightmaps.reserve(m_Data.surfaces.size());
+    appfw::Timer timer;
+    std::vector<stbrp_rect> rects;
+    rects.reserve(m_Data.surfaces.size());
+    int totalLightmapArea = 0;
 
     for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
         Surface &surf = m_Data.surfaces[i];
@@ -526,95 +517,86 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
             maxs.t = std::max(maxs.t, valt);
         }
         
-        // Calculate lightmap texture extents and size
+        // Calculate lightmap texture extents
         glm::vec2 texmins = {floor(mins.x / BSP_LIGHTMAP_DIVISOR), floor(mins.y / BSP_LIGHTMAP_DIVISOR)};
         glm::vec2 texmaxs = {ceil(maxs.x / BSP_LIGHTMAP_DIVISOR), ceil(maxs.y / BSP_LIGHTMAP_DIVISOR)};
         surf.m_vTextureMins = texmins * (float)BSP_LIGHTMAP_DIVISOR; // This one used in the engine (I think)
         //surf.m_vTextureMins = mins; // This one makes more sense. I don't see any difference in-game between them though
 
+        // Calculate size
         int wide = (int)((texmaxs - texmins).x + 1);
         int tall = (int)((texmaxs - texmins).y + 1);
         surf.m_BSPLMSize = {wide, tall};
 
-        uint32_t baseOffset = baseSurf.nLightmapOffset;
-
-        if (baseOffset == bsp::NO_LIGHTMAP_OFFSET) {
+        // Skip surfaces without lightmaps
+        if (baseSurf.nLightmapOffset == bsp::NO_LIGHTMAP_OFFSET) {
             continue;
         }
 
-        Lightmap lightmap;
-        lightmap.surface = (unsigned)i;
-        lightmap.size = wide * tall;
+        // Calculate are of the lightmap, it is used to guess lightmap size
+        int maxDim = std::max(wide, tall);
+        totalLightmapArea += maxDim * maxDim;
 
-        uint32_t lmBytesSize = wide * tall * 3;
-        const bsp::BSPFace &face = m_pLevel->getFaces()[i];
-        uint32_t curOffset = baseOffset;
-
-        for (int j = 0; j < bsp::NUM_LIGHTSTYLES; j++) {
-            if (face.nStyles[j] == 255) {
-                // Read all lightmaps
-                break;
-            }
-
-            if (curOffset + lmBytesSize > m_pLevel->getLightMaps().size()) {
-                printw("BSP lightmaps: face {}, lightstyle index has invalid lightmap offset", i, j);
-                continue;
-            }
-
-            lightmap.offsets[j] = curOffset;
-            lightmap.lightmapCount++;
-            curOffset += lmBytesSize;
-        }
-
-        // Add to sorting list
-        sortedLightmaps.push_back(std::move(lightmap));
+        // Add to pack list
+        stbrp_rect rect;
+        rect.id = (int)i;
+        rect.w = wide + 2 * BSP_LIGHTMAP_PADDING;
+        rect.h = tall + 2 * BSP_LIGHTMAP_PADDING;
+        rects.push_back(rect);
     }
 
-    // Sort all lightmaps by size, large to small
-    std::sort(sortedLightmaps.begin(), sortedLightmaps.end());
+    // Estimate texture size
+    int squareSize = (int)ceil(totalLightmapArea / (1 - BSP_LIGHTMAP_BLOCK_WASTED));
+    int textureSize = std::min((int)sqrt(squareSize), MAX_BSP_LIGHTMAP_BLOCK_SIZE);
 
-    // Add them to the lightmap block
-    appfw::Timer timer;
-    timer.start();
+    if (textureSize % 4 != 0) {
+        textureSize += (4 - textureSize % 4); // round up so it's divisable by 4
+    }
 
-    TextureBlock<glm::u8vec3> lightmapBlock;
-    lightmapBlock.resize(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
+    // Pack lightmaps
+    stbrp_context packContext; 
+    std::vector<stbrp_node> packNodes(2 * textureSize);
+    stbrp_init_target(&packContext, textureSize, textureSize, packNodes.data(),
+                      (int)packNodes.size());
+
+    stbrp_pack_rects(&packContext, rects.data(), (int)rects.size());
+
+    // Create bitmaps
     Bitmap<glm::u8vec3> bitmaps[bsp::NUM_LIGHTSTYLES];
     for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
-        bitmaps[i].init(BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE);
+        bitmaps[i].init(textureSize, textureSize);
     }
 
-    for (auto &i : sortedLightmaps) {
-        Surface &surf = m_Data.surfaces[i.surface];
-        const glm::u8vec3 *data[4] = {};
+    // Add lightmaps to bitmaps
+    int failedCount = 0;
+    for (const stbrp_rect &rect : rects) {
+        if (rect.was_packed) {
+            Surface &surf = m_Data.surfaces[rect.id];
+            const bsp::BSPFace &face = m_pLevel->getFaces()[rect.id];
+            const glm::u8vec3 *pixels = reinterpret_cast<const glm::u8vec3 *>(
+                m_pLevel->getLightMaps().data() + face.nLightmapOffset);
 
-        for (int j = 0; j < i.lightmapCount; j++) {
-            data[j] = reinterpret_cast<const glm::u8vec3 *>(m_pLevel->getLightMaps().data() +
-                                                            i.offsets[j]);
-        }
+            for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+                if (face.nStyles[i] == 255) {
+                    break;
+                }
 
-        int x, y;
-        
-        if (lightmapBlock.insertNoCopy(surf.m_BSPLMSize.x + BSP_LIGHTMAP_PADDING,
-                                       surf.m_BSPLMSize.y + BSP_LIGHTMAP_PADDING, x, y,
-                                       BSP_LIGHTMAP_PADDING)) {
-            surf.m_BSPLMOffset.x = x;
-            surf.m_BSPLMOffset.y = y;
-
-            for (int j = 0; j < i.lightmapCount; j++) {
-                bitmaps[j].copyPixels(x - BSP_LIGHTMAP_PADDING, y - BSP_LIGHTMAP_PADDING,
-                                      surf.m_BSPLMSize.x, surf.m_BSPLMSize.y, data[j],
+                bitmaps[i].copyPixels(rect.x, rect.y,
+                                      surf.m_BSPLMSize.x, surf.m_BSPLMSize.y, pixels,
                                       BSP_LIGHTMAP_PADDING);
+                pixels += surf.m_BSPLMSize.x * surf.m_BSPLMSize.y;
             }
+
+            surf.m_BSPLMOffset.x = rect.x + BSP_LIGHTMAP_PADDING;
+            surf.m_BSPLMOffset.y = rect.y + BSP_LIGHTMAP_PADDING;
         } else {
-            printw("BSP lightmaps: no space for surface {} ({}x{})", i.surface, surf.m_BSPLMSize.x,
-                   surf.m_BSPLMSize.y);
+            failedCount++;
         }
     }
 
     // Combine bitmaps
     std::vector<glm::u8vec3> &finalImage = m_pLoadingState->bspLightmapBlock;
-    size_t imageSize = BSP_LIGHTMAP_BLOCK_SIZE * BSP_LIGHTMAP_BLOCK_SIZE;
+    size_t imageSize = textureSize * textureSize;
     finalImage.resize(imageSize * bsp::NUM_LIGHTSTYLES);
 
     for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
@@ -622,8 +604,14 @@ void SceneRenderer::asyncLoadBSPLightmaps() {
         std::copy(pixels.begin(), pixels.end(), finalImage.begin() + imageSize * i);
     }
 
+    m_pLoadingState->iBspLightmapSize = textureSize;
+
     timer.stop();
-    printi("BSP lightmaps: block {:.3f} s", timer.dseconds());
+    printi("BSP lightmaps: block {:.3f} s, size {}x{}", timer.dseconds(), textureSize, textureSize);
+
+    if (failedCount != 0) {
+        printw("BSP Lightmaps: {} faces failed to pack.", failedCount);
+    }
 }
 
 void SceneRenderer::finishLoadBSPLightmaps() {
@@ -636,9 +624,9 @@ void SceneRenderer::finishLoadBSPLightmaps() {
     texture.setFilter(filter);
 
     // Upload to the GPU
-    texture.initTexture(GraphicsFormat::RGB8, BSP_LIGHTMAP_BLOCK_SIZE, BSP_LIGHTMAP_BLOCK_SIZE,
-                        bsp::NUM_LIGHTSTYLES, false, GL_RGB, GL_UNSIGNED_BYTE,
-                        m_pLoadingState->bspLightmapBlock.data());
+    texture.initTexture(GraphicsFormat::RGB8, m_pLoadingState->iBspLightmapSize,
+                        m_pLoadingState->iBspLightmapSize, bsp::NUM_LIGHTSTYLES, false, GL_RGB,
+                        GL_UNSIGNED_BYTE, m_pLoadingState->bspLightmapBlock.data());
     
     printi("BSP lightmaps: loaded.");
 }
@@ -868,7 +856,7 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
                 bspLmCoord -= surf.m_vTextureMins;
                 bspLmCoord += glm::vec2(BSP_LIGHTMAP_DIVISOR / 2); // Shift by half-texel
                 bspLmCoord += surf.m_BSPLMOffset * BSP_LIGHTMAP_DIVISOR;
-                bspLmCoord /= BSP_LIGHTMAP_BLOCK_SIZE * BSP_LIGHTMAP_DIVISOR;
+                bspLmCoord /= m_Data.bspLightmapBlockTex.getWide() * BSP_LIGHTMAP_DIVISOR;
             }
             m_pLoadingState->bspLMCoordsBuf.push_back(bspLmCoord);
 
