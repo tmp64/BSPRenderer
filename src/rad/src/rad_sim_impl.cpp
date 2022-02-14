@@ -10,11 +10,21 @@
 #include "patch_divider.h"
 #include "bouncer.h"
 
-rad::RadSimImpl::RadSimImpl()
+rad::RadSimImpl::RadSimImpl(int threadCount)
     : m_VisMat(*this)
     , m_VFList(*this)
     , m_SVisMat(*this) {
-    printi("Using {} thread(s).", m_Executor.num_workers());
+    if (threadCount == -1) {
+        threadCount = std::thread::hardware_concurrency();
+
+        if (threadCount == 0) {
+            threadCount = 1;
+            printw("Failed to detect thread count, assuming {}", threadCount);
+        }
+    }
+
+    m_pExecutor = std::make_unique<tf::Executor>(threadCount);
+    printi("Using {} thread(s).", m_pExecutor->num_workers());
 }
 
 void rad::RadSimImpl::setAppConfig(AppConfig *appcfg) {
@@ -534,7 +544,7 @@ void rad::RadSimImpl::samplePatchReflectivity() {
 #if 1
     tf::Taskflow taskflow;
     taskflow.for_each_index_dynamic((size_t)0, m_Faces.size(), (size_t)1, fnSampleFacePatches);
-    m_Executor.run(taskflow).wait();
+    m_pExecutor->run(taskflow).wait();
 #else
     // Run in signle thread for easier debugging
     for (size_t i = 0; i < m_Faces.size(); i++) {

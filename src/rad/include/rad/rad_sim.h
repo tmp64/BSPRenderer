@@ -20,7 +20,7 @@ class RadSim : appfw::NoMove {
 public:
     using ProgressCallback = std::function<void(double progress)>;
 
-    RadSim();
+    RadSim(int threadCount = -1);
     ~RadSim();
 
     //! Sets app config used by the rad.

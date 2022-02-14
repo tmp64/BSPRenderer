@@ -145,7 +145,7 @@ void rad::VFList::calcViewFactors() {
     m_uFinishedPatches = 0;
     tf::Taskflow taskflow;
     taskflow.for_each_index_dynamic((size_t)0, patchCount, (size_t)1, [this](size_t i) { worker(i); });
-    auto result = m_RadSim.m_Executor.run(taskflow);
+    auto result = m_RadSim.m_pExecutor->run(taskflow);
 
     while (!appfw::isFutureReady(result)) {
         size_t work = m_uFinishedPatches;

@@ -58,7 +58,9 @@ int main(int argc, char **argv) {
         appfw::Timer timer;
         timer.start();
 
-        rad::RadSim rad;
+        int threadCount = getCommandLine().getArgInt("--threads", -1);
+
+        rad::RadSim rad(threadCount);
         rad.setAppConfig(&g_AppConfig);
         rad.setProgressCallback(progressCallback);
         

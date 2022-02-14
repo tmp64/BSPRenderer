@@ -164,7 +164,7 @@ void rad::SparseVisMat::calcSize() {
 
     tf::Taskflow taskflow;
     taskflow.for_each_index_dynamic((PatchIndex)0, patchCount - 1, (PatchIndex)1, fnLoopBody);
-    m_RadSim.m_Executor.run(taskflow).wait();
+    m_RadSim.m_pExecutor->run(taskflow).wait();
 
     timer.stop();
     printi("Calculate sparse vismat: {:.3f} s", timer.dseconds());

@@ -7,7 +7,7 @@ rad::Bouncer::Bouncer(RadSimImpl &radSim)
     : m_RadSim(radSim) {
     m_flLinearThreshold = radSim.gammaToLinear(GAMMA_INTENSITY_THRESHOLD);
     m_uPatchCount = radSim.m_Patches.size();
-    m_uWorkerCount = m_RadSim.m_Executor.num_workers();
+    m_uWorkerCount = m_RadSim.m_pExecutor->num_workers();
     m_Texlights.resize(m_uPatchCount);
     m_TotalPatchLight.resize(m_uPatchCount);
     m_WorkerData.resize(m_uPatchCount * m_uWorkerCount);
@@ -55,7 +55,7 @@ void rad::Bouncer::addSunLight() {
     tf::Taskflow taskflow;
     tf::Task bounceTask = taskflow.for_each_index_dynamic(
         PatchIndex(0), m_uPatchCount, PatchIndex(1), fnProcessPatch, PatchIndex(128));
-    m_RadSim.m_Executor.run(taskflow).wait();
+    m_RadSim.m_pExecutor->run(taskflow).wait();
 }
 
 void rad::Bouncer::addSkyLight() {
@@ -104,7 +104,7 @@ void rad::Bouncer::addSkyLight() {
     tf::Taskflow taskflow;
     tf::Task bounceTask = taskflow.for_each_index_dynamic(
         PatchIndex(0), m_uPatchCount, PatchIndex(1), fnProcessPatch, PatchIndex(128));
-    m_RadSim.m_Executor.run(taskflow).wait();
+    m_RadSim.m_pExecutor->run(taskflow).wait();
 }
 
 void rad::Bouncer::addEntLight(const EntLight &el) {
@@ -199,7 +199,7 @@ void rad::Bouncer::radiateTexLights() {
     appfw::span<glm::vec3> initialLight = appfw::span(m_PatchBounce).subspan(0, m_uPatchCount);
 
     auto fnProcessPatch = [&](PatchIndex patch1) {
-        int worker = m_RadSim.m_Executor.this_worker_id();
+        int worker = m_RadSim.m_pExecutor->this_worker_id();
         PatchRef patch1ref(m_RadSim.m_Patches, patch1);
         size_t dataOffset = m_RadSim.m_VFList.getPatchOffsets()[patch1];
         appfw::span<glm::vec3> workerData =
@@ -246,7 +246,7 @@ void rad::Bouncer::radiateTexLights() {
     sumTask.succeed(bounceTask);
     clearWorkersTask.succeed(sumTask);
 
-    m_RadSim.m_Executor.run(taskflow).wait();
+    m_RadSim.m_pExecutor->run(taskflow).wait();
 }
 
 void rad::Bouncer::bounceLight() {
@@ -261,7 +261,7 @@ void rad::Bouncer::bounceLight() {
             appfw::span(m_PatchBounce).subspan(m_uPatchCount * bounce, m_uPatchCount);
 
         auto fnProcessPatch = [&](PatchIndex patch1) {
-            int worker = m_RadSim.m_Executor.this_worker_id();
+            int worker = m_RadSim.m_pExecutor->this_worker_id();
             PatchRef patch1ref(m_RadSim.m_Patches, patch1);
             size_t dataOffset = m_RadSim.m_VFList.getPatchOffsets()[patch1];
             appfw::span<glm::vec3> workerData =
@@ -317,7 +317,7 @@ void rad::Bouncer::bounceLight() {
         sumTask.succeed(bounceTask);
         clearWorkersTask.succeed(sumTask);
 
-        m_RadSim.m_Executor.run(taskflow).wait();
+        m_RadSim.m_pExecutor->run(taskflow).wait();
     }
 }
 

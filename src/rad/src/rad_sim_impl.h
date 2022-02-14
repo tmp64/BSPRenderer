@@ -46,6 +46,8 @@ public:
         glm::vec3 vLight = glm::vec3(0, 0, 0); //!< Linear color times intensity
     };
 
+    std::unique_ptr<tf::Executor> m_pExecutor;
+
     // Rad data
     AppConfig *m_pAppConfig = nullptr;
     RadSim::ProgressCallback m_fnProgressCallback;
@@ -78,7 +80,7 @@ public:
 
     appfw::SHA256::Digest m_PatchHash = {};
 
-    RadSimImpl();
+    RadSimImpl(int threadCount = -1);
 
     //! Sets app config used by the rad.
     void setAppConfig(AppConfig *appcfg);
@@ -180,8 +182,6 @@ public:
             poff += item.size;
         }
     }
-
-    static inline tf::Executor m_Executor;
 
 private:
 

@@ -1,8 +1,8 @@
 #include <rad/rad_sim.h>
 #include "rad_sim_impl.h"
 
-rad::RadSim::RadSim() {
-    m_Impl = std::make_unique<RadSimImpl>();
+rad::RadSim::RadSim(int threadCount) {
+    m_Impl = std::make_unique<RadSimImpl>(threadCount);
 }
 
 rad::RadSim::~RadSim() {}
