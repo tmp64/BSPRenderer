@@ -672,11 +672,18 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
             throw std::runtime_error("Unsupported lightmap format, expected RGBF32");
         }
 
+        LightmapFileFormat::Compression compression =
+            (LightmapFileFormat::Compression)file.readByte();
+
+        if (compression != LightmapFileFormat::Compression::None) {
+            throw std::runtime_error("Unsupported lightmap compression");
+        }
+
         // Lightmap texture
-        m_pLoadingState->customLightmapTex.resize((size_t)lightmapBlockSize.x *
-                                                  lightmapBlockSize.y);
+        size_t textureBlockSize = lightmapBlockSize.x * lightmapBlockSize.y * bsp::NUM_LIGHTSTYLES;
+        m_pLoadingState->customLightmapTex.resize(textureBlockSize);
         file.readBytes(reinterpret_cast<uint8_t *>(m_pLoadingState->customLightmapTex.data()),
-                       m_pLoadingState->customLightmapTex.size() * sizeof(glm::vec3));
+                       textureBlockSize * sizeof(glm::vec3));
 
         auto &patchBuf = m_pLoadingState->patchBuffer;
         patchBuf.clear();
@@ -700,16 +707,25 @@ void SceneRenderer::asyncLoadCustomLightmaps() {
             file.readVec<glm::vec2>(); // Offset of (0, 0) to get to plane coords
             file.readVec<glm::vec2>(); // Face size
 
+            // Lightstyles
+            glm::ivec4 lightstyles = glm::ivec4(255);
+            for (int j = 0; j < bsp::NUM_LIGHTSTYLES; j++) {
+                lightstyles[j] = file.readByte();
+            }
+
             bool hasLightmap = file.readByte(); // Has lightmap
 
             if (hasLightmap) {
                 glm::ivec2 lmSize = file.readVec<glm::ivec2>(); // Lightmap size
-                surf.m_vCustomLMTexCoords.resize(surf.m_iVertexCount);
+                surf.m_CustomVertData.resize(surf.m_iVertexCount);
 
                 // Lightmap tex coords
                 for (uint32_t j = 0; j < vertCount; j++) {
+                    LightmapVertexData vertData;
                     glm::vec2 texCoords = file.readVec<glm::vec2>(); // Tex coord in luxels
-                    surf.m_vCustomLMTexCoords[j] = texCoords / glm::vec2(lightmapBlockSize);
+                    vertData.texture = texCoords / glm::vec2(lightmapBlockSize);
+                    vertData.lightstyle = lightstyles;
+                    surf.m_CustomVertData[j] = vertData;
                 }
 
                 // Patches
@@ -768,13 +784,8 @@ void SceneRenderer::finishLoadCustomLightmaps() {
     texture.setWrapMode(TextureWrapMode::Clamp);
     texture.setFilter(filter);
 
-    // TODO: Add lightstyles to rad
-    int layerSize = 3 * sizeof(float) * blockSize.x * blockSize.y;
-    std::vector<uint8_t> data(layerSize * bsp::NUM_LIGHTSTYLES);
-    std::memcpy(data.data(), blockData.data(), layerSize);
-
     texture.initTexture(GraphicsFormat::RGB16F, blockSize.x, blockSize.y, bsp::NUM_LIGHTSTYLES,
-                        false, GL_RGB, GL_FLOAT, data.data());
+                        false, GL_RGB, GL_FLOAT, blockData.data());
 
     blockData.clear();
 
@@ -805,8 +816,8 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
     unsigned maxEboSize = 0; // Sum of vertex counts of all surfaces + surface count (to account for primitive restart element)
 
     m_pLoadingState->surfVertices.resize(m_Data.surfaces.size());
-    m_pLoadingState->bspLMCoordsBuf.reserve(bsp::MAX_MAP_VERTS);
-    m_pLoadingState->customLMCoordsBuf.reserve(bsp::MAX_MAP_VERTS);
+    m_pLoadingState->bspVertData.reserve(bsp::MAX_MAP_VERTS);
+    m_pLoadingState->customVertData.reserve(bsp::MAX_MAP_VERTS);
 
     for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
         Surface &surf = m_Data.surfaces[i];
@@ -842,30 +853,31 @@ void SceneRenderer::asyncCreateSurfaceObjects() {
             v.texture.t = glm::dot(v.position, texInfo.vT) + texInfo.fTShift;
             v.texture.t /= material.getTall();
 
-            // Lightstyle
-            for (int k = 0; k < bsp::NUM_LIGHTSTYLES; k++) {
-                v.lightstyle[k] = face.nStyles[k];
+
+            // BSP lightmap data
+            LightmapVertexData bspData;
+            if (surf.m_BSPLMSize.x != 0) {
+                bspData.texture.s = glm::dot(v.position, texInfo.vS);
+                bspData.texture.t = glm::dot(v.position, texInfo.vT);
+                bspData.texture += glm::vec2(texInfo.fSShift, texInfo.fTShift);
+                bspData.texture -= surf.m_vTextureMins;
+                bspData.texture += glm::vec2(BSP_LIGHTMAP_DIVISOR / 2); // Shift by half-texel
+                bspData.texture += surf.m_BSPLMOffset * BSP_LIGHTMAP_DIVISOR;
+                bspData.texture /= m_Data.bspLightmapBlockTex.getWide() * BSP_LIGHTMAP_DIVISOR;
             }
 
-            // BSP lightmap texture
-            glm::vec2 bspLmCoord = glm::vec2(0, 0);
-            if (surf.m_BSPLMSize.x != 0) {
-                bspLmCoord.s = glm::dot(v.position, texInfo.vS);
-                bspLmCoord.t = glm::dot(v.position, texInfo.vT);
-                bspLmCoord += glm::vec2(texInfo.fSShift, texInfo.fTShift);
-                bspLmCoord -= surf.m_vTextureMins;
-                bspLmCoord += glm::vec2(BSP_LIGHTMAP_DIVISOR / 2); // Shift by half-texel
-                bspLmCoord += surf.m_BSPLMOffset * BSP_LIGHTMAP_DIVISOR;
-                bspLmCoord /= m_Data.bspLightmapBlockTex.getWide() * BSP_LIGHTMAP_DIVISOR;
+            for (int k = 0; k < bsp::NUM_LIGHTSTYLES; k++) {
+                bspData.lightstyle[k] = face.nStyles[k];
             }
-            m_pLoadingState->bspLMCoordsBuf.push_back(bspLmCoord);
+
+            m_pLoadingState->bspVertData.push_back(bspData);
 
             // Custom lightmap texture
-            glm::vec2 customLmCoord = glm::vec2(0, 0);
-            if (m_Data.bCustomLMLoaded && !surf.m_vCustomLMTexCoords.empty()) {
-                customLmCoord = surf.m_vCustomLMTexCoords[j];
+            LightmapVertexData customData;
+            if (m_Data.bCustomLMLoaded && !surf.m_CustomVertData.empty()) {
+                customData = surf.m_CustomVertData[j];
             }
-            m_pLoadingState->customLMCoordsBuf.push_back(customLmCoord);
+            m_pLoadingState->customVertData.push_back(customData);
 
             vertices.push_back(v);
 
@@ -891,15 +903,17 @@ void SceneRenderer::finishCreateSurfaceObjects() {
     auto &allVertices = m_pLoadingState->allVertices;
 
     // Lightmap coord buffers
-    m_Data.bspLightmapCoords.create(GL_ARRAY_BUFFER, "BSP lm coords");
-    m_Data.bspLightmapCoords.bind();
-    m_Data.bspLightmapCoords.init(sizeof(glm::vec2) * m_pLoadingState->bspLMCoordsBuf.size(),
-                                  m_pLoadingState->bspLMCoordsBuf.data(), GL_STATIC_DRAW);
+    m_Data.bspLightmapSurfData.create(GL_ARRAY_BUFFER, "BSP lm coords");
+    m_Data.bspLightmapSurfData.bind();
+    m_Data.bspLightmapSurfData.init(sizeof(LightmapVertexData) *
+                                        m_pLoadingState->bspVertData.size(),
+                                    m_pLoadingState->bspVertData.data(), GL_STATIC_DRAW);
 
-    m_Data.customLightmapCoords.create(GL_ARRAY_BUFFER, "Custom lm coords");
-    m_Data.customLightmapCoords.bind();
-    m_Data.customLightmapCoords.init(sizeof(glm::vec2) * m_pLoadingState->customLMCoordsBuf.size(),
-                                     m_pLoadingState->customLMCoordsBuf.data(), GL_STATIC_DRAW);
+    m_Data.customLightmapSurfData.create(GL_ARRAY_BUFFER, "Custom lm coords");
+    m_Data.customLightmapSurfData.bind();
+    m_Data.customLightmapSurfData.init(sizeof(LightmapVertexData) *
+                                           m_pLoadingState->customVertData.size(),
+                                       m_pLoadingState->customVertData.data(), GL_STATIC_DRAW);
 
     // Surface vertices
     m_Data.surfVbo.create(GL_ARRAY_BUFFER, "SceneRenderer: Surface vertices");
@@ -941,7 +955,7 @@ void SceneRenderer::finishCreateSurfaceObjects() {
 }
 
 void SceneRenderer::updateVao() {
-    static_assert(sizeof(SurfaceVertex) == sizeof(float) * 12, "Size of Vertex is invalid");
+    static_assert(sizeof(SurfaceVertex) == sizeof(float) * 8, "Size of Vertex is invalid");
 
     m_Data.surfVao.create();
     glBindVertexArray(m_Data.surfVao);
@@ -951,25 +965,26 @@ void SceneRenderer::updateVao() {
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
-    glEnableVertexAttribArray(3);
     glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(SurfaceVertex),
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, position)));
     glVertexAttribPointer(1, 3, GL_FLOAT, false, sizeof(SurfaceVertex),
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, normal)));
     glVertexAttribPointer(2, 2, GL_FLOAT, false, sizeof(SurfaceVertex),
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, texture)));
-    glVertexAttribIPointer(3, 4, GL_INT, sizeof(SurfaceVertex),
-                           reinterpret_cast<void *>(offsetof(SurfaceVertex, lightstyle)));
 
     // Lightmap attributes
     if (m_Data.lightmapType == LightmapType::BSP) {
-        m_Data.bspLightmapCoords.bind();
+        m_Data.bspLightmapSurfData.bind();
     } else {
-        m_Data.customLightmapCoords.bind();
+        m_Data.customLightmapSurfData.bind();
     }
 
+    glEnableVertexAttribArray(3);
     glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(glm::vec2), reinterpret_cast<void *>(0));
+    glVertexAttribIPointer(3, 4, GL_INT, sizeof(LightmapVertexData),
+                           reinterpret_cast<void *>(offsetof(LightmapVertexData, lightstyle)));
+    glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(LightmapVertexData),
+                          reinterpret_cast<void *>(offsetof(LightmapVertexData, texture)));
 
 #ifdef RENDERER_SUPPORT_TINTING
     // Tinting

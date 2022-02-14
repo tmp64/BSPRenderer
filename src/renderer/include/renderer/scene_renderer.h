@@ -148,7 +148,11 @@ private:
         glm::vec3 position;
         glm::vec3 normal;
         glm::vec2 texture;
+    };
+
+    struct LightmapVertexData {
         glm::ivec4 lightstyle;
+        glm::vec2 texture;
     };
 
     struct Surface {
@@ -164,7 +168,7 @@ private:
         glm::ivec2 m_BSPLMOffset = glm::ivec2(0, 0);
 
         // Custom lightmap info
-        std::vector<glm::vec2> m_vCustomLMTexCoords;
+        std::vector<LightmapVertexData> m_CustomVertData;
     };
 
     struct OptBrushModel {
@@ -189,8 +193,8 @@ private:
         // Lightmaps
         Texture2DArray bspLightmapBlockTex;
         Texture2DArray customLightmapBlockTex;
-        GPUBuffer bspLightmapCoords;
-        GPUBuffer customLightmapCoords;
+        GPUBuffer bspLightmapSurfData;
+        GPUBuffer customLightmapSurfData;
         LightmapType lightmapType = LightmapType::Custom;
 
         // Surface lighting
@@ -232,8 +236,8 @@ private:
         std::vector<glm::vec3> customLightmapTex;
         std::vector<glm::vec3> patchBuffer;
         glm::ivec2 customLightmapTexSize;
-        std::vector<glm::vec2> bspLMCoordsBuf;
-        std::vector<glm::vec2> customLMCoordsBuf;
+        std::vector<LightmapVertexData> bspVertData;
+        std::vector<LightmapVertexData> customVertData;
 
         // Surface objects
         std::future<void> createSurfaceObjectsResult;
