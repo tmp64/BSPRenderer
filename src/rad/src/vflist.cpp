@@ -186,6 +186,7 @@ void rad::VFList::worker(size_t i) {
     }
 
     AFW_ASSERT(dataOffset - m_Offsets[i] == m_RadSim.m_SVisMat.getOnesCountTable()[i]);
+    m_uFinishedPatches++;
 
     // Normalize view factors
     /*float k = 1 / sum;
