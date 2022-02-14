@@ -10,7 +10,7 @@ layout (location = 1) in vec3 inNormal;
 // Texture coordinates
 layout (location = 2) in vec2 inTexCoord;
 
-// Lightmap texture coordinates
+// Lightstyle index
 layout (location = 3) in ivec4 inLightStyle;
 
 // Lightmap texture coordinates

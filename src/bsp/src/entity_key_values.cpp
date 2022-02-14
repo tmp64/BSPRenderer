@@ -16,7 +16,7 @@ const glm::ivec3 bsp::EntityValue::asInt3() const {
 const glm::ivec4 bsp::EntityValue::asInt4() const {
     glm::ivec4 vec(0, 0, 0, 0);
 
-    if (sscanf(m_Value.c_str(), "%d %d %d %d", &vec.x, &vec.y, &vec.z, &vec.w) != 3) {
+    if (sscanf(m_Value.c_str(), "%d %d %d %d", &vec.x, &vec.y, &vec.z, &vec.w) != 4) {
         throw std::invalid_argument("value is not ivec4");
     }
 
@@ -36,7 +36,7 @@ const glm::vec3 bsp::EntityValue::asFloat3() const {
 const glm::vec4 bsp::EntityValue::asFloat4() const {
     glm::vec4 vec(0, 0, 0, 0);
 
-    if (sscanf(m_Value.c_str(), "%f %f %f %f", &vec.x, &vec.y, &vec.z, &vec.w) != 3) {
+    if (sscanf(m_Value.c_str(), "%f %f %f %f", &vec.x, &vec.y, &vec.z, &vec.w) != 4) {
         throw std::invalid_argument("value is not vec4");
     }
 

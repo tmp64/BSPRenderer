@@ -24,6 +24,9 @@ constexpr float SMALL_FACE_SIZE = 12.0f;
 //! (depends on original size before subdivision).
 constexpr float MIN_PATCH_SIZE_FOR_SMALL_FACES = 0.51f;
 
+//! Intensity scales to convert linear RGB color into linear intensity
+constexpr glm::vec3 RGB_INTENSITY = glm::vec3(0.25f, 0.50f, 0.25f);
+
 /**
  * Epsilon used for floating-point comparisons.
  */
@@ -99,6 +102,46 @@ struct Face : public bsp::BSPFace {
     inline glm::vec2 worldToFace(const glm::vec3 &world) const {
         return rad::worldToFace(world, vFaceI, vFaceJ);
     }
+
+    inline int findLightstyle(uint8_t ls) const {
+        for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+            if (nStyles[i] == ls) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+};
+
+enum class LightType
+{
+    Point,
+    Spot,
+};
+
+//! An entity light.
+struct EntLight {
+    LightType type = LightType::Point;
+    glm::vec3 vOrigin = glm::vec3(0, 0, 0);
+    //glm::vec3 vDirection = glm::vec3(0, 0, 0);
+    glm::vec3 vLight = glm::vec3(0, 0, 0); //!< Linear color times intensity
+    float flLinear = 0.3f;                 //!< Linear term of attenuation
+    float flQuadratic = 0.8f;              //!< Quadratic term of attenuation.
+    float flFalloff = 1;                   //!< Scale of attenuation function denominator. Closer to 0 means light travels further.
+
+};
+
+//! A group of lights that can be toggled together.
+//! Grouped by name or pattern of entity lights.
+struct LightStyle {
+    std::string name;    //!< Targetname, can be empty
+    std::string pattern; //!< Light blinking pattern (or empty if no pattern)
+    std::vector<EntLight> entlights;
+    std::vector<int> texlights;
+    int iBounceCount = 0;
+
+    inline bool hasLights() { return !entlights.empty() || !texlights.empty(); }
 };
 
 /**
@@ -123,6 +166,38 @@ inline int texFloatToInt(float flVal) {
     }
 
     return (int)intpart + 1;
+}
+
+//! Returns vector that points in the direction given in degrees (or -1/-2 for yaw).
+//! Used for sunlight calculation.
+inline glm::vec3 getDirectionFromAngles(float pitch, float yaw) {
+    glm::vec3 dir;
+
+    if (yaw == -1) {
+        // ANGLE_UP
+        dir.x = 0;
+        dir.y = 0;
+        dir.z = 1;
+    } else if (yaw == -2) {
+        // ANGLE_DOWN
+        dir.x = 0;
+        dir.y = 0;
+        dir.z = -1;
+    } else {
+        dir.x = cos(glm::radians(yaw));
+        dir.y = sin(glm::radians(yaw));
+        dir.z = 0;
+    }
+
+    dir.x *= cos(glm::radians(pitch));
+    dir.y *= cos(glm::radians(pitch));
+    dir.z = sin(glm::radians(pitch));
+
+    return glm::normalize(dir);
+}
+
+inline bool isNullVector(glm::vec3 v) {
+    return v.x == 0 && v.y == 0 && v.z == 0;
 }
 
 } // namespace rad

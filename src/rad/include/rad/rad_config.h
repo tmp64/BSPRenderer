@@ -15,11 +15,17 @@ struct RadConfig {
     //! Base surface reflectivity
     float flBaseRefl = 0;
 
+    //! Scale of "light" entity intensity
+    float flEntLightScale = 0;
+
     //! Divisor of default light_environment brightness
     float flEnvLightDiv = 0;
 
     //! Brightness multiplier relative to sun brightness
     float flSkyLightBrightness = 0;
+
+    //! Number of bounces for dynamic lights
+    int iLightBounce = 0;
 
     //! Loads the default config.
     void loadFromAppConfig(AppConfig &cfg);

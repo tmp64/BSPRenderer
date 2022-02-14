@@ -17,16 +17,35 @@
 #include "vismat.h"
 #include "sparse_vismat.h"
 #include "vflist.h"
-#include "bouncer.h"
 #include "material.h"
 
 namespace rad {
+
+//! Gamma used by the GoldSrc engine when displaying lightmaps.
+//! qrad encodes lightmaps with gamma of 2 but engine displays them with lightgamma = 2.5.
+//! qrad also interprets color values of entities in linear space.
+constexpr float ENT_LIGHT_GAMMA = 2.5f;
+
+//! Maximum number of lightstyles. Engine limit.
+constexpr int MAX_LIGHTSTYLES = 255;
+
+//! Number of reserved lightstyles
+constexpr int RESERVED_LIGHTSTYLES = 32;
 
 /**
  * Internal state of the radiosity simulator.
  */
 class RadSimImpl : appfw::NoMove {
 public:
+    struct SunLight {
+        glm::vec3 vLight = glm::vec3(0, 0, 0); //!< Linear color times intensity
+        glm::vec3 vDirection = glm::vec3(0, 0, 0);
+    };
+
+    struct SkyLight {
+        glm::vec3 vLight = glm::vec3(0, 0, 0); //!< Linear color times intensity
+    };
+
     // Rad data
     AppConfig *m_pAppConfig = nullptr;
     RadSim::ProgressCallback m_fnProgressCallback;
@@ -34,21 +53,28 @@ public:
 
     // Level data
     const bsp::Level *m_pLevel = nullptr;
-    bsp::EntityKeyValuesDict m_Entities;
     std::string m_LevelName;
     LevelConfig m_LevelConfig;
     YAML::Node m_SurfaceConfig;
+
     BuildProfile m_Profile;
+
     std::map<std::string, bsp::WADFile> m_Wads;
     MaterialPropLoader m_MatPropLoader;
     std::vector<Material> m_Materials;
     std::vector<Plane> m_Planes;
     std::vector<Face> m_Faces;
+
+    bsp::EntityKeyValuesDict m_Entities;
+    LightStyle m_LightStyles[MAX_LIGHTSTYLES];
+    int m_iMaxLightstyle = 0;
+    SunLight m_SunLight;
+    SkyLight m_SkyLight;
+
     PatchList m_Patches;
     VisMat m_VisMat;
     SparseVisMat m_SVisMat;
     VFList m_VFList;
-    Bouncer m_Bouncer;
 
     appfw::SHA256::Digest m_PatchHash = {};
 
@@ -127,9 +153,11 @@ public:
     float linearToGamma(float val);
     glm::vec3 linearToGamma(const glm::vec3 &val);
 
-    //! Executes func for each patch pair. Pairs don't duplicate: if (i, j) was called, (j, i) won't be.
-    
-    //! Executes func for each patch that is visible from patch i
+    //! Converts light entity color to gamma space.
+    //! Entity color is linear but displayed with gamma of 2.5
+    glm::vec3 entLightColorToGamma(const glm::vec3 &val);
+
+    //! Executes func for each patch that is visible from patch i, starting with i + 1 to patchCount.
     //! void func(PatchRef j)
     template <typename F>
     void forEachVisiblePatch(PatchIndex i, F func) {
@@ -173,8 +201,14 @@ private:
 
     //! Loads lights from entities.
     void loadLevelEntities();
+    void addLightEntity(bsp::EntityKeyValues &kv);
+    void addEnvLightEntity(bsp::EntityKeyValues &kv);
 
     void samplePatchReflectivity();
+
+    //! Finds a lightstyle or allocates a new one.
+    //! @returns lightstyle index or -1 if limit is reached.
+    //int findOrAllocateLightStyle(std::string targetName, std::string pattern, int origLightstyle);
 };
 
 } // namespace rad

@@ -12,32 +12,26 @@ public:
     //! Maximum distance from any point in world to a point on a sky face.
     static constexpr float SKY_RAY_LENGTH = 8192.f;
 
-    inline Bouncer(RadSimImpl &radSim)
-        : m_RadSim(radSim) {}
+    //! Minimum brightness for light to be considered to light up the surface.
+    static constexpr float GAMMA_INTENSITY_THRESHOLD = 4.0f / 255.0f;
 
-    //! Initializes the bouncer
-    void setup(int bounceCount);
-
-    //! Adds all lighting
-    void addLighting();
-
-    //! Adds light to a patch
-    void addPatchLight(PatchIndex patch, const glm::vec3 &light);
-
-    //! Bounces light around
-    void bounceLight();
+    Bouncer(RadSimImpl &radSim);
+    void setup(int lightstyle, int bounceCount);
+    void addSunLight();
+    void addSkyLight();
+    void addEntLight(const EntLight &el);
+    void addTexLight(int faceIdx);
+    void calcLight();
 
 private:
     RadSimImpl &m_RadSim;
-    int m_iBounceCount = 0;
+    float m_flLinearThreshold = 0;
     PatchIndex m_uPatchCount = 0;
-    std::vector<glm::vec3> m_PatchBounce;
-
-    //! Sum of all light for each patch
-    std::vector<glm::vec3> m_PatchSum;
-
-    //! Patch reflectivity multiplied by area
-    std::vector<glm::vec3> m_PatchReflArea;
+    int m_iLightstyle = -1;
+    int m_iBounceCount = 0;
+    std::vector<glm::vec3> m_Texlights;       //!< Texlights. Added in a separate radiosity pass to direct lighting.
+    std::vector<glm::vec3> m_TotalPatchLight; //!< Sum of m_PatchBounce for all bounces as well as initial direct lighting as bounce 0.
+    std::vector<glm::vec3> m_PatchBounce;     //!< Patch colors for each bounce.
 
     //! Returns reference to color of patch in specified bounce.
     //! Bounce 0 is initial color.
@@ -46,15 +40,12 @@ private:
         return m_PatchBounce[m_uPatchCount * (size_t)bounce + patch];
     }
 
-    void addEnvLighting();
-    void addTexLights();
+    void addPointLightToFace(Face &face, const EntLight &el);
 
-    void addDirectSunlight(PatchRef &patch, const glm::vec3 vSunDir, const glm::vec3 &vSunColor);
-    void addDiffuseSkylight(PatchRef &patch, const glm::vec3 &vSunColor);
-
-    template <bool secondPass>
-    void receiveLight(int bounce, PatchIndex i);
-    void receiveLightFromOther(int bounce, PatchIndex i);
+    void radiateTexLights();    //!< Radiosity pass for texlight direct lighting.
+    void bounceLight();         //!< Main radiosity pass with multiple bounces.
+    void calcTotalLight();      //!< Fills m_TotalPatchLight with sum of all bounces.
+    void assignLightStyles();   //!< Assigns lightstyle to faces that received enough light.
 };
 
 } // namespace rad 

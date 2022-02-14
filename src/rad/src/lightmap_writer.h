@@ -2,7 +2,7 @@
 #define RAD_LIGHTMAP_WRITER_H
 #include <appfw/appfw.h>
 #include <appfw/binary_file.h>
-#include <app_base/texture_block.h>
+#include <app_base/bitmap.h>
 #include "types.h"
 
 namespace rad {
@@ -20,19 +20,22 @@ private:
     static constexpr float TRACE_OFFSET = 0.1f;
     static constexpr float FILTER_RADIUS = 2.0f;
 
+    static constexpr float LIGHTMAP_BLOCK_WASTED = 0.40f; //!< How much area is assumed to be wasted due to packing
+
     struct FaceLightmap {
         glm::ivec2 vSize;
         std::vector<glm::vec2> vTexCoords;
-        std::vector<glm::vec3> lightmapData;
+        std::vector<glm::vec3> lightmapData[bsp::NUM_LIGHTSTYLES];
         glm::ivec2 vBlockOffset;
         glm::vec2 vFaceOffset; //< Face plane pos of lightmap (0;0)
     };
 
     RadSimImpl &m_RadSim;
-    TextureBlock<glm::vec3> m_TexBlock;
+    Bitmap<glm::vec3> m_Bitmaps[bsp::NUM_LIGHTSTYLES];
 
     float m_flLuxelSize = 0;
     int m_iOversampleSize = 0;
+    int m_iMaxBlockSize = 0;
     int m_iBlockSize = 0;
     int m_iBlockPadding = 0;
 
@@ -42,7 +45,7 @@ private:
     void processFace(size_t faceIdx);
     void sampleLightmap(FaceLightmap &lm, size_t faceIdx, float luxelSize);
     void sampleFace(const Face &face, glm::vec2 luxelPos, float radius, glm::vec2 filterk,
-                    glm::vec3 &out, float &weightSum, bool checkTrace);
+                    glm::vec3 out[4], float &weightSum, bool checkTrace);
     void createBlock();
     void writeLightmapFile();
 

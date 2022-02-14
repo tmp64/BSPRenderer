@@ -20,11 +20,17 @@ rad:
     # Base surface reflectivity (will be replaced by materials)
     base_reflectivity: 0.4
     
+    # Scale of "light" entity intensity
+    light_brightness_scale: 24
+    
     # Divisor of default light_environment brightness
     light_env_brightness_divisor: 140
     
     # Brightness multiplier relative to sun brightness
     sky_light_brightness_multiplier: 0.3
+    
+    # Number of bounces for dynamic lights
+    light_bounce: 3
 
 commands:
     - app_sync_rates 1

@@ -8,12 +8,12 @@
 #include <bsp/utils.h>
 #include "lightmap_writer.h"
 #include "patch_divider.h"
+#include "bouncer.h"
 
 rad::RadSimImpl::RadSimImpl()
     : m_VisMat(*this)
     , m_VFList(*this)
-    , m_SVisMat(*this)
-    , m_Bouncer(*this) {
+    , m_SVisMat(*this) {
     printi("Using {} thread(s).", m_Executor.num_workers());
 }
 
@@ -105,17 +105,42 @@ void rad::RadSimImpl::calcViewFactors() {
 }
 
 void rad::RadSimImpl::bounceLight() {
-    printi("Applying lighting...");
-    m_Bouncer.setup(m_Profile.iBounceCount);
+    printn("Bouncing light...");
+    Bouncer bouncer(*this);
 
-    printi("Bouncing light...");
-    appfw::Timer timer;
-    timer.start();
+    for (int i = 0; i <= m_iMaxLightstyle; i++) {
+        LightStyle &ls = m_LightStyles[i];
+        if (!ls.hasLights()) {
+            continue;
+        }
 
-    m_Bouncer.bounceLight();
+        appfw::Timer timer;
 
-    timer.stop();
-    printi("Bounce light: {:.3} s", timer.dseconds());
+        int bounceCount = ls.iBounceCount == -1 ? m_Profile.iBounceCount : ls.iBounceCount;
+        bounceCount = std::min(bounceCount, m_Profile.iBounceCount);
+
+        printi("{}: {} entlights, {} texlights, {} bounces", i, ls.entlights.size(), ls.texlights.size(), bounceCount);
+
+        bouncer.setup(i, bounceCount);
+
+        if (i == 0) {
+            bouncer.addSunLight();
+            bouncer.addSkyLight();
+        }
+
+        for (int faceIdx : ls.texlights) {
+            bouncer.addTexLight(faceIdx);
+        }
+
+        for (EntLight &el : ls.entlights) {
+            bouncer.addEntLight(el);
+        }
+
+        bouncer.calcLight();
+
+        timer.stop();
+        printi("    ... {:.3f} s", timer.dseconds());
+    }
 }
 
 void rad::RadSimImpl::writeLightmaps() {
@@ -323,11 +348,40 @@ void rad::RadSimImpl::loadLevelEntities() {
     bool wasEnvLightSet = m_LevelConfig.sunLight.bIsSet;
     bool isEnvLightFound = false;
 
+    // Set initial bounce count for all lightstyles
+    m_LightStyles[0].iBounceCount = m_Profile.iBounceCount;
+    for (int i = 1; i < MAX_LIGHTSTYLES; i++) {
+        m_LightStyles[i].iBounceCount = m_Config.iLightBounce;
+    }
+
+    // Add texlights to lightstyles
+    // TODO: Allow to change lightstyle idx
+    for (size_t i = 0; i < m_Faces.size(); i++) {
+        int lightstyle = 0;
+
+        if (!isNullVector(m_Faces[i].vLightColor)) {
+            m_LightStyles[lightstyle].texlights.push_back(int(i));
+        }
+    }
+
+    // Parse all entities
     for (auto &ent : m_Entities) {
-        std::string_view classname = ent.getClassName();
+        std::string classname = ent.getClassName();
 
         if (classname.empty()) {
             continue;
+        }
+
+        std::string_view cn = classname;
+
+        try {
+            if (cn == "light_environment") {
+                addEnvLightEntity(ent);
+            } else if (cn.substr(0, 5) == "light") {
+                addLightEntity(ent);
+            }
+        } catch (const std::exception &e) {
+            printe("Entity failed to parse: {}", e.what());
         }
 
         if (classname == "light") {
@@ -381,6 +435,79 @@ void rad::RadSimImpl::loadLevelEntities() {
             }
         }
     }
+
+    // Apply env lighting from the config
+    if (m_LevelConfig.sunLight.bIsSet) {
+        const auto &sun = m_LevelConfig.sunLight;
+        m_SunLight.vLight = gammaToLinear(sun.vColor) * sun.flBrightness;
+        m_SunLight.vDirection = getDirectionFromAngles(sun.flPitch, sun.flYaw);
+    }
+
+    float skyBrightness = m_LevelConfig.skyLight.flBrightnessMul != -1
+                              ? m_LevelConfig.skyLight.flBrightnessMul
+                              : m_Config.flSkyLightBrightness;
+
+    if (m_LevelConfig.skyLight.vColor.r != -1) {
+        m_SkyLight.vLight = m_LevelConfig.skyLight.vColor * skyBrightness;
+    }
+}
+
+void rad::RadSimImpl::addLightEntity(bsp::EntityKeyValues &kv) {
+    std::string classname = kv.getClassName();
+    std::string targetname = kv.getTargetName();
+
+    // Read color
+    glm::vec4 light = kv.get("_light").asFloat4();
+    glm::vec3 color = entLightColorToGamma(light / 255.0f);
+    float intensity = light.a * m_Config.flEntLightScale;
+
+    // Create ent light
+    EntLight el;
+    el.vOrigin = kv.get("origin").asFloat3();
+    el.vLight = gammaToLinear(color) * intensity;
+
+    if (classname == "light") {
+        el.type = LightType::Point;
+    } else {
+        throw std::runtime_error("Invalid light type: " + classname);
+    }
+
+    // Read entity properties
+    int lightstyle = 0;
+    int kvStyle = kv.indexOf("style");
+
+    if (kvStyle != -1) {
+        lightstyle = kv.get(kvStyle).asInt();
+    }
+
+    m_iMaxLightstyle = std::max(lightstyle, m_iMaxLightstyle);
+
+    m_LightStyles[lightstyle].entlights.push_back(std::move(el));
+}
+
+void rad::RadSimImpl::addEnvLightEntity(bsp::EntityKeyValues &kv) {
+    // Read color
+    glm::vec4 light = kv.get("_light").asFloat4();
+    glm::vec3 color = entLightColorToGamma(light / 255.0f);
+    float intensity = light.a / m_Config.flEnvLightDiv;
+
+    // Read angle
+    float pitch = 0, yaw = 0;
+    int kvAngles = kv.indexOf("angles");
+
+    if (kvAngles != -1) {
+        glm::ivec3 angles = kv.get(kvAngles).asInt3();
+        yaw = (float)angles.y;
+        pitch = (float)angles.x;
+    } else {
+        yaw = kv.get("angle").asFloat();
+        pitch = kv.get("pitch").asFloat();
+    }
+
+    m_SunLight.vLight = gammaToLinear(color) * intensity;
+    m_SunLight.vDirection = getDirectionFromAngles(pitch, yaw);
+
+    m_SkyLight.vLight = m_SunLight.vLight * m_Config.flSkyLightBrightness;
 }
 
 void rad::RadSimImpl::samplePatchReflectivity() {
@@ -415,6 +542,37 @@ void rad::RadSimImpl::samplePatchReflectivity() {
     }
 #endif
 }
+
+#if 0
+// Lightstyles are give out by csg compiler, not rad
+int rad::RadSimImpl::findOrAllocateLightStyle(std::string targetName, std::string pattern,
+                                              int origLightstyle) {
+    if (targetName.empty() && pattern.empty() && origLightstyle < RESERVED_LIGHTSTYLES) {
+        // Non-toggleable lighting
+        return origLightstyle;
+    }
+
+    if (origLightstyle > 0 && origLightstyle < RESERVED_LIGHTSTYLES && pattern.empty()) {
+        pattern = "__reserved" + std::to_string(origLightstyle);
+    }
+
+    // Find a lightstyle with targetName and pattern
+    for (int i = 0; i < std::size(m_LightStyles); i++) {
+        LightStyle &ls = m_LightStyles[i];
+
+        if (ls.name == targetName && ls.pattern == pattern) {
+            return i;
+        }
+    }
+
+    // Allocate a new one
+    if (m_iNumLightstyles == MAX_LIGHTSTYLES) {
+        return -1;
+    }
+
+    return m_iNumLightstyles++;
+}
+#endif
 
 void rad::RadSimImpl::updateProgress(double progress) {
     if (m_fnProgressCallback) {
@@ -464,4 +622,8 @@ float rad::RadSimImpl::linearToGamma(float val) {
 
 glm::vec3 rad::RadSimImpl::linearToGamma(const glm::vec3 &val) {
     return glm::pow(val, glm::vec3(1.0f / m_LevelConfig.flGamma));
+}
+
+glm::vec3 rad::RadSimImpl::entLightColorToGamma(const glm::vec3 &val) {
+    return glm::pow(val, glm::vec3(1.0f / ENT_LIGHT_GAMMA));
 }

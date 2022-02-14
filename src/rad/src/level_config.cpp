@@ -4,7 +4,6 @@
 void rad::LevelConfig::loadDefaults(const RadConfig &cfg) {
     flGamma = cfg.flGamma;
     flRefl = cfg.flRefl;
-    skyLight.flBrightnessMul = cfg.flSkyLightBrightness;
 }
 
 void rad::LevelConfig::loadLevelConfig(const fs::path &path) {
@@ -31,7 +30,7 @@ void rad::LevelConfig::loadLevelConfig(const fs::path &path) {
 
     if (yaml["sunlight"]) {
         auto n = yaml["sunlight"];
-        SunLight &s = sunLight;
+        SunLightConfig &s = sunLight;
         s.flPitch = n["pitch"].as<float>();
         s.flYaw = n["yaw"].as<float>();
         s.vColor = n["color"].as<glm::vec3>() / 255.0f;
@@ -41,7 +40,7 @@ void rad::LevelConfig::loadLevelConfig(const fs::path &path) {
 
     if (yaml["skylight"]) {
         auto n = yaml["skylight"];
-        SkyLight &s = skyLight;
+        SkyLightConfig &s = skyLight;
         
         if (n["color"]) {
             s.vColor = n["color"].as<glm::vec3>() / 255.0f;

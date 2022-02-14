@@ -1,3 +1,4 @@
+#include <stb_rect_pack.h>
 #include <appfw/timer.h>
 #include <app_base/lightmap.h>
 #include "lightmap_writer.h"
@@ -13,7 +14,7 @@ void rad::LightmapWriter::saveLightmap() {
 
     m_flLuxelSize = m_RadSim.m_Profile.flLuxelSize;
     m_iOversampleSize = m_RadSim.m_Profile.iOversample;
-    m_iBlockSize = m_RadSim.m_Profile.iBlockSize;
+    m_iMaxBlockSize = m_RadSim.m_Profile.iBlockSize;
     m_iBlockPadding = m_RadSim.m_Profile.iBlockPadding;
 
     size_t faceCount = m_RadSim.m_Faces.size();
@@ -61,7 +62,10 @@ void rad::LightmapWriter::processFace(size_t faceIdx) {
     }
 
     // Lightmap
-    lm.lightmapData.resize((size_t)lm.vSize.x * lm.vSize.y);
+    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+        lm.lightmapData[i].resize((size_t)lm.vSize.x * lm.vSize.y);
+    }
+    
     sampleLightmap(lm, faceIdx, luxelSize);
 
     m_LightmapIdx[faceIdx] = m_Lightmaps.size();
@@ -74,14 +78,18 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx, float
     const Face &face = m_RadSim.m_Faces[faceIdx];
 
     for (int lmy = 0; lmy < lmSize.y; lmy++) {
-        glm::vec3 *lmrow = lm.lightmapData.data() + (size_t)lmy * lmSize.x;
+        glm::vec3 *lmrow[bsp::NUM_LIGHTSTYLES];
+
+        for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+            lmrow[i] = lm.lightmapData[i].data() + (size_t)lmy * lmSize.x;
+        }
 
         for (int lmx = 0; lmx < lmSize.x; lmx++) {
-            glm::vec3 &luxel = lmrow[lmx];
 #if 1
             glm::vec2 luxelPos =
                 lm.vFaceOffset + (glm::vec2(lmx, lmy) + glm::vec2(0.5f)) * luxelSize;
-            glm::vec3 output = glm::vec3(0, 0, 0);
+            glm::vec3 output[4];
+            std::fill(std::begin(output), std::end(output), glm::vec3(0, 0, 0));
             float weightSum = 0;
 
             // Filter options
@@ -103,18 +111,32 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx, float
 
                     if (neighbourIdx != faceIdx && neighbour.hasLightmap() &&
                         normalDir == !!neighbour.nPlaneSide) {
+                        glm::vec3 neighbourSamples[4] = {};
                         glm::vec2 luxelPosHere = neighbour.worldToFace(luxelWorldPos);
-                        sampleFace(neighbour, luxelPosHere, radius, glm::vec2(filterk), output,
-                                   weightSum, true);
+                        sampleFace(neighbour, luxelPosHere, radius, glm::vec2(filterk),
+                                   neighbourSamples, weightSum, true);
+
+                        // Adjust lightstyles
+                        for (int i = 0; i < 4; i++) {
+                            int idx = neighbour.findLightstyle(face.nStyles[i]);
+
+                            if (idx != -1) {
+                                output[i] += neighbourSamples[idx];
+                            }
+                        }
                     }
                 }
             }
 
             if (weightSum != 0) {
-                luxel = output / weightSum;
+                for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+                    lmrow[i][lmx] = output[i] / weightSum;
+                }
             } else {
                 // TODO:
-                luxel = glm::vec3(1, 0, 1);
+                for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+                    lmrow[i][lmx] = glm::vec3(1, 0, 1);
+                }
             }
 #else
             // Random color
@@ -134,7 +156,7 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx, float
 //! @prarm  weightSum   Sum of weights
 //! @param  checkTrace  Whether to check if there is visibility from luxelPos to sampled patch
 void rad::LightmapWriter::sampleFace(const Face &face, glm::vec2 luxelPos, float radius,
-                                     glm::vec2 filterk, glm::vec3 &out, float &weightSum,
+                                     glm::vec2 filterk, glm::vec3 out[4], float &weightSum,
                                      bool checkTrace) {
     // Check if pos intersects with the face
     glm::vec2 corners[4];
@@ -161,10 +183,13 @@ void rad::LightmapWriter::sampleFace(const Face &face, glm::vec2 luxelPos, float
             float weight = lightmapFilter(d.x * filterk.x) * lightmapFilter(d.y * filterk.y);
 #if 1
             // Sample final color
-            out += weight * patch.getFinalColor();
+            out[0] += weight * patch.getFinalColor().color[0];
+            out[1] += weight * patch.getFinalColor().color[1];
+            out[2] += weight * patch.getFinalColor().color[2];
+            out[3] += weight * patch.getFinalColor().color[3];
 #else
             // Sample reflectivity (for debugging)
-            out += weight * patch.getReflectivity();
+            out[0] += weight * patch.getReflectivity();
 #endif
             weightSum += weight;
         }
@@ -175,29 +200,60 @@ void rad::LightmapWriter::createBlock() {
     printn("Allocating lightmap block...");
     appfw::Timer timer;
 
-    if (m_iBlockSize % 8 != 0) {
-        throw std::runtime_error("block_size must be divisable by 8");
+    std::vector<stbrp_rect> rects(m_Lightmaps.size());
+    int totalLightmapArea = 0;
+
+    for (int i = 0; i < m_Lightmaps.size(); i++) {
+        FaceLightmap &lm = m_Lightmaps[i];
+        stbrp_rect &rect = rects[i];
+        rect.id = i;
+        rect.w = lm.vSize.x + 2 * m_iBlockPadding;
+        rect.h = lm.vSize.y + 2 * m_iBlockPadding;
+
+        totalLightmapArea += rect.w * rect.h;
     }
 
-    m_TexBlock.resize(m_iBlockSize, m_iBlockSize);
-    size_t idx = 0;
+    // Estimate texture size
+    int squareSize = (int)ceil(totalLightmapArea / (1 - LIGHTMAP_BLOCK_WASTED));
+    int textureSize = std::min((int)sqrt(squareSize), m_iMaxBlockSize);
 
-    for (FaceLightmap &lm : m_Lightmaps) {
-        glm::ivec2 offset = glm::ivec2(0, 0);
-        
-        AFW_ASSERT(lm.vSize.x > 0);
-        AFW_ASSERT(lm.vSize.y > 0);
+    if (textureSize % 4 != 0) {
+        textureSize += (4 - textureSize % 4); // round up so it's divisable by 4
+    }
 
-        if (!m_TexBlock.insert(lm.lightmapData.data(), lm.vSize.x, lm.vSize.y, offset.x, offset.y,
-                               m_iBlockPadding)) {
+    m_iBlockSize = textureSize;
+
+    // Pack lightmaps
+    stbrp_context packContext;
+    std::vector<stbrp_node> packNodes(2 * textureSize);
+    stbrp_init_target(&packContext, textureSize, textureSize, packNodes.data(),
+                      (int)packNodes.size());
+
+    stbrp_pack_rects(&packContext, rects.data(), (int)rects.size());
+
+    // Create bitmaps
+    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+        m_Bitmaps[i].init(textureSize, textureSize);
+    }
+
+    // Add lightmaps to bitmaps
+    for (const stbrp_rect &rect : rects) {
+        FaceLightmap &lm = m_Lightmaps[rect.id];
+
+        if (rect.was_packed) {
+            for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+                m_Bitmaps[i].copyPixels(rect.x, rect.y, lm.vSize.x, lm.vSize.y,
+                                        lm.lightmapData[i].data(), m_iBlockPadding);
+            }
+
+            lm.vBlockOffset.x = rect.x + m_iBlockPadding;
+            lm.vBlockOffset.y = rect.y + m_iBlockPadding;
+        } else {
             throw std::runtime_error(
                 fmt::format("Failed to add lightmap {}/{} ({}x{}) to the texture "
                             "block. Please, resize the texture block.",
-                            idx + 1, m_Lightmaps.size(), lm.vSize.x, lm.vSize.y));
+                            rect.id + 1, m_Lightmaps.size(), lm.vSize.x, lm.vSize.y));
         }
-
-        lm.vBlockOffset = offset;
-        idx++;
     }
 
     printi("Allocate lightmap block: {:.3} s", timer.dseconds());
@@ -213,16 +269,19 @@ void rad::LightmapWriter::writeLightmapFile() {
 
     // Header
     file.writeBytes(LightmapFileFormat::MAGIC, sizeof(LightmapFileFormat::MAGIC));
-    file.writeUInt32((uint32_t)faceCount);                       // Face count
-    file.writeUInt32((uint32_t)m_Lightmaps.size());              // Lightmap count
-    file.writeInt32(m_iBlockSize);                               // Lightmap texture wide
-    file.writeInt32(m_iBlockSize);                               // Lightmap texture tall
-    file.writeByte((uint8_t)LightmapFileFormat::Format::RGBF32); // Lightmap texture format
+    file.writeUInt32((uint32_t)faceCount);                          // Face count
+    file.writeUInt32((uint32_t)m_Lightmaps.size());                 // Lightmap count
+    file.writeInt32(m_iBlockSize);                                  // Lightmap texture wide
+    file.writeInt32(m_iBlockSize);                                  // Lightmap texture tall
+    file.writeByte((uint8_t)LightmapFileFormat::Format::RGBF32);    // Lightmap data format
+    file.writeByte((uint8_t)LightmapFileFormat::Compression::None); // Lightmap compression
 
     // Lightmap texture block
-    size_t texBlockSize =
-        sizeof(*m_TexBlock.getData()) * m_TexBlock.getWide() * m_TexBlock.getTall();
-    file.writeBytes(reinterpret_cast<const uint8_t *>(m_TexBlock.getData()), texBlockSize);
+    size_t texBlockDataSize = sizeof(glm::vec3) * m_iBlockSize * m_iBlockSize;
+    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
+        file.writeBytes(reinterpret_cast<const uint8_t *>(m_Bitmaps[i].getPixels().data()),
+                        texBlockDataSize);
+    }
 
     // Face info
     for (size_t i = 0; i < faceCount; i++) {
@@ -234,6 +293,11 @@ void rad::LightmapWriter::writeLightmapFile() {
         file.writeVec(glm::vec3(face.vWorldOrigin));    // World position of (0, 0) plane coord.
         file.writeVec(glm::vec2(0.0f, 0.0f));           // Offset of (0, 0) to get to plane coords
         file.writeVec(face.vFaceMaxs - face.vFaceMins); // Face size
+
+        // Lightstyles
+        for (int j = 0; j < bsp::NUM_LIGHTSTYLES; j++) {
+            file.writeByte(face.nStyles[j]);
+        }
 
         if (face.hasLightmap()) {
             const FaceLightmap &lm = m_Lightmaps[m_LightmapIdx[i]];

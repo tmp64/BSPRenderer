@@ -1,131 +1,32 @@
+#include <glm/gtx/norm.hpp>
 #include "bouncer.h"
 #include "rad_sim_impl.h"
 #include "anorms.h"
 
-/**
- * Returns vector that points in the direction given in degrees (or -1/-2 for yaw).
- * Used for sunlight calculation.
- */
-static glm::vec3 getVecFromAngles(float pitch, float yaw) {
-    glm::vec3 dir;
-
-    if (yaw == -1) {
-        // ANGLE_UP
-        dir.x = 0;
-        dir.y = 0;
-        dir.z = 1;
-    } else if (yaw == -2) {
-        // ANGLE_DOWN
-        dir.x = 0;
-        dir.y = 0;
-        dir.z = -1;
-    } else {
-        dir.x = cos(glm::radians(yaw));
-        dir.y = sin(glm::radians(yaw));
-        dir.z = 0;
-    }
-
-    dir.x *= cos(glm::radians(pitch));
-    dir.y *= cos(glm::radians(pitch));
-    dir.z = sin(glm::radians(pitch));
-
-    return glm::normalize(dir);
+rad::Bouncer::Bouncer(RadSimImpl &radSim)
+    : m_RadSim(radSim) {
+    m_flLinearThreshold = radSim.gammaToLinear(GAMMA_INTENSITY_THRESHOLD);
+    m_uPatchCount = radSim.m_Patches.size();
+    m_Texlights.resize(m_uPatchCount);
+    m_TotalPatchLight.resize(m_uPatchCount);
 }
 
-static bool isNullVector(glm::vec3 v) {
-    return v.x == 0 && v.y == 0 && v.z == 0;
-}
-
-void rad::Bouncer::setup(int bounceCount) {
+void rad::Bouncer::setup(int lightstyle, int bounceCount) {
+    m_iLightstyle = lightstyle;
     m_iBounceCount = bounceCount;
-    m_uPatchCount = m_RadSim.m_Patches.size();
-
     m_PatchBounce.resize((size_t)m_uPatchCount * (size_t)(m_iBounceCount + 1));
-    m_PatchSum.resize(m_uPatchCount);
+
+    std::fill(m_Texlights.begin(), m_Texlights.end(), glm::vec3(0, 0, 0));
+    std::fill(m_TotalPatchLight.begin(), m_TotalPatchLight.end(), glm::vec3(0, 0, 0));
     std::fill(m_PatchBounce.begin(), m_PatchBounce.end(), glm::vec3(0, 0, 0));
-
-    addLighting();
 }
 
-void rad::Bouncer::addLighting() {
-    addEnvLighting();
-    addTexLights();
-}
+void rad::Bouncer::addSunLight() {
+    glm::vec3 vSunDir = -m_RadSim.m_SunLight.vDirection;
+    glm::vec3 vSunLight = m_RadSim.m_SunLight.vLight;
 
-void rad::Bouncer::addPatchLight(PatchIndex patch, const glm::vec3 &light) {
-    getPatchBounce(patch, 0) += light;
-}
-
-void rad::Bouncer::bounceLight() {
-    // Prepare patch refl * area
-    m_PatchReflArea.resize(m_uPatchCount);
-    for (PatchIndex i = 0; i < m_uPatchCount; i++) {
-        PatchRef patch(m_RadSim.m_Patches, i);
-        float area = patch.getSize() * patch.getSize();
-        m_PatchReflArea[i] = patch.getReflectivity() * area;
-    }
-
-    // Copy bounce 0 into the lightmap
-    for (PatchIndex i = 0; i < m_uPatchCount; i++) {
-        PatchRef patch(m_RadSim.m_Patches, i);
-        patch.getFinalColor() = getPatchBounce(i, 0);
-    }
-
-    m_RadSim.updateProgress(0);
-
-    // Bounce light
-    for (int bounce = 1; bounce <= m_iBounceCount; bounce++) {
-        m_RadSim.updateProgress((bounce - 1.0) / (m_iBounceCount - 1.0));
-
-        std::fill(m_PatchSum.begin(), m_PatchSum.end(), glm::vec3(0, 0, 0));
-
-        // Bounce light for each visible path
-        tf::Taskflow taskflow;
-        tf::Task taskThis = taskflow.for_each_index_dynamic(
-            (PatchIndex)0, m_uPatchCount, (PatchIndex)1,
-            [&](PatchIndex idx) { receiveLight<false>(bounce, idx); }, (PatchIndex)128);
-
-        tf::Task taskOther = taskflow.for_each_index_dynamic(
-            (PatchIndex)0, m_uPatchCount, (PatchIndex)1,
-            [&](PatchIndex idx) { receiveLight<true>(bounce, idx); }, (PatchIndex)128);
-
-        taskThis.precede(taskOther);
-        m_RadSim.m_Executor.run(taskflow).wait();
-
-        for (PatchIndex i = 0; i < m_uPatchCount; i++) {
-            // Received light from all visible patches
-            // Write it
-            PatchRef patch(m_RadSim.m_Patches, i);
-            AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
-            getPatchBounce(i, bounce) = m_PatchSum[i];
-            patch.getFinalColor() += getPatchBounce(i, bounce);
-        }
-    }
-
-    m_PatchReflArea.clear();
-    m_RadSim.updateProgress(1);
-}
-
-void rad::Bouncer::addEnvLighting() {
-    const SunLight &sun = m_RadSim.m_LevelConfig.sunLight;
-    const SkyLight &sky = m_RadSim.m_LevelConfig.skyLight;
-    
-    bool bIsSunSet = sun.bIsSet;
-
-    glm::vec3 vSunDir = -getVecFromAngles(sun.flPitch, sun.flYaw);
-    glm::vec3 vSunColor = m_RadSim.gammaToLinear(sun.vColor) * sun.flBrightness;
-    glm::vec3 vSkyColor;
-
-    if (sky.vColor.r != -1) {
-        vSkyColor = m_RadSim.gammaToLinear(sky.vColor) * sun.flBrightness;
-    } else {
-        vSkyColor = vSunColor;
-    }
-
-    vSkyColor *= sky.flBrightnessMul;
-
-    if (!bIsSunSet && vSkyColor == glm::vec3(0, 0, 0)) {
-        // No env lighting
+    if (isNullVector(vSunLight)) {
+        // No sun lighting
         return;
     }
 
@@ -134,111 +35,276 @@ void rad::Bouncer::addEnvLighting() {
     for (PatchIndex patchIdx = 0; patchIdx < patchCount; patchIdx++) {
         PatchRef patch(m_RadSim.m_Patches, patchIdx);
 
-        if (bIsSunSet) {
-            addDirectSunlight(patch, vSunDir, vSunColor);
+        // Check if patch can be hit by the sky
+        float cosangle = glm::dot(patch.getNormal(), vSunDir);
+
+        if (cosangle < 0.0001f) {
+            continue;
         }
 
-        addDiffuseSkylight(patch, vSkyColor);
+        // Cast a ray to the sky and check if it hits
+        glm::vec3 from = patch.getOrigin();
+        glm::vec3 to = from + (vSunDir * SKY_RAY_LENGTH);
+
+        if (m_RadSim.m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
+            // Hit the sky, add the sun color
+            getPatchBounce(patchIdx, 0) += vSunLight * cosangle;
+        }
     }
 }
 
-void rad::Bouncer::addTexLights() {
-    for (Face &face : m_RadSim.m_Faces) {
-        if (!isNullVector(face.vLightColor)) {
-            glm::vec3 light = face.vLightColor;
-            for (PatchIndex p = face.iFirstPatch; p < face.iFirstPatch + face.iNumPatches; p++) {
-                PatchRef patch(m_RadSim.m_Patches, p);
-                addPatchLight(p, light / patch.getReflectivity());
+void rad::Bouncer::addSkyLight() {
+    glm::vec3 vSkyLight = m_RadSim.m_SkyLight.vLight;
+
+    if (isNullVector(vSkyLight)) {
+        // No diffuse sky lighting
+        return;
+    }
+
+    PatchIndex patchCount = m_RadSim.m_Patches.size();
+
+    for (PatchIndex patchIdx = 0; patchIdx < patchCount; patchIdx++) {
+        PatchRef patch(m_RadSim.m_Patches, patchIdx);
+
+        float intensity = 0;
+        const glm::vec3 normal = patch.getNormal();
+
+        float sum = 0;
+
+        for (size_t i = 0; i < std::size(AVER_TEX_NORMALS); i++) {
+            const glm::vec3 &anorm = AVER_TEX_NORMALS[i];
+
+            float cosangle = glm::dot(normal, anorm);
+
+            if (cosangle < 0.0001f) {
+                continue;
+            }
+
+            sum += cosangle;
+
+            // Cast a ray to the sky and check if it hits
+            glm::vec3 from = patch.getOrigin();
+            glm::vec3 to = from + (anorm * SKY_RAY_LENGTH);
+
+            if (m_RadSim.m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
+                // Hit the sky
+                intensity += cosangle;
+            }
+        }
+
+        if (sum != 0) {
+            intensity /= sum;
+            getPatchBounce(patchIdx, 0) += vSkyLight * intensity;
+        }
+    }
+}
+
+void rad::Bouncer::addEntLight(const EntLight &el) {
+    uint8_t pvsBuf[bsp::MAX_MAP_LEAFS / 8];
+    std::vector<uint8_t> litFaces(bsp::MAX_MAP_FACES);
+
+    auto &leaves = m_RadSim.m_pLevel->getLeaves();
+    auto &marksurfaces = m_RadSim.m_pLevel->getMarkSurfaces();
+    unsigned leafCount = (unsigned)leaves.size();
+
+    int lightLeaf = m_RadSim.m_pLevel->pointInLeaf(el.vOrigin);
+    const uint8_t *pvs = m_RadSim.m_pLevel->leafPVS(lightLeaf, pvsBuf);
+
+    for (unsigned leafIdx = 1; leafIdx < leafCount; leafIdx++) {
+        if (!(pvs[(leafIdx - 1) >> 3] & (1 << ((leafIdx - 1) & 7)))) {
+            // Leaf not visible
+            continue;
+        }
+
+        const bsp::BSPLeaf &leaf = leaves[leafIdx];
+
+        for (int i = 0; i < leaf.nMarkSurfaces; i++) {
+            unsigned faceIdx = marksurfaces[leaf.iFirstMarkSurface + i];
+
+            // Faces can be marksurfed by multiple leaves
+            if (litFaces[faceIdx]) {
+                continue;
+            }
+                
+            litFaces[faceIdx] = true;
+            Face &face = m_RadSim.m_Faces[faceIdx];
+
+            if (el.type == LightType::Point) {
+                addPointLightToFace(face, el);
+            } else {
+                std::abort();
             }
         }
     }
 }
 
-void rad::Bouncer::addDirectSunlight(PatchRef &patch, const glm::vec3 vSunDir,
-                                     const glm::vec3 &vSunColor) {
-    // Check if patch can be hit by the sky
-    float cosangle = glm::dot(patch.getNormal(), vSunDir);
+void rad::Bouncer::addTexLight(int faceIdx) {
+    appfw::span<glm::vec3> patchLight = appfw::span(m_PatchBounce).subspan(0, m_uPatchCount);
 
-    if (cosangle < 0.001f) {
-        return;
-    }
+    Face &face = m_RadSim.m_Faces[faceIdx];
+    PatchIndex beginPatch = face.iFirstPatch;
+    PatchIndex endPatch = beginPatch + face.iNumPatches;
 
-    // Cast a ray to the sky and check if it hits
-    glm::vec3 from = patch.getOrigin();
-    glm::vec3 to = from + (vSunDir * SKY_RAY_LENGTH);
-
-    if (m_RadSim.m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
-        // Hit the sky, add the sun color
-        addPatchLight(patch.index(), vSunColor * cosangle);
+    for (PatchIndex lightPatch = beginPatch; lightPatch < endPatch; lightPatch++) {
+        m_Texlights[lightPatch] = face.vLightColor;
     }
 }
 
-void rad::Bouncer::addDiffuseSkylight(PatchRef &patch, const glm::vec3 &vSkyColor) {
-    float intensity = 0;
-    const glm::vec3 normal = patch.getNormal();
+void rad::Bouncer::calcLight() {
+    radiateTexLights();
+    bounceLight();
+    calcTotalLight();
+    assignLightStyles();
+}
 
-    float sum = 0;
+void rad::Bouncer::addPointLightToFace(Face &face, const EntLight &el) {
+    PatchIndex beginPatch = face.iFirstPatch;
+    PatchIndex endPatch = beginPatch + face.iNumPatches;
 
-    for (size_t i = 0; i < std::size(AVER_TEX_NORMALS); i++) {
-        const glm::vec3 &anorm = AVER_TEX_NORMALS[i];
+    glm::vec3 attenuation = glm::vec3(1, el.flLinear, el.flQuadratic) * el.flFalloff;
 
-        float cosangle = glm::dot(normal, anorm);
+    for (PatchIndex patch = beginPatch; patch < endPatch; patch++) {
+        PatchRef p(m_RadSim.m_Patches, patch);
 
-        if (cosangle < 0.001f) {
+        if (m_RadSim.traceLine(el.vOrigin, p.getOrigin()) != bsp::CONTENTS_EMPTY) {
+            // No visibility
             continue;
         }
 
-        sum += cosangle;
+        // Calculate light
+        glm::vec3 delta = p.getOrigin() - el.vOrigin;
+        float d2 = glm::length2(delta); // dist squared
+        glm::vec3 dist = glm::vec3(1, std::sqrt(d2), d2);
 
-        // Cast a ray to the sky and check if it hits
-        glm::vec3 from = patch.getOrigin();
-        glm::vec3 to = from + (anorm * SKY_RAY_LENGTH);
-
-        if (m_RadSim.m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
-            // Hit the sky
-            intensity += cosangle;
-        }
-    }
-
-    if (sum != 0) {
-        intensity /= sum;
-        addPatchLight(patch.index(), vSkyColor * intensity);
+        float cosangle = std::max(-glm::dot(glm::normalize(delta), p.getNormal()), 0.0f);
+        float k = cosangle / glm::dot(dist, attenuation);
+        glm::vec3 light = k * el.vLight;
+        
+        // Add direct lighting
+        getPatchBounce(patch, 0) += light;
     }
 }
 
-template <bool secondPass>
-void rad::Bouncer::receiveLight(int bounce, PatchIndex i) {
+void rad::Bouncer::radiateTexLights() {
+    auto &vfdata = m_RadSim.m_VFList.getVFData();
+    auto &vfkoeff = m_RadSim.m_VFList.getVFKoeff();
+    appfw::span<glm::vec3> initialLight = appfw::span(m_PatchBounce).subspan(0, m_uPatchCount);
+
+    for (PatchIndex patch1 = 0; patch1 < m_uPatchCount; patch1++) {
+        PatchRef patch1ref(m_RadSim.m_Patches, patch1);
+        size_t dataOffset = m_RadSim.m_VFList.getPatchOffsets()[patch1];
+
+        m_RadSim.forEachVisiblePatch(patch1, [&](PatchRef patch2ref) {
+            PatchIndex patch2 = patch2ref.index();
+            float vf = vfdata[dataOffset];
+
+            initialLight[patch1] +=
+                (vf * vfkoeff[patch2] * patch2ref.getSize() * patch2ref.getSize()) *
+                m_Texlights[patch2];
+
+            initialLight[patch2] +=
+                (vf * vfkoeff[patch1] * patch1ref.getSize() * patch1ref.getSize()) *
+                m_Texlights[patch1];
+
+            dataOffset++;
+        });
+    }
+}
+
+void rad::Bouncer::bounceLight() {
     auto &vfdata = m_RadSim.m_VFList.getVFData();
     auto &vfkoeff = m_RadSim.m_VFList.getVFKoeff();
 
-    PatchRef patch1ref(m_RadSim.m_Patches, i);
-    size_t dataOffset = m_RadSim.m_VFList.getPatchOffsets()[i];
+    // Calculate bounces
+    for (int bounce = 1; bounce <= m_iBounceCount; bounce++) {
+        appfw::span<glm::vec3> prevBounce =
+            appfw::span(m_PatchBounce).subspan(m_uPatchCount * (bounce - 1), m_uPatchCount);
+        appfw::span<glm::vec3> curBounce =
+            appfw::span(m_PatchBounce).subspan(m_uPatchCount * bounce, m_uPatchCount);
 
-    glm::vec3 patch1ReflArea = m_PatchReflArea[i];
+        for (PatchIndex patch1 = 0; patch1 < m_uPatchCount; patch1++) {
+            PatchRef patch1ref(m_RadSim.m_Patches, patch1);
+            size_t dataOffset = m_RadSim.m_VFList.getPatchOffsets()[patch1];
 
-    m_RadSim.forEachVisiblePatch(i, [&](PatchRef patch2ref) {
-        PatchIndex patch2 = patch2ref.index();
-        float vf = vfdata[dataOffset];
+            m_RadSim.forEachVisiblePatch(patch1, [&](PatchRef patch2ref) {
+                PatchIndex patch2 = patch2ref.index();
+                float vf = vfdata[dataOffset];
 
-        AFW_ASSERT(!isnan(vf) && !isinf(vf));
-        AFW_ASSERT(!isnan(vfkoeff[i]) && !isinf(vfkoeff[i]));
-        AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
+                AFW_ASSERT(!isnan(vf) && !isinf(vf));
+                AFW_ASSERT(!isnan(vfkoeff[patch1]) && !isinf(vfkoeff[patch1]));
+                AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
 
-        if constexpr (!secondPass) {
-            // Take light from i to patch2
-            m_PatchSum[patch2] +=
-                getPatchBounce(i, bounce - 1) * patch1ReflArea * (vf * vfkoeff[i]);
-        } else {
-            // Take light from patch2 to i
-            glm::vec3 patch2ReflArea = m_PatchReflArea[patch2];
-            m_PatchSum[i] +=
-                getPatchBounce(patch2, bounce - 1) * patch2ReflArea * (vf * vfkoeff[patch2]);
+                curBounce[patch1] +=
+                    (vf * vfkoeff[patch2] * patch2ref.getSize() * patch2ref.getSize()) *
+                    prevBounce[patch2] * patch2ref.getReflectivity();
+
+                curBounce[patch2] +=
+                    (vf * vfkoeff[patch1] * patch1ref.getSize() * patch1ref.getSize()) *
+                    prevBounce[patch1] * patch1ref.getReflectivity();
+
+                AFW_ASSERT(curBounce[patch1].r >= 0 && curBounce[patch1].g >= 0 &&
+                           curBounce[patch1].b >= 0);
+                AFW_ASSERT(curBounce[patch2].r >= 0 && curBounce[patch2].g >= 0 &&
+                           curBounce[patch2].b >= 0);
+
+                dataOffset++;
+            });
         }
+    }
+}
 
-        AFW_ASSERT(m_PatchSum[i].r >= 0 && m_PatchSum[i].g >= 0 && m_PatchSum[i].b >= 0);
-        AFW_ASSERT(m_PatchSum[patch2].r >= 0 && m_PatchSum[patch2].g >= 0 &&
-                   m_PatchSum[patch2].b >= 0);
+void rad::Bouncer::calcTotalLight() {
+    // Calculate radiosity result
+    for (int bounce = 0; bounce <= m_iBounceCount; bounce++) {
+        for (PatchIndex i = 0; i < m_uPatchCount; i++) {
+            m_TotalPatchLight[i] += getPatchBounce(i, bounce);
+        }
+    }
 
-        dataOffset++;
-    });
+    // Add texlights
+    for (PatchIndex i = 0; i < m_uPatchCount; i++) {
+        // TODO: May want to scale the intensity so it doesn't oversaturate
+        m_TotalPatchLight[i] += m_Texlights[i];
+    }
+}
+
+void rad::Bouncer::assignLightStyles() {
+    // Assign lightstyles to faces
+    auto &faces = m_RadSim.m_Faces;
+
+    for (size_t faceIdx = 0; faceIdx < faces.size(); faceIdx++) {
+        Face &face = faces[faceIdx];
+        PatchIndex endPatch = face.iFirstPatch + face.iNumPatches;
+        int lightstyleIdx = -1; // Index into face.nStyles
+
+        for (PatchIndex i = face.iFirstPatch; i < endPatch; i++) {
+            float intensity = glm::dot(m_TotalPatchLight[i], RGB_INTENSITY);
+
+            if (intensity < m_flLinearThreshold) {
+                // Patch is too dim
+                continue;
+            }
+
+            // Find a valid lightstyle slot
+            if (lightstyleIdx == -1) {
+                for (int j = 0; j < bsp::NUM_LIGHTSTYLES; j++) {
+                    if (face.nStyles[j] == 255 || face.nStyles[j] == m_iLightstyle) {
+                        face.nStyles[j] = (uint8_t)m_iLightstyle;
+                        lightstyleIdx = j;
+                        break;
+                    }
+                }
+
+                if (lightstyleIdx == -1) {
+                    printe("Face #{}: too many lightstyles.", faceIdx);
+                    break;
+                }
+            }
+
+            // Save into the patch for sampling
+            PatchRef patch(m_RadSim.m_Patches, i);
+            AFW_ASSERT(isNullVector(patch.getFinalColor().color[lightstyleIdx]));
+            patch.getFinalColor().color[lightstyleIdx] = m_TotalPatchLight[i];
+        }
+    }
 }

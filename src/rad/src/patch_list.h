@@ -10,6 +10,10 @@ namespace rad {
 
 class PatchRef;
 
+struct PatchFinalColor {
+    glm::vec3 color[bsp::NUM_LIGHTSTYLES];
+};
+
 class PatchList {
 public:
     struct Iterator {
@@ -88,7 +92,7 @@ private:
     std::vector<glm::vec3> m_vNormal;
     std::vector<const Plane *> m_pPlane;
     std::vector<glm::vec3> m_Reflectivity;
-    std::vector<glm::vec3> m_FinalColor;
+    std::vector<PatchFinalColor> m_FinalColor;
 
     friend class PatchRef;
 };
@@ -135,7 +139,7 @@ public:
     /**
      * Final color of the patch.
      */
-    inline glm::vec3 &getFinalColor() { return m_List.m_FinalColor[m_iIndex]; }
+    inline PatchFinalColor &getFinalColor() { return m_List.m_FinalColor[m_iIndex]; }
 
     inline PatchRef &operator++() {
         ++m_iIndex;

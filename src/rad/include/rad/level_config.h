@@ -9,7 +9,7 @@ namespace rad {
 
 struct RadConfig;
 
-struct SunLight {
+struct SunLightConfig {
     float flPitch = 0;
     float flYaw = 0;
     glm::vec3 vColor = glm::vec3(0, 0, 0); //!< Color in gamma space
@@ -17,9 +17,9 @@ struct SunLight {
     bool bIsSet = false;
 };
 
-struct SkyLight {
+struct SkyLightConfig {
     glm::vec3 vColor = glm::vec3(-1, -1, -1); //!< Color in gamma space
-    float flBrightnessMul = 0; //!< Brightness multiplier relative to sun brightness
+    float flBrightnessMul = -1; //!< Brightness multiplier relative to sun brightness
 };
 
 struct LevelConfig {
@@ -33,10 +33,10 @@ struct LevelConfig {
     float flRefl = 0;
 
     //! Direct sunlight.
-    SunLight sunLight;
+    SunLightConfig sunLight;
 
     //! Diffuse skylight
-    SkyLight skyLight;
+    SkyLightConfig skyLight;
 
     //! Loads the default config.
     void loadDefaults(const RadConfig &cfg);

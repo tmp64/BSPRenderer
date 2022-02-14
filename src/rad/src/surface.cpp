@@ -239,4 +239,7 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace, int faceIn
     flPatchSize = (float)radSim.m_Profile.iBasePatchSize / props.flLightmapScale;
     flLightmapScale = props.flLightmapScale;
     flBaseReflectivity = props.flReflectivity;
+
+    // Reset lightstyles
+    std::fill(std::begin(nStyles), std::end(nStyles), uint8_t(255));
 }
