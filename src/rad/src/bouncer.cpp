@@ -7,8 +7,10 @@ rad::Bouncer::Bouncer(RadSimImpl &radSim)
     : m_RadSim(radSim) {
     m_flLinearThreshold = radSim.gammaToLinear(GAMMA_INTENSITY_THRESHOLD);
     m_uPatchCount = radSim.m_Patches.size();
+    m_uWorkerCount = m_RadSim.m_Executor.num_workers();
     m_Texlights.resize(m_uPatchCount);
     m_TotalPatchLight.resize(m_uPatchCount);
+    m_WorkerData.resize(m_uPatchCount * m_uWorkerCount);
 }
 
 void rad::Bouncer::setup(int lightstyle, int bounceCount) {
@@ -30,16 +32,14 @@ void rad::Bouncer::addSunLight() {
         return;
     }
 
-    PatchIndex patchCount = m_RadSim.m_Patches.size();
-
-    for (PatchIndex patchIdx = 0; patchIdx < patchCount; patchIdx++) {
+    auto fnProcessPatch = [&](PatchIndex patchIdx) {
         PatchRef patch(m_RadSim.m_Patches, patchIdx);
 
         // Check if patch can be hit by the sky
         float cosangle = glm::dot(patch.getNormal(), vSunDir);
 
         if (cosangle < 0.0001f) {
-            continue;
+            return;
         }
 
         // Cast a ray to the sky and check if it hits
@@ -50,7 +50,12 @@ void rad::Bouncer::addSunLight() {
             // Hit the sky, add the sun color
             getPatchBounce(patchIdx, 0) += vSunLight * cosangle;
         }
-    }
+    };
+
+    tf::Taskflow taskflow;
+    tf::Task bounceTask = taskflow.for_each_index_dynamic(
+        PatchIndex(0), m_uPatchCount, PatchIndex(1), fnProcessPatch, PatchIndex(128));
+    m_RadSim.m_Executor.run(taskflow).wait();
 }
 
 void rad::Bouncer::addSkyLight() {
@@ -61,9 +66,7 @@ void rad::Bouncer::addSkyLight() {
         return;
     }
 
-    PatchIndex patchCount = m_RadSim.m_Patches.size();
-
-    for (PatchIndex patchIdx = 0; patchIdx < patchCount; patchIdx++) {
+    auto fnProcessPatch = [&](PatchIndex patchIdx) {
         PatchRef patch(m_RadSim.m_Patches, patchIdx);
 
         float intensity = 0;
@@ -96,7 +99,12 @@ void rad::Bouncer::addSkyLight() {
             intensity /= sum;
             getPatchBounce(patchIdx, 0) += vSkyLight * intensity;
         }
-    }
+    };
+
+    tf::Taskflow taskflow;
+    tf::Task bounceTask = taskflow.for_each_index_dynamic(
+        PatchIndex(0), m_uPatchCount, PatchIndex(1), fnProcessPatch, PatchIndex(128));
+    m_RadSim.m_Executor.run(taskflow).wait();
 }
 
 void rad::Bouncer::addEntLight(const EntLight &el) {
@@ -190,25 +198,55 @@ void rad::Bouncer::radiateTexLights() {
     auto &vfkoeff = m_RadSim.m_VFList.getVFKoeff();
     appfw::span<glm::vec3> initialLight = appfw::span(m_PatchBounce).subspan(0, m_uPatchCount);
 
-    for (PatchIndex patch1 = 0; patch1 < m_uPatchCount; patch1++) {
+    auto fnProcessPatch = [&](PatchIndex patch1) {
+        int worker = m_RadSim.m_Executor.this_worker_id();
         PatchRef patch1ref(m_RadSim.m_Patches, patch1);
         size_t dataOffset = m_RadSim.m_VFList.getPatchOffsets()[patch1];
+        appfw::span<glm::vec3> workerData =
+            appfw::span(m_WorkerData).subspan(m_uPatchCount * worker, m_uPatchCount);
 
         m_RadSim.forEachVisiblePatch(patch1, [&](PatchRef patch2ref) {
             PatchIndex patch2 = patch2ref.index();
             float vf = vfdata[dataOffset];
 
-            initialLight[patch1] +=
+            workerData[patch1] +=
                 (vf * vfkoeff[patch2] * patch2ref.getSize() * patch2ref.getSize()) *
                 m_Texlights[patch2];
 
-            initialLight[patch2] +=
+            workerData[patch2] +=
                 (vf * vfkoeff[patch1] * patch1ref.getSize() * patch1ref.getSize()) *
                 m_Texlights[patch1];
 
             dataOffset++;
         });
-    }
+    };
+
+    auto fnSumWorkers = [&](PatchIndex patchIdx) {
+        glm::vec3 sum = glm::vec3(0, 0, 0);
+
+        for (size_t i = 0; i < m_uWorkerCount; i++) {
+            sum += getWorkerData(patchIdx, i);
+        }
+
+        initialLight[patchIdx] += sum;
+    };
+
+    auto fnClearWorkers = [&](size_t idx) {
+        m_WorkerData[idx] = glm::vec3(0, 0, 0);
+    };
+
+    tf::Taskflow taskflow;
+    tf::Task bounceTask = taskflow.for_each_index_dynamic(
+        PatchIndex(0), m_uPatchCount, PatchIndex(1), fnProcessPatch, PatchIndex(128));
+    tf::Task sumTask =
+        taskflow.for_each_index(PatchIndex(0), m_uPatchCount, PatchIndex(1), fnSumWorkers);
+    tf::Task clearWorkersTask =
+        taskflow.for_each_index(size_t(0), m_WorkerData.size(), size_t(1), fnClearWorkers);
+
+    sumTask.succeed(bounceTask);
+    clearWorkersTask.succeed(sumTask);
+
+    m_RadSim.m_Executor.run(taskflow).wait();
 }
 
 void rad::Bouncer::bounceLight() {
@@ -222,9 +260,12 @@ void rad::Bouncer::bounceLight() {
         appfw::span<glm::vec3> curBounce =
             appfw::span(m_PatchBounce).subspan(m_uPatchCount * bounce, m_uPatchCount);
 
-        for (PatchIndex patch1 = 0; patch1 < m_uPatchCount; patch1++) {
+        auto fnProcessPatch = [&](PatchIndex patch1) {
+            int worker = m_RadSim.m_Executor.this_worker_id();
             PatchRef patch1ref(m_RadSim.m_Patches, patch1);
             size_t dataOffset = m_RadSim.m_VFList.getPatchOffsets()[patch1];
+            appfw::span<glm::vec3> workerData =
+                appfw::span(m_WorkerData).subspan(m_uPatchCount * worker, m_uPatchCount);
 
             m_RadSim.forEachVisiblePatch(patch1, [&](PatchRef patch2ref) {
                 PatchIndex patch2 = patch2ref.index();
@@ -234,22 +275,49 @@ void rad::Bouncer::bounceLight() {
                 AFW_ASSERT(!isnan(vfkoeff[patch1]) && !isinf(vfkoeff[patch1]));
                 AFW_ASSERT(!isnan(vfkoeff[patch2]) && !isinf(vfkoeff[patch2]));
 
-                curBounce[patch1] +=
+                workerData[patch1] +=
                     (vf * vfkoeff[patch2] * patch2ref.getSize() * patch2ref.getSize()) *
                     prevBounce[patch2] * patch2ref.getReflectivity();
 
-                curBounce[patch2] +=
+                workerData[patch2] +=
                     (vf * vfkoeff[patch1] * patch1ref.getSize() * patch1ref.getSize()) *
                     prevBounce[patch1] * patch1ref.getReflectivity();
 
-                AFW_ASSERT(curBounce[patch1].r >= 0 && curBounce[patch1].g >= 0 &&
-                           curBounce[patch1].b >= 0);
-                AFW_ASSERT(curBounce[patch2].r >= 0 && curBounce[patch2].g >= 0 &&
-                           curBounce[patch2].b >= 0);
+                AFW_ASSERT(workerData[patch1].r >= 0 && workerData[patch1].g >= 0 &&
+                           workerData[patch1].b >= 0);
+                AFW_ASSERT(workerData[patch2].r >= 0 && workerData[patch2].g >= 0 &&
+                           workerData[patch2].b >= 0);
 
                 dataOffset++;
             });
-        }
+        };
+
+        auto fnSumWorkers = [&](PatchIndex patchIdx) {
+            glm::vec3 sum = glm::vec3(0, 0, 0);
+
+            for (size_t i = 0; i < m_uWorkerCount; i++) {
+                sum += getWorkerData(patchIdx, i);
+            }
+
+            curBounce[patchIdx] = sum;
+        };
+
+        auto fnClearWorkers = [&](size_t idx) {
+            m_WorkerData[idx] = glm::vec3(0, 0, 0);
+        };
+
+        tf::Taskflow taskflow;
+        tf::Task bounceTask = taskflow.for_each_index_dynamic(
+            PatchIndex(0), m_uPatchCount, PatchIndex(1), fnProcessPatch, PatchIndex(128));
+        tf::Task sumTask =
+            taskflow.for_each_index(PatchIndex(0), m_uPatchCount, PatchIndex(1), fnSumWorkers);
+        tf::Task clearWorkersTask =
+            taskflow.for_each_index(size_t(0), m_WorkerData.size(), size_t(1), fnClearWorkers);
+
+        sumTask.succeed(bounceTask);
+        clearWorkersTask.succeed(sumTask);
+
+        m_RadSim.m_Executor.run(taskflow).wait();
     }
 }
 
