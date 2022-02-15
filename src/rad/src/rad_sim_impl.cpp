@@ -536,7 +536,16 @@ void rad::RadSimImpl::samplePatchReflectivity() {
             texScale.s = std::max(patchSize * glm::length(texInfo.vS), 1.0f);
             texScale.t = std::max(patchSize * glm::length(texInfo.vT), 1.0f);
 
-            patch.getReflectivity() *= material.sampleColor(texPos, texScale);
+            // A bit of gamma "correction" to increase the reflectivity
+            glm::vec3 texel = material.sampleColor(texPos, texScale);
+            float intensity = glm::dot(texel, RGB_INTENSITY);
+
+            if (intensity >= 0.0001f) {
+                float adjustedIntensity = std::pow(intensity, 1.0f / TEXTURE_GAMMA_ADJ);
+                texel *= adjustedIntensity / intensity;
+            }
+
+            patch.getReflectivity() *= texel;
         }
     };
 

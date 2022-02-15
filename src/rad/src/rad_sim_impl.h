@@ -26,6 +26,10 @@ namespace rad {
 //! qrad also interprets color values of entities in linear space.
 constexpr float ENT_LIGHT_GAMMA = 2.5f;
 
+//! Adjustment gamma when sampling reflectivity from textures.
+//! Applied to linear values. Increases low reflectivity values.
+constexpr float TEXTURE_GAMMA_ADJ = 1.3f;
+
 //! Maximum number of lightstyles. Engine limit.
 constexpr int MAX_LIGHTSTYLES = 255;
 
