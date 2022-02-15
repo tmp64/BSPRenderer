@@ -109,20 +109,31 @@ void rad::LightmapWriter::sampleLightmap(FaceLightmap &lm, size_t faceIdx, float
                 for (unsigned neighbourIdx : neighbours) {
                     Face &neighbour = m_RadSim.m_Faces[neighbourIdx];
 
-                    if (neighbourIdx != faceIdx && neighbour.hasLightmap() &&
-                        normalDir == !!neighbour.nPlaneSide) {
-                        glm::vec3 neighbourSamples[4] = {};
-                        glm::vec2 luxelPosHere = neighbour.worldToFace(luxelWorldPos);
-                        sampleFace(neighbour, luxelPosHere, radius, glm::vec2(filterk),
-                                   neighbourSamples, weightSum, true);
+                    if (neighbourIdx == faceIdx || !neighbour.hasLightmap()) {
+                        continue;
+                    }
 
-                        // Adjust lightstyles
-                        for (int i = 0; i < 4; i++) {
-                            int idx = neighbour.findLightstyle(face.nStyles[i]);
+                    if (normalDir != !!neighbour.nPlaneSide) {
+                        // Wrong side
+                        continue;
+                    }
 
-                            if (idx != -1) {
-                                output[i] += neighbourSamples[idx];
-                            }
+                    if (!isNullVector(neighbour.vLightColor)) {
+                        // Ignore texlights, they have insane color values
+                        continue;
+                    }
+
+                    glm::vec3 neighbourSamples[4] = {};
+                    glm::vec2 luxelPosHere = neighbour.worldToFace(luxelWorldPos);
+                    sampleFace(neighbour, luxelPosHere, radius, glm::vec2(filterk),
+                               neighbourSamples, weightSum, true);
+
+                    // Adjust lightstyles
+                    for (int i = 0; i < 4; i++) {
+                        int idx = neighbour.findLightstyle(face.nStyles[i]);
+
+                        if (idx != -1) {
+                            output[i] += neighbourSamples[idx];
                         }
                     }
                 }
