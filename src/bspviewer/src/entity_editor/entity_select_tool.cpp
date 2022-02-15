@@ -62,12 +62,10 @@ void EntitySelectTool::onMainViewClicked(const glm::vec2 &position) {
     EntityRaycastHit hit;
 
     if (drawEntities) {
-        Vis::get().raycastToEntity(ray, hit);
+        Vis::get().raycastToEntity(ray, hit, !mainView.showTriggers());
     }
 
     if (hit.entity != -1) {
-        printw("Hit {} - {}", hit.entity,
-               WorldState::get()->getEntList()[hit.entity]->getClassName());
         setSelection(hit.entity);
     }
 }

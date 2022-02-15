@@ -4,6 +4,7 @@
 
 class TriggerEntity : public BaseEntity {
 public:
+    void spawn() override;
     void onKeyValuesUpdated() override;
 };
 

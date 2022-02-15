@@ -109,6 +109,10 @@ void BaseEntity::updateSpawnFlags(unsigned flags) {
     m_uSpawnFlags = flags;
 }
 
+void BaseEntity::setIsTrigger(bool isTrigger) {
+    m_bIsTrigger = isTrigger;
+}
+
 void BaseEntity::setUseAABB(bool state) {
     m_bUseAABB = state;
     updateAABB();

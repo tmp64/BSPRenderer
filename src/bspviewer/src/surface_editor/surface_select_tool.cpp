@@ -66,11 +66,11 @@ void SurfaceSelectTool::onMainViewClicked(const glm::vec2 &position) {
     SurfaceRaycastHit hit;
 
     if (drawWorld && drawEntities) {
-        Vis::get().raycastToSurface(ray, hit);
+        Vis::get().raycastToSurface(ray, hit, !mainView.showTriggers());
     } else if (drawWorld) {
         Vis::get().raycastToWorldSurface(ray, hit);
     } else if (drawEntities) {
-        Vis::get().raycastToEntitySurface(ray, hit);
+        Vis::get().raycastToEntitySurface(ray, hit, !mainView.showTriggers());
     }
 
     if (hit.surface != -1) {

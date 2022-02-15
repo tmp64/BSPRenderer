@@ -42,7 +42,8 @@ public:
     //! Casts a ray to a world or entity surface.
     //! @param  hit     The closest surface hit
     //! @returns whether hit something or not
-    bool raycastToSurface(const Ray &ray, SurfaceRaycastHit &hit, float maxDist = MAX_RAYCAST_DIST);
+    bool raycastToSurface(const Ray &ray, SurfaceRaycastHit &hit, bool ignoreTriggers,
+                          float maxDist = MAX_RAYCAST_DIST);
 
     //! Casts a ray to a world surface.
     //! @param  hit     The closest surface hit
@@ -53,13 +54,14 @@ public:
     //! Casts a ray to a brush entity surface.
     //! @param  hit     The closest surface hit
     //! @returns whether hit something or not
-    bool raycastToEntitySurface(const Ray &ray, SurfaceRaycastHit &hit,
+    bool raycastToEntitySurface(const Ray &ray, SurfaceRaycastHit &hit, bool ignoreTriggers,
                                 float maxDist = MAX_RAYCAST_DIST);
 
     //! Casts a ray to an entity.
     //! @param  hit     The closest entity hit
     //! @returns whether hit something or not
-    bool raycastToEntity(const Ray &ray, EntityRaycastHit &hit, float maxDist = MAX_RAYCAST_DIST);
+    bool raycastToEntity(const Ray &ray, EntityRaycastHit &hit, bool ignoreTriggers,
+                         float maxDist = MAX_RAYCAST_DIST);
 
     //! Casts a ray to an AABB.
     //! @param  ray         The ray

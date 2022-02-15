@@ -22,6 +22,9 @@ public:
     //! @returns whether entities are rendered
     bool isEntityRenderingEnabled();
 
+    //! @returns whether to show trigger brushes.
+    bool showTriggers();
+
     //! @returns direction of ray cast from the view origin into a screen pixel.
     //! @param  pos     Screen position in pixels, origin - top left corner.
     Ray screenPointToRay(const glm::vec2 &pos);

@@ -139,7 +139,8 @@ bool Vis::rayIntersectsWithSurface(const Ray &ray, int surfIdx, SurfaceRaycastHi
     return true;
 }
 
-bool Vis::raycastToSurface(const Ray &ray, SurfaceRaycastHit &hit, float maxDist) {
+bool Vis::raycastToSurface(const Ray &ray, SurfaceRaycastHit &hit, bool ignoreTriggers,
+                           float maxDist) {
     hit = SurfaceRaycastHit();
     hit.distance = maxDist;
 
@@ -149,7 +150,7 @@ bool Vis::raycastToSurface(const Ray &ray, SurfaceRaycastHit &hit, float maxDist
     }
 
     // Entities are not rendered behind the world so raycast can't go further than the world
-    if (raycastToEntitySurface(ray, entHit, worldHit.distance)) {
+    if (raycastToEntitySurface(ray, entHit, ignoreTriggers, worldHit.distance)) {
         hit = entHit;
     }
 
@@ -178,13 +179,18 @@ bool Vis::raycastToWorldSurface(const Ray &ray, SurfaceRaycastHit &hit, float ma
     return hit.surface != -1;
 }
 
-bool Vis::raycastToEntitySurface(const Ray &inputRay, SurfaceRaycastHit &hit, float maxDist) {
+bool Vis::raycastToEntitySurface(const Ray &inputRay, SurfaceRaycastHit &hit, bool ignoreTriggers,
+                                 float maxDist) {
     hit = SurfaceRaycastHit();
     hit.distance = maxDist;
     auto &ents = WorldState::get()->getEntList();
 
     for (size_t i = 0; i < ents.size(); i++) {
         BaseEntity *pEnt = ents[i].get();
+
+        if (ignoreTriggers && pEnt->isTrigger()) {
+            continue;
+        }
 
         if (pEnt->getModel() && pEnt->getModel()->getType() == ModelType::Brush) {
             BrushModel &model = static_cast<BrushModel &>(*pEnt->getModel());
@@ -208,13 +214,18 @@ bool Vis::raycastToEntitySurface(const Ray &inputRay, SurfaceRaycastHit &hit, fl
     return hit.entIndex != -1;
 }
 
-bool Vis::raycastToEntity(const Ray &inputRay, EntityRaycastHit &hit, float maxDist) {
+bool Vis::raycastToEntity(const Ray &inputRay, EntityRaycastHit &hit, bool ignoreTriggers,
+                          float maxDist) {
     hit = EntityRaycastHit();
     hit.distance = maxDist;
     auto &ents = WorldState::get()->getEntList();
 
     for (size_t i = 0; i < ents.size(); i++) {
         BaseEntity *pEnt = ents[i].get();
+
+        if (ignoreTriggers && pEnt->isTrigger()) {
+            continue;
+        }
 
         if (pEnt->useAABB()) {
             glm::vec3 mins = pEnt->getOrigin() + pEnt->getAABBPos() - pEnt->getAABBHalfExtents();

@@ -13,6 +13,7 @@ extern ConVar<bool> r_drawents;
 static ConVar<float> m_sens("m_sens", 0.15f, "Mouse sensitivity (degrees/pixel)");
 static ConVar<float> cam_speed("cam_speed", 1000.f, "Camera speed");
 static ConfigItem<float> v_fov("main_view_fov", 110.f, "Horizontal field of view");
+static ConfigItem<bool> v_show_triggers("main_view_show_triggers", true, "Show triggers");
 static KeyBind grabToggleBind("Toggle main view mouse grab", KeyCode::Z);
 
 static ConCommand cmd_getpos("getpos", "", [](const CmdString &) {
@@ -178,6 +179,10 @@ bool MainViewRenderer::isEntityRenderingEnabled() {
     return r_drawents.getValue();
 }
 
+bool MainViewRenderer::showTriggers() {
+    return v_show_triggers.getValue();
+}
+
 void MainViewRenderer::setSurfaceTint(int surface, glm::vec4 color) {
     AFW_ASSERT(WorldState::get());
     m_SceneRenderer.setSurfaceTint(surface, color);
@@ -213,6 +218,13 @@ void MainViewRenderer::tick() {
             v_fov.setValue(fov);
         }
         ImGui::PopItemWidth();
+
+        // Show triggers checkbox
+        bool bShowTriggers = showTriggers();
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Show triggers", &bShowTriggers)) {
+            v_show_triggers.setValue(bShowTriggers);
+        }
 
         if (WorldState::get()) {
             bool isGrabbed = InputSystem::get().isInputGrabbed();
@@ -362,6 +374,10 @@ void MainViewRenderer::updateVisibleEnts() {
 
     for (size_t i = 0; i < ents.size(); i++) {
         BaseEntity *pEnt = ents[i].get();
+
+        if (pEnt->isTrigger() && !showTriggers()) {
+            continue;
+        }
 
         if (pEnt->useAABB()) {
             // Draw a box for this entity

@@ -42,6 +42,12 @@ public:
     inline void setSpawnFlag(unsigned flag) { updateSpawnFlags(m_uSpawnFlags | flag); }
     inline void clearSpawnFlag(unsigned flag) { updateSpawnFlags(m_uSpawnFlags & (~flag)); }
 
+    //! @returns whether the entity is a trigger brush entity.
+    inline bool isTrigger() { return m_bIsTrigger; }
+    
+    //! Sets whether the entity is a trigger.
+    virtual void setIsTrigger(bool isTrigger);
+
     //! Sets whether to use AABB for raycasting.
     virtual void setUseAABB(bool state);
 
@@ -113,6 +119,7 @@ private:
     int m_iEntIndex = 0;
     bsp::EntityKeyValues *m_pLevelKeyValues = nullptr;
     unsigned m_uSpawnFlags = 0;
+    bool m_bIsTrigger = false;
 
     // Base bounding box (without rotation)
     glm::vec3 m_BaseAABBPos = glm::vec3(0, 0, 0);
