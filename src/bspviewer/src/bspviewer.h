@@ -69,6 +69,7 @@ private:
 
     void showModeSelection();
     void showToolSelection();
+    void handleSwitchModesKey();
     void showInspector();
 
     static inline BSPViewer *m_sSingleton = nullptr;

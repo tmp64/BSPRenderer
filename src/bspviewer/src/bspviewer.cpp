@@ -25,6 +25,8 @@ static ConfigItem<bool> cfg_window_gpu("windows_gpu", false, "Window: GPU Stats"
 static ConfigItem<bool> cfg_window_mat("windows_mat", false, "Window: Material Stats",
                                        [](const bool &val) { mat_ui.setValue(val); });
 
+KeyBind key_switch_modes("Switch modes", KeyCode::F);
+
 static bool CfgMenuItem(const char *text, ConfigItem<bool> &cfg) {
     bool val = cfg.getValue();
 
@@ -90,6 +92,7 @@ void BSPViewer::tick() {
     ImGui::ShowDemoWindow();
     showModeSelection();
     showToolSelection();
+    handleSwitchModesKey();
     MainViewRenderer::get().tick();
     showInspector();
 
@@ -262,6 +265,23 @@ void BSPViewer::showToolSelection() {
     }
 
     ImGui::End();
+}
+
+void BSPViewer::handleSwitchModesKey() {
+    if (key_switch_modes.isPressed()) {
+        // Find current mode
+        size_t curMode = 0;
+        for (size_t i = 0; i < m_EditorModes.size(); i++) {
+            if (m_pActiveMode == m_EditorModes[i]) {
+                curMode = i;
+                break;
+            }
+        }
+
+        // Switch to the next one
+        size_t newMode = (curMode + 1) % m_EditorModes.size();
+        activateMode(m_EditorModes[newMode]);
+    }
 }
 
 void BSPViewer::showInspector() {
