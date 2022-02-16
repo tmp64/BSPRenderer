@@ -247,7 +247,7 @@ void rad::VFList::sumViewFactors() {
 }
 
 float rad::VFList::calcPatchViewfactor(PatchRef &patch1, PatchRef &patch2) {
-    glm::vec3 dir = patch2.getOrigin() - patch1.getOrigin();
+    glm::vec3 dir = patch2.getRealOrigin() - patch1.getRealOrigin();
     float dist = glm::length(dir);
 
     if (floatEquals(dist, 0)) {

@@ -51,6 +51,8 @@ struct Face : public bsp::BSPFace {
         glm::vec2 vFacePos;  //!< Position in face space.
     };
 
+    glm::vec3 vBrushOrigin = glm::vec3(0, 0, 0);
+
     //! Plane in which face is located.
     const Plane *pPlane = nullptr;
 

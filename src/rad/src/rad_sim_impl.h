@@ -70,6 +70,9 @@ public:
     std::vector<Material> m_Materials;
     std::vector<Plane> m_Planes;
     std::vector<Face> m_Faces;
+    std::vector<glm::vec3> m_FaceTranslations;
+    int m_iFirstBModelFace = 0;
+    int m_iLastBModelFace = 0;
 
     bsp::EntityKeyValuesDict m_Entities;
     LightStyle m_LightStyles[MAX_LIGHTSTYLES];
@@ -197,6 +200,9 @@ private:
     //! Loads planes from the BSP.
     void loadPlanes();
 
+    //! Loads brush models' origins into m_FaceTranslations
+    void preloadBrushModels();
+
     //! Loads faces from the BSP.
     void loadFaces();
 
@@ -207,6 +213,7 @@ private:
     void loadLevelEntities();
     void addLightEntity(bsp::EntityKeyValues &kv);
     void addEnvLightEntity(bsp::EntityKeyValues &kv);
+    void parseBrushModel(bsp::EntityKeyValues &kv, int model);
 
     void samplePatchReflectivity();
 

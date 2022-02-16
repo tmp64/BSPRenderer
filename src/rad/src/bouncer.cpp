@@ -43,7 +43,7 @@ void rad::Bouncer::addSunLight() {
         }
 
         // Cast a ray to the sky and check if it hits
-        glm::vec3 from = patch.getOrigin();
+        glm::vec3 from = patch.getRealOrigin();
         glm::vec3 to = from + (vSunDir * SKY_RAY_LENGTH);
 
         if (m_RadSim.m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
@@ -86,7 +86,7 @@ void rad::Bouncer::addSkyLight() {
             sum += cosangle;
 
             // Cast a ray to the sky and check if it hits
-            glm::vec3 from = patch.getOrigin();
+            glm::vec3 from = patch.getRealOrigin();
             glm::vec3 to = from + (anorm * SKY_RAY_LENGTH);
 
             if (m_RadSim.m_pLevel->traceLine(from, to) == bsp::CONTENTS_SKY) {
@@ -174,13 +174,13 @@ void rad::Bouncer::addPointLightToFace(Face &face, const EntLight &el) {
     for (PatchIndex patch = beginPatch; patch < endPatch; patch++) {
         PatchRef p(m_RadSim.m_Patches, patch);
 
-        if (m_RadSim.traceLine(el.vOrigin, p.getOrigin()) != bsp::CONTENTS_EMPTY) {
+        if (m_RadSim.traceLine(el.vOrigin, p.getRealOrigin()) != bsp::CONTENTS_EMPTY) {
             // No visibility
             continue;
         }
 
         // Calculate light
-        glm::vec3 delta = p.getOrigin() - el.vOrigin;
+        glm::vec3 delta = p.getRealOrigin() - el.vOrigin;
         float d2 = glm::length2(delta); // dist squared
         glm::vec3 dist = glm::vec3(1, std::sqrt(d2), d2);
 

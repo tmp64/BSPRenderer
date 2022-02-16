@@ -100,6 +100,9 @@ void rad::Face::load(RadSimImpl &radSim, const bsp::BSPFace &bspFace, int faceIn
     nLightmapOffset = bspFace.nLightmapOffset;
     memcpy(nStyles, bspFace.nStyles, sizeof(nStyles));
 
+    // Brush model origin
+    vBrushOrigin = radSim.m_FaceTranslations[faceIndex];
+
     // Face vars
     pPlane = &radSim.m_Planes.at(iPlane);
 

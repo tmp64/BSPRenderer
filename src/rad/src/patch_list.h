@@ -79,8 +79,8 @@ public:
             return sizeof(Type);
         };
 
-        return fn(m_flSize) + fn(m_vFaceOrigin) + fn(m_vOrigin) + fn(m_vNormal) + fn(m_pPlane) +
-               fn(m_Reflectivity) + fn(m_FinalColor);
+        return fn(m_flSize) + fn(m_vFaceOrigin) + fn(m_vOrigin) + fn(m_vRealOrigin) +
+               fn(m_vNormal) + fn(m_pPlane) + fn(m_Reflectivity) + fn(m_FinalColor);
     }
 
 private:
@@ -89,6 +89,7 @@ private:
     std::vector<float> m_flSize;
     std::vector<glm::vec2> m_vFaceOrigin;
     std::vector<glm::vec3> m_vOrigin;
+    std::vector<glm::vec3> m_vRealOrigin;
     std::vector<glm::vec3> m_vNormal;
     std::vector<const Plane *> m_pPlane;
     std::vector<glm::vec3> m_Reflectivity;
@@ -117,9 +118,15 @@ public:
     inline glm::vec2 &getFaceOrigin() { return m_List.m_vFaceOrigin[m_iIndex]; }
 
     /**
-     * Center point of the square in world-space.
+     * Center point of the square in world-space on the face.
      */
     inline glm::vec3 &getOrigin() { return m_List.m_vOrigin[m_iIndex]; }
+
+    /**
+     * Center point of the square in world-space, but may be translated away from face
+     * if it's a brush model.
+     */
+    inline glm::vec3 &getRealOrigin() { return m_List.m_vRealOrigin[m_iIndex]; }
 
     /**
      * Normal vector. Points away from front side.

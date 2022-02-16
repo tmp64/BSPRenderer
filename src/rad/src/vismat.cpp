@@ -171,10 +171,10 @@ void rad::VisMat::buildVisLeaves(size_t i) {
             buildVisRow(patchnum, pvs, bitpos, face_tested);
 
             // build to bmodel faces (to brush entities)
-            /*if (nummodels < 2)
-                continue;
-            for (int facenum2 = dmodels[1].firstface; facenum2 < numfaces; facenum2++)
-                TestPatchToFace(patchnum, facenum2, head, bitpos);*/
+            for (int brushFaceIdx = m_RadSim.m_iFirstBModelFace;
+                 brushFaceIdx < m_RadSim.m_iLastBModelFace; brushFaceIdx++) {
+                testPatchToFace(patchnum, brushFaceIdx, bitpos);
+            }
         }
     }
 
@@ -216,7 +216,7 @@ void rad::VisMat::testPatchToFace(PatchIndex patchnum, int facenum, size_t bitpo
     const auto &face = m_RadSim.m_Faces[facenum];
     PatchRef patch(m_RadSim.m_Patches, patchnum);
 
-    if (glm::dot(patch.getOrigin(), face.vNormal) - face.flPlaneDist < 0) {
+    if (glm::dot(patch.getRealOrigin(), face.vNormal) - face.flPlaneDist < 0) {
         // Patch behind the plane
         return;
     }
@@ -228,8 +228,8 @@ void rad::VisMat::testPatchToFace(PatchIndex patchnum, int facenum, size_t bitpo
         // check vis between patch and patch2
         // if bit has not already been set
         // and p2 is visible from p1
-        glm::vec3 org1 = patch.getOrigin();
-        glm::vec3 org2 = patch2.getOrigin();
+        glm::vec3 org1 = patch.getRealOrigin();
+        glm::vec3 org2 = patch2.getRealOrigin();
         if (m > patchnum && m_RadSim.traceLine(org1, org2) == bsp::CONTENTS_EMPTY) {
             // patchnum can see patch m
             size_t bitset = bitpos + m;

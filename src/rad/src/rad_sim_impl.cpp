@@ -53,6 +53,7 @@ void rad::RadSimImpl::setLevel(const bsp::Level *pLevel, const std::string &name
     loadWADs();
     loadMaterials();
     loadPlanes();
+    preloadBrushModels();
     loadFaces();
     createPatches(hash);
     loadLevelEntities();
@@ -284,6 +285,32 @@ void rad::RadSimImpl::loadPlanes() {
     }
 }
 
+void rad::RadSimImpl::preloadBrushModels() {
+    m_FaceTranslations.resize(m_pLevel->getFaces().size());
+
+    for (auto &ent : m_Entities) {
+        try {
+            // See if has brush model
+            int kvModel = ent.indexOf("model");
+            if (kvModel != -1) {
+                const std::string &model = ent.get(kvModel).asString();
+
+                if (model.length() >= 2 && model[0] == '*') {
+                    parseBrushModel(ent, std::stoi(model.substr(1)));
+                }
+            }
+        } catch (const std::exception &e) {
+            printe("Failed to parse model in an entity: {}", e.what());
+        }
+    }
+
+    auto &models = m_pLevel->getModels();
+    if (models.size() > 1) {
+        m_iFirstBModelFace = models[1].iFirstFace;
+        m_iLastBModelFace = (int)m_FaceTranslations.size();
+    }
+}
+
 void rad::RadSimImpl::loadFaces() {
     m_Faces.resize(m_pLevel->getFaces().size());
 
@@ -301,6 +328,7 @@ void rad::RadSimImpl::loadFaces() {
     }
 
     printi("{} faces have lightmaps", lightmapCount);
+    std::vector<glm::vec3>().swap(m_FaceTranslations);
 }
 
 void rad::RadSimImpl::createPatches(appfw::SHA256 &hash) {
@@ -355,9 +383,6 @@ void rad::RadSimImpl::createPatches(appfw::SHA256 &hash) {
 }
 
 void rad::RadSimImpl::loadLevelEntities() {
-    bool wasEnvLightSet = m_LevelConfig.sunLight.bIsSet;
-    bool isEnvLightFound = false;
-
     // Set initial bounce count for all lightstyles
     m_LightStyles[0].iBounceCount = m_Profile.iBounceCount;
     for (int i = 1; i < MAX_LIGHTSTYLES; i++) {
@@ -392,57 +417,6 @@ void rad::RadSimImpl::loadLevelEntities() {
             }
         } catch (const std::exception &e) {
             printe("Entity failed to parse: {}", e.what());
-        }
-
-        if (classname == "light") {
-
-        } else if (classname == "light_environment") {
-            if (!wasEnvLightSet) {
-                if (!m_LevelConfig.sunLight.bIsSet) {
-                    m_LevelConfig.sunLight.bIsSet = true;
-
-                    // Read color
-                    int color[4];
-                    const std::string &lightValue = ent.get("_light").asString();
-                    if (sscanf(lightValue.c_str(), "%d %d %d %d", &color[0], &color[1], &color[2],
-                               &color[3]) != 4) {
-                        throw std::runtime_error(
-                            fmt::format("light_environment _light = {} is invalid", lightValue));
-                    }
-
-                    m_LevelConfig.sunLight.vColor.r = color[0] / 255.f;
-                    m_LevelConfig.sunLight.vColor.g = color[1] / 255.f;
-                    m_LevelConfig.sunLight.vColor.b = color[2] / 255.f;
-
-                    // Light color is interpreted as linear value in qrad
-                    m_LevelConfig.sunLight.vColor = linearToGamma(m_LevelConfig.sunLight.vColor);
-
-                    m_LevelConfig.sunLight.flBrightness = color[3] / m_Config.flEnvLightDiv;
-
-                    // Read angle
-                    int anglesIdx = ent.indexOf("angles");
-                    if (anglesIdx != -1) {
-                        std::string angles = ent.get(anglesIdx).asString();
-                        int pitch, yaw, roll;
-                        if (sscanf(angles.c_str(), "%d %d %d", &pitch, &yaw, &roll) != 3) {
-                            throw std::runtime_error(
-                                fmt::format("light_environment angles = '{}' is invalid", angles));
-                        }
-
-                        m_LevelConfig.sunLight.flYaw = (float)yaw;
-                        m_LevelConfig.sunLight.flPitch = (float)pitch;
-                    } else {
-                        m_LevelConfig.sunLight.flYaw = ent.get("angle").asFloat();
-                        m_LevelConfig.sunLight.flPitch = ent.get("pitch").asFloat();
-                    }
-                }
-
-                if (isEnvLightFound) {
-                    printw("Level has multiple light_environment. Only first one is used.");
-                }
-
-                isEnvLightFound = true;
-            }
         }
     }
 
@@ -518,6 +492,19 @@ void rad::RadSimImpl::addEnvLightEntity(bsp::EntityKeyValues &kv) {
     m_SunLight.vDirection = getDirectionFromAngles(pitch, yaw);
 
     m_SkyLight.vLight = m_SunLight.vLight * m_Config.flSkyLightBrightness;
+}
+
+void rad::RadSimImpl::parseBrushModel(bsp::EntityKeyValues &kv, int modelIdx) {
+    int kvOrigin = kv.indexOf("origin");
+    if (kvOrigin != -1) {
+        // Translate all faces of the model
+        glm::vec3 origin = kv.get(kvOrigin).asFloat3();
+        const bsp::BSPModel &model = m_pLevel->getModels().at(modelIdx);
+        
+        for (int i = model.iFirstFace; i < model.iFirstFace + model.nFaces; i++) {
+            m_FaceTranslations[i] = origin;
+        }
+    }
 }
 
 void rad::RadSimImpl::samplePatchReflectivity() {
