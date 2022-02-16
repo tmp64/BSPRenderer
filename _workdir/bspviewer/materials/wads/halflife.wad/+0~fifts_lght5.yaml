@@ -1,6 +1,6 @@
 light_intensity_scale: 1
 light_color:
-  - 252.627914
-  - 227.050873
-  - 168.026932
-light_intensity: 10
+  - 255
+  - 212.329895
+  - 113.860466
+light_intensity: 8
