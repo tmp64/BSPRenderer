@@ -115,6 +115,7 @@ void BSPViewer::drawBackground() {
 }
 
 void BSPViewer::onWindowSizeChange(int wide, int tall) {
+    GuiAppBase::onWindowSizeChange(wide, tall);
     glViewport(0, 0, wide, tall);
 }
 

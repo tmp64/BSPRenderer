@@ -34,6 +34,10 @@ public:
     //! Sets autoclear color.
     inline void setAutoClearColor(glm::vec4 color) { m_vAutoClearColor = color; }
 
+    //! Takes a snapshot of the whole screen and saves it in assets:snapshots
+    //! Actual snapshot will be taken at the end of the frame, before SDL_GL_SwapWindow.
+    void takeSnapshot();
+
 protected:
     void lateInit() override;
     void beginTick() override;
@@ -77,8 +81,13 @@ private:
     bool m_bAutoClear = true;
     glm::vec4 m_vAutoClearColor = glm::vec4(0x0D / 255.0f, 0x27 / 255.0f, 0x40 / 255.0f, 1);
 
+    bool m_bPendingSnapshot = false;
+
     //! Fully processes the SDL event queue
     void pollEvents();
+
+    //! Saves the framebuffer into a file.
+    void saveSnapshot();
 };
 
 #endif
