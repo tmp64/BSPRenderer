@@ -15,7 +15,6 @@ WorldState::WorldState(LevelAssetRef level) {
 
     loadBrushModels();
     loadEntities();
-    optimizeBrushModels();
     m_Vis.setLevel(m_pLevel);
     m_MaterialLoader.init(BSPViewer::get().getMapName(), "assets:sound/materials.txt",
                           "assets:materials");
@@ -167,12 +166,6 @@ void WorldState::loadEntities() {
 
     if (fail > 0) {
         printw("{} entities failed to load", fail);
-    }
-}
-
-void WorldState::optimizeBrushModels() {
-    for (auto &i : m_BrushModels) {
-        MainViewRenderer::get().optimizeBrushModel(&i);
     }
 }
 

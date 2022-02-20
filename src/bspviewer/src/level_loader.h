@@ -23,7 +23,6 @@ private:
     enum class Status
     {
         Level,
-        Renderer,
         Finished
     };
 

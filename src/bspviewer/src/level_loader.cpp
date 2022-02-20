@@ -8,16 +8,7 @@ LevelLoader::LevelLoader(std::string_view path) {
     m_Future = AssetManager::get().loadLevel(path);
 }
 
-LevelLoader::~LevelLoader() {
-    if (m_Status == Status::Renderer) {
-        // Wait for renderer to finish loading
-        while (!MainViewRenderer::get().loadingTick()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(30));
-        }
-    } else {
-        // Asset manager will clean up itself
-    }
-}
+LevelLoader::~LevelLoader() {}
 
 bool LevelLoader::tick() {
     const char *action = "< text not set >";
@@ -30,10 +21,8 @@ bool LevelLoader::tick() {
             // BSP is loaded
             m_pLevel = m_Future.get();
             m_Future = LevelAssetFuture();
-
-            printi("Setting up the renderer...");
-            m_Status = Status::Renderer;
-            MainViewRenderer::get().loadLevel(m_pLevel);
+            m_Status = Status::Finished;
+            return true;
         } else {
             // Update progress status
             std::shared_ptr<LevelAsset::SharedState> state = m_Future.getState();
@@ -53,17 +42,6 @@ bool LevelLoader::tick() {
                 AFW_ASSERT(false);
             }
         }
-        break;
-    }
-    case Status::Renderer: {
-        action = "Setting up the renderer";
-        
-        if (MainViewRenderer::get().loadingTick()) {
-            // Finished
-            m_Status = Status::Finished;
-            return true;
-        }
-
         break;
     }
     }

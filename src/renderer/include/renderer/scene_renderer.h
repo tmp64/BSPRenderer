@@ -2,96 +2,145 @@
 #define RENDERER_SCENE_RENDERER_H
 #include <vector>
 #include <functional>
+#include <bsp/level.h>
 #include <app_base/texture_block.h>
 #include <graphics/raii.h>
-#include <graphics/texture2d.h>
-#include <graphics/texture2d_array.h>
-#include <graphics/texture_cube.h>
 #include <graphics/gpu_buffer.h>
 #include <graphics/render_buffer.h>
+#include <graphics/framebuffer.h>
+#include <graphics/texture2d.h>
 #include <material_system/material_system.h>
-#include <renderer/surface_renderer.h>
 #include <renderer/client_entity.h>
+
+//! Error for checking on which side of plane a point is.
+constexpr float BACKFACE_EPSILON = 0.01f;
+
+//! Maximum count of vertices a surface can have.
+constexpr int MAX_SIDE_VERTS = 512;
+
+constexpr int SURF_NOCULL = (1 << 0);    //!< Two-sided polygon (e.g. 'water4b')
+constexpr int SURF_PLANEBACK = (1 << 1); //!< Plane should be negated
+constexpr int SURF_DRAWSKY = (1 << 2);   //!< Sky surface
 
 class IRendererEngine;
 
-class SceneRenderer : appfw::NoCopy {
-public:
-    struct Shaders;
+class SceneRenderer : appfw::NoMove {
+private:
+    struct Surface; // Forward def for ViewContext
 
+public:
     static constexpr int GLOBAL_UNIFORM_BIND = 0;
 
-    enum TextureBinds
+    enum
     {
-        TEX_LIGHTMAP = Material::MAX_TEXTURES,
+        TEX_BRUSH_LIGHTMAP = Material::MAX_TEXTURES,
         TEX_LIGHTSTYLES,
+        TEX_MAX_COUNT
     };
 
-    SceneRenderer();
+    class ViewContext {
+    public:
+        enum class ProjType
+        {
+            None = 0,
+            Perspective,
+            Orthogonal,
+        };
+
+        enum class Cull
+        {
+            None = 0,
+            Front,
+            Back
+        };
+
+        //! Sets perspective projection.
+        //! @param   fov     Horizontal field of view
+        //! @param   aspect  Aspect ration of the screen (wide / tall)
+        //! @param   near    Near clipping plane
+        //! @param   far     Far clipping plane
+        void setPerspective(float fov, float aspect, float near, float far);
+
+        //! Sets position and angles of the perspective view.
+        //! @param   origin  Origin of view
+        //! @param   angles  Pitch, yaw and roll in degrees
+        void setPerspViewOrigin(const glm::vec3 &origin, const glm::vec3 &angles);
+
+        //! Returns culling mode.
+        inline Cull getCulling() const { return m_Cull; }
+
+        //! Sets which faces to cull.
+        inline void setCulling(Cull cull) { m_Cull = cull; }
+
+        //! Returns view position in the world.
+        inline const glm::vec3 &getViewOrigin() const { return m_vViewOrigin; }
+
+        //! Returns view forward direction
+        inline const glm::vec3 &getViewForward() const { return m_vForward; }
+
+        //! Returns projection matrix.
+        inline const glm::mat4 &getProjectionMatrix() const { return m_ProjMat; }
+
+        //! Returns view matrix.
+        inline const glm::mat4 &getViewMatrix() const { return m_ViewMat; }
+
+        //! Checks if an AABB is in view frustum.
+        //! @returns true if the box is culled and not drawn.
+        bool cullBox(glm::vec3 mins, glm::vec3 maxs) const;
+
+        //! Checks if a surface is in view and with correct side.
+        //! @returns true if the surface is culled and not drawn.
+        bool cullSurface(const Surface &surface) const;
+
+    private:
+        struct Plane {
+            glm::vec3 vNormal;
+            float fDist;
+            uint8_t signbits; // signx + (signy<<1) + (signz<<1)
+        };
+
+        ProjType m_Type = ProjType::None;
+        Cull m_Cull = Cull::Back;
+        glm::mat4 m_ProjMat;
+        glm::mat4 m_ViewMat;
+
+        glm::vec3 m_vForward, m_vRight, m_vUp; //!< View direction vectors
+
+        // Perspective options
+        glm::vec3 m_vViewOrigin = glm::vec3(0, 0, 0);
+        glm::vec3 m_vViewAngles = glm::vec3(0, 0, 0);
+        float m_flHorFov = 0;
+        float m_flVertFov = 0;
+        float m_flAspect = 0;
+        float m_flNearZ = 0;
+        float m_flFarZ = 0;
+
+        //! Frustum planes
+        //! 0 - left
+        //! 1 - right
+        //! 2 - bottom
+        //! 3 - top
+        //! 4 - near
+        //! 5 - far
+        Plane m_Frustum[6];
+
+        void setupFrustum();
+    };
+
+    SceneRenderer(bsp::Level &level, std::string_view path, IRendererEngine &engine);
     ~SceneRenderer();
-
-    struct RenderingStats {
-        //! Number of world polygons rendered
-        unsigned uRenderedWorldPolys = 0;
-
-        //! Number of sky polygons rendered
-        unsigned uRenderedSkyPolys = 0;
-
-        //! Number of brush entity polygons rendered
-        unsigned uRenderedBrushEntPolys = 0;
-
-        //! Number of draw calls issued (glDrawArrays, ...)
-        unsigned uDrawCallCount = 0;
-
-        //! Time of the last frame
-        double flFrameTime = 0;
-    };
-
-    //! Sets the engine.
-    inline void setEngine(IRendererEngine *engine) { m_pEngine = engine; }
-
-    //! Returns level set to the renderer.
-    inline const bsp::Level *getLevel() { return m_pLevel; }
-
-    //! Begins async level loading.
-    //! @param   level   Loaded bsp::Level
-    //! @param   path    Path to the .bsp file to load lightmap from (can be empty)
-    //! @param   tag     Tag of .bsp
-    void beginLoading(const bsp::Level *level, std::string_view path);
-
-    //! Creates an optimized model for a brush model for more effficient solid rendering.
-    void optimizeBrushModel(Model *model);
-
-    //! Unloads the level.
-    void unloadLevel();
-
-    //! Returns whether the level is loading.
-    bool isLoading() { return m_pLoadingState != nullptr; }
-
-    //! Should be called during loading from main thread.
-    //! @return  Whether loading has finished or not
-    bool loadingTick();
-
-    //! Sets perspective projection.
-    //! @param   fov     Horizontal field of view
-    //! @param   aspect  Aspect ration of the screen (wide / tall)
-    //! @param   near    Near clipping plane
-    //! @param   far     Far clipping plane
-    void setPerspective(float fov, float aspect, float near, float far);
-
-    //! Sets position and angles of the perspective view.
-    //! @param   origin  Origin of view
-    //! @param   angles  Pitch, yaw and roll in degrees
-    void setPerspViewOrigin(const glm::vec3 &origin, const glm::vec3 &angles);
 
     //! Sets size of the viewport.
     void setViewportSize(const glm::ivec2 &size);
 
-    //! Renders the image to the screen.
-    void renderScene(GLint targetFb, float flSimTime, float flTimeDelta);
+    //! @returns the view context.
+    inline ViewContext &getViewContext() { return m_ViewContext; }
 
-    //! Returns performance stats for last renderScene call.
-    inline const RenderingStats &getStats() const { return m_Stats; }
+    //! Renders the image to the framebuffer.
+    //! @param  targetFb    Framebuffer to draw to
+    //! @param  flSimTime   Current simulation time
+    //! @param  flTimeDelta Simulation time since last frame
+    void renderScene(GLint targetFb, float flSimTime, float flTimeDelta);
 
     //! Shows ImGui dialog with debug info.
     void showDebugDialog(const char *title, bool *isVisible = nullptr);
@@ -106,13 +155,9 @@ public:
     //! @returns the material used by the surface.
     Material *getSurfaceMaterial(int surface);
 
-    //! Reloads the custom lightmap file synchronously.
-    //! Can't be called during loading.
-    void reloadCustomLightmaps();
-
     //! Sets linear intensity scale of a lightstyle.
     inline void setLightstyleScale(int lightstyle, float scale) {
-        m_Data.flLightstyleScale[lightstyle] = scale;
+        m_flLightstyleScales[lightstyle] = scale;
     }
 
 #ifdef RENDERER_SUPPORT_TINTING
@@ -123,26 +168,14 @@ public:
 #endif
 
 private:
-    static constexpr int BSP_LIGHTMAP_DIVISOR = 16;
-    static constexpr int MAX_BSP_LIGHTMAP_BLOCK_SIZE = 2048;
-    static constexpr float BSP_LIGHTMAP_BLOCK_WASTED = 0.40f; //!< How much area is assumed to be wasted due to packing
-    static constexpr int BSP_LIGHTMAP_PADDING = 2;
-    static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
-    static constexpr int MAX_TRANS_SURFS_PER_MODEL = 512; //!< Maximum number of surfaces per transparent model
+    class ILightmap;
+    class FakeLightmap;
+    class BSPLightmap;
+    class CustomLightmap;
 
-    enum class LoadingStatus
-    {
-        NotLoading,
-        CreateSurfaces,       //!< Calls SurfaceRenderer::setLevel and fills m_Data.surfaces
-        AsyncTasks,           //!< Starts and waits for various tasks
-        CreateSurfaceObjects, //!< Creates VAOs and VBOs
-    };
-
-    enum class LightmapType
-    {
-        BSP = 0,
-        Custom = 1,
-    };
+    //! Maximum number of vertices. Limited by two byte vertex index in hte EBO,
+    //! (2^16 - 1) is reserved for primitive restart.
+    static constexpr uint16_t MAX_SURF_VERTEX_COUNT = std::numeric_limits<uint16_t>::max() - 1;
 
     struct SurfaceVertex {
         glm::vec3 position;
@@ -150,29 +183,25 @@ private:
         glm::vec2 texture;
     };
 
-    struct LightmapVertexData {
+    struct LightmapVertex {
         glm::ivec4 lightstyle;
         glm::vec2 texture;
     };
 
     struct Surface {
-        glm::vec3 m_Color;
-        GLsizei m_iVertexCount = 0;
-        Material *m_pMat = nullptr;
+        // Face info
+        const bsp::BSPPlane *plane = nullptr;
+        int flags = 0;
+        glm::vec3 vMins, vMaxs;
+        glm::vec3 vOrigin;                   //!< Middle point of the surface (average of vertices)
+        std::vector<glm::vec3> faceVertices; //!< World positions of vertices
+        Material *material = nullptr;
+        unsigned materialIdx = 0;
 
-        uint16_t m_nFirstVertex; //!< Index of first vertex in the vertex buffer
-
-        // BSP lightmap info
-        glm::vec2 m_vTextureMins = glm::vec2(0, 0);
-        glm::ivec2 m_BSPLMSize = glm::ivec2(0, 0);
-        glm::ivec2 m_BSPLMOffset = glm::ivec2(0, 0);
-
-        // Custom lightmap info
-        std::vector<LightmapVertexData> m_CustomVertData;
-    };
-
-    struct OptBrushModel {
-        std::vector<unsigned> surfs; //!< Contains surface indeces sorted by material
+        // Face info for rendering
+        glm::vec3 color;      //!< Unique color of the surface
+        int vertexOffset = 0; //!< Index of first vertex in the buffer
+        int vertexCount = 0;  //!< Number of vertices
     };
 
     struct GlobalUniform {
@@ -184,187 +213,126 @@ private:
         glm::ivec4 viParams1;      // x is texture type, y is lighting type
     };
 
-    struct LevelData {
-        fs::path customLightmapPath;
-        SurfaceRenderer::Context viewContext;
-        std::vector<Surface> surfaces;
-        bool bCustomLMLoaded = false;
-        
-        // Lightmaps
-        Texture2DArray bspLightmapBlockTex;
-        Texture2DArray customLightmapBlockTex;
-        GPUBuffer bspLightmapSurfData;
-        GPUBuffer customLightmapSurfData;
-        LightmapType lightmapType = LightmapType::Custom;
+    struct RenderingStats {
+        unsigned uWorldPolys = 0;
+        unsigned uSkyPolys = 0;
+        unsigned uBrushEntPolys = 0;
+        unsigned uDrawCalls = 0;
+        double flFrameTime = 0;
+    };
 
-        // Surface lighting
-        float flLightstyleScale[MAX_LIGHTSTYLES] = {};
+    bsp::Level &m_Level;
+    IRendererEngine &m_Engine;
+    fs::path m_CustomLightmapPath;
+    RenderingStats m_Stats;
 
-        // Brush geometry rendering
-        GLVao surfVao;
-        GPUBuffer surfVbo;
-        GPUBuffer surfEbo;
-        std::vector<uint16_t> surfEboData;
+    // Viewport
+    GLVao m_BlitQuadVao;
+    GPUBuffer m_BlitQuadVbo;
+    glm::ivec2 m_vViewportSize = glm::ivec2(0, 0);
+    glm::ivec2 m_vTargetViewportSize = glm::ivec2(800, 600);
+    Texture2D m_HdrColorbuffer;
+    RenderBuffer m_HdrDepthbuffer;
+    Framebuffer m_HdrBackbuffer;
+    
+    // Shared rendering stuff
+    GlobalUniform m_GlobalUniform;
+    GPUBuffer m_GlobalUniformBuffer;
+    unsigned m_uFrameCount = 0;
 
-        // Brush entity rendering
-        std::vector<OptBrushModel> optBrushModels;
+    // Brush rendering
+    std::unordered_map<Material *, unsigned> m_MaterialIndexes; //!< Maps materials to their unique indexes.
+    unsigned m_uNextMaterialIndex = 0;
+    std::vector<Surface> m_Surfaces;         //!< BSP surfaces
+    GPUBuffer m_SurfaceVertexBuffer;         //!< Surface vertices
+    unsigned m_uSurfaceVertexBufferSize = 0; //!< Number of brush vertices
+    unsigned m_uMaxEboSize = 0;              //!< Maximum number of elelements in the EBO
+    GLVao m_SurfaceVao;
 
 #ifdef RENDERER_SUPPORT_TINTING
-        // Tinting
-        GPUBuffer surfTintBuf;
+    GPUBuffer m_SurfaceTintBuffer;
 #endif
 
-        // Patches
-        uint32_t patchesVerts = 0;
-        GLVao patchesVao;
-        GPUBuffer patchesVbo;
-    };
+    std::unique_ptr<FakeLightmap> m_pFakeLightmap;
+    std::unique_ptr<BSPLightmap> m_pBSPLightmap;
+    std::unique_ptr<CustomLightmap> m_pCustomLightmap;
+    ILightmap *m_pCurrentLightmap = nullptr;
 
-    struct LoadingState {
-        // CreateSurfaces
-        std::future<void> createSurfacesResult;
-
-        // Async tasks
-        std::future<void> loadBSPLightmapsResult;
-        std::future<void> loadCustomLightmapsResult;
-        bool loadBSPLightmapsFinished = false;
-        bool loadCustomLightmapsFinished = false;
-
-        // Lightmaps
-        std::vector<glm::u8vec3> bspLightmapBlock;
-        int iBspLightmapSize = 0;
-        std::vector<glm::vec3> customLightmapTex;
-        std::vector<glm::vec3> patchBuffer;
-        glm::ivec2 customLightmapTexSize;
-        std::vector<LightmapVertexData> bspVertData;
-        std::vector<LightmapVertexData> customVertData;
-
-        // Surface objects
-        std::future<void> createSurfaceObjectsResult;
-        std::vector<std::vector<SurfaceVertex>> surfVertices; //!< Vertices of individual surfaces
-        std::vector<SurfaceVertex> allVertices; //!< Vertices of all surfaces
-        int maxEboSize = 0; //!< Maximum number of elements in the EBO (if all surfaces are visible at the same time)
-    };
-
-    IRendererEngine *m_pEngine = nullptr;
-    const bsp::Level *m_pLevel = nullptr;
-    SurfaceRenderer m_Surf;
-    LevelData m_Data;
-    RenderingStats m_Stats;
-    LoadingStatus m_LoadingStatus;
-    std::unique_ptr<LoadingState> m_pLoadingState;
-    Material *m_pSkyboxMaterial = nullptr;
-    Material *m_pPatchesMaterial = nullptr;
-    Material *m_pWireframeMaterial = nullptr;
+    float m_flLightstyleScales[MAX_LIGHTSTYLES] = {};
     GPUBuffer m_LightstyleBuffer;
     GLTexture m_LightstyleTexture;
 
-    unsigned m_uFrameCount = 0;
+    ViewContext m_ViewContext;
 
-    // Entities
-    std::vector<ClientEntity *> m_SolidEntityList;
-    std::vector<ClientEntity *> m_TransEntityList;
-    std::vector<size_t> m_SortBuffer;
-    unsigned m_uVisibleEntCount = 0;
+    //----------------------------------------------------------------
+    // Initialization
+    //----------------------------------------------------------------
+    //! Initializes m_Surfaces.
+    void initSurfaces();
 
-    // Screen-wide quad
-    GLVao m_nQuadVao;
-    GPUBuffer m_nQuadVbo;
-    void createScreenQuad();
+    //! Creates the screen-wide quad for blitting.
+    void createBlitQuad();
 
-    // Framebuffers
-    bool m_bNeedRefreshFB = true;
-    glm::ivec2 m_vViewportSize = glm::ivec2(1, 1);
-    GLFramebuffer m_nHdrFramebuffer;
-    Texture2D m_nColorBuffer;
-    RenderBuffer m_nRenderBuffer;
-
-    // Global uniform buffer
-    GPUBuffer m_GlobalUniformBuffer;
-    GlobalUniform m_GlobalUniform;
+    //! Creates global uniform buffer.
     void createGlobalUniform();
 
+    //! Creates lightstyle buffer texture.
     void createLightstyleBuffer();
 
-    void recreateFramebuffer();
-    void destroyFramebuffer();
+    //! Creates surface vertex buffer.
+    void createSurfaceBuffers();
 
-    void asyncCreateSurfaces();
-    void asyncLoadBSPLightmaps();
-    void finishLoadBSPLightmaps();
-    void asyncLoadCustomLightmaps();
-    void finishLoadCustomLightmaps();
-    void asyncCreateSurfaceObjects();
-    void finishCreateSurfaceObjects();
-    void updateVao();
-    void loadTextures();
-    void loadSkyBox();
-    void finishLoading();
-    std::vector<uint8_t> rotateImage90CW(uint8_t *data, int wide, int tall);
-    std::vector<uint8_t> rotateImage90CCW(uint8_t *data, int wide, int tall);
+    //! Loads lightmaps.
+    void loadLightmaps(std::string_view levelPath);
 
-    //! Pre-rendering stuff
+    //! Loads custom lightmap.
+    void loadCustomLightmap();
+
+    //! @returns material and its index.
+    std::pair<Material *, unsigned> getMaterialForTexture(const bsp::BSPMipTex &miptex);
+
+    //----------------------------------------------------------------
+    // Rendering
+    //----------------------------------------------------------------
+    //! Validates cvars and applies any configuration changes.
+    void validateSettings();
+
+    //! Selects a lightmap based on current settings.
+    //! @returns the lightmap or nullptr.
+    ILightmap *selectLightmap();
+
+    //! Updates the surface vertex array object.
+    void updateSurfaceVao();
+
+    //! Sets up OpenGL, updates uniforms
     void frameSetup(float flSimTime, float flTimeDelta);
 
-    //! Post-rendering stuff.
-    //! Disables stuff enabled in frameSetup.
+    //! Called at the end of the rendering
     void frameEnd();
 
-    //! Binds and clears HDB framebuffer
-    void prepareHdrFramebuffer();
+    //! Sets up OpenGL for rendering into the backbuffer
+    void viewRenderingSetup();
 
-    //! Sets view constext settings.
-    void setupViewContext();
+    //! Reverts viewRenderingSetup
+    void viewRenderingEnd();
 
-    //! Binds lightmap block texture
-    void bindLightmapBlock();
+    //! Renders world polygons
+    void drawWorld();
 
-    //! Updates and binds lightstyle buffer.
-    void bindLightstyles();
+    //! Renders entities
+    void drawEntities();
 
-    //! Draws solid BSP faces.
-    void drawWorldSurfaces();
+    //! Blits the HDR backbuffer into current framebuffer.
+    void postProcessBlit();
 
-    //! Draws solid BSP faces.
-    void drawWorldSurfacesVao();
+    //----------------------------------------------------------------
+    // Backbuffer
+    //----------------------------------------------------------------
+    //! Creates the HDB backbuffer.
+    void createBackbuffer();
 
-    //! Draws solid BSP faces using indexed rendering.
-    void drawWorldSurfacesIndexed();
-
-    //! Draws BSP faces with SKY texture.
-    void drawSkySurfaces();
-
-    //! Draws BSP faces with SKY texture using VAOs.
-    void drawSkySurfacesVao();
-
-    //! Draws BSP faces with SKY texture using EBO.
-    void drawSkySurfacesIndexed();
-
-    //! Draws solid entities
-    void drawSolidEntities();
-    void drawSolidTriangles();
-
-    //! Draws transparent entities
-    void drawTransEntities();
-    void drawTransTriangles();
-
-    //! Draws a solid brush entity
-    void drawSolidBrushEntity(ClientEntity *pClent);
-
-    //! Draws a (maybe transparent) brush entity
-    void drawBrushEntity(ClientEntity *pClent);
-
-    //! Draws a brush entity surface.
-    void drawBrushEntitySurface(Surface &surf);
-
-    //! Draws custom lightmap patches
-    void drawPatches();
-
-    //! Post-processes HDB framebuffer (tonemapping, gamma correction) and draws it into active framebuffer.
-    void doPostProcessing();
-
-    //! Sets up render mode.
-    void setRenderMode(RenderMode mode);
+    //! Destroys all backbuffer-related objects.
+    void destroyBackbuffer();
 };
 
 #endif

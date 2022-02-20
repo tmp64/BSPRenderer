@@ -36,7 +36,7 @@ public:
 
     void onShaderCompiled() override {
         m_uTexture.set(0);
-        m_uLMTexture.set(SceneRenderer::TEX_LIGHTMAP);
+        m_uLMTexture.set(SceneRenderer::TEX_BRUSH_LIGHTMAP);
         m_uLightstyleBuf.set(SceneRenderer::TEX_LIGHTSTYLES);
     }
 

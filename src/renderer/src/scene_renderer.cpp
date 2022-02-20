@@ -1,285 +1,235 @@
-#include <appfw/binary_file.h>
-#include <appfw/timer.h>
-#include <appfw/prof.h>
-#include <bsp/entity_key_values.h>
-#include <app_base/lightmap.h>
-#include <stb_image.h>
-#include <stb_rect_pack.h>
-#include <material_system/shader_instance.h>
-#include <renderer/scene_renderer.h>
+#include <appfw/str_utils.h>
 #include <renderer/renderer_engine_interface.h>
-#include <imgui.h>
-#include <gui_app_base/imgui_controls.h>
+#include <renderer/scene_renderer.h>
+#include <renderer/utils.h>
 #include <renderer/scene_shaders.h>
-#include <app_base/bitmap.h>
+#include <gui_app_base/imgui_controls.h>
+#include "lightmap_iface.h"
+#include "bsp_lightmap.h"
+#include "custom_lightmap.h"
+#include "fake_lightmap.h"
 
-ConVar<int> r_cull("r_cull", 1,
-                   "Backface culling:\n"
-                   "0 - none\n"
-                   "1 - back\n"
-                   "2 - front",
-                   [](const int &, const int &newVal) {
-                       if (newVal < 0 || newVal > 2)
-                           return false;
-                       return true;
-                   });
-
-ConVar<bool> r_drawworld("r_drawworld", true, "Draw world polygons");
+ConVar<bool> r_drawworld("r_drawworld", true, "Draw world surfaces");
 ConVar<bool> r_drawsky("r_drawsky", true, "Draw skybox");
 ConVar<bool> r_drawents("r_drawents", true, "Draw entities");
-ConVar<float> r_gamma("r_gamma", 2.2f, "Gamma");
+ConVar<float> r_gamma("r_gamma", 2.2f, "Screen gamma");
 ConVar<float> r_texgamma("r_texgamma", 2.2f, "Texture gamma");
-ConVar<int> r_texture("r_texture", 2,
-              "Which texture should be used:\n  0 - white color, 1 - random color, 2 - texture");
-ConVar<int> r_shading("r_shading", 2, "Lighting method:\n  0 - fullbright, 1 - shaded, 2 - lightmaps");
+ConVar<int>
+    r_texture("r_texture", 2,
+              "Which texture should be used:\n  0 - white color, 1 - texture, 2 - random color");
+ConVar<int> r_shading("r_shading", 2,
+                      "Lighting method:\n  0 - fullbright, 1 - shaded, 2 - lightmaps");
 ConVar<int> r_lightmap("r_lightmap", 1, "Used lightmap:\n  0 - BSP, 1 - custom");
-ConVar<bool> r_ebo("r_ebo", true, "Use indexed rendering");
 ConVar<bool> r_wireframe("r_wireframe", false, "Draw wireframes");
 ConVar<bool> r_nosort("r_nosort", false, "Disable transparent entity sorting");
 ConVar<bool> r_notrans("r_notrans", false, "Disable entity transparency");
-ConVar<bool> r_filter_lm("r_filter_lm", true, "Filter lightmaps (requires map reload)");
+ConVar<bool> r_filter_lm("r_filter_lm", true, "Filter lightmaps");
 ConVar<bool> r_patches("r_patches", false, "Draw custom lightmap patches");
 
 static const char *r_shading_values[] = {"Fullbright", "Shaded", "Lightmaps"};
 static const char *r_lightmap_values[] = {"BSP", "Custom"};
 
-static inline bool isVectorNull(const glm::vec3 &v) { return v.x == 0.f && v.y == 0.f && v.z == 0.f; }
+//----------------------------------------------------------------
+// ViewContext
+//----------------------------------------------------------------
+void SceneRenderer::ViewContext::setPerspective(float fov, float aspect, float zNear, float zFar) {
+    m_Type = ProjType::Perspective;
+
+    float fov_x = fov;
+    float fov_x_tan = 0;
+
+    if (fov_x < 1.0) {
+        fov_x_tan = 1.0;
+    } else if (fov_x <= 179.0f) {
+        fov_x_tan = tan(fov_x * glm::pi<float>() / 360.f); // TODO:
+    } else {
+        fov_x_tan = 1.0;
+    }
+
+    float fov_y = atan(fov_x_tan / aspect) * 360.f / glm::pi<float>(); // TODO:
+    float fov_y_tan = tan(fov_y * glm::pi<float>() / 360.f) * 4.f; // TODO:
+
+    float xMax = fov_y_tan * aspect;
+    float xMin = -xMax;
+
+    m_ProjMat = glm::frustum(xMin, xMax, -fov_y_tan, fov_y_tan, zNear, zFar);
+
+    m_flHorFov = fov_x;
+    m_flVertFov = fov_y;
+    m_flAspect = aspect;
+    m_flNearZ = zNear;
+    m_flFarZ = zFar;
+}
+
+void SceneRenderer::ViewContext::setPerspViewOrigin(const glm::vec3 &origin,
+                                                    const glm::vec3 &angles) {
+    m_Type = ProjType::Perspective;
+    m_vViewOrigin = origin;
+    m_vViewAngles = angles;
+
+    m_ViewMat = glm::identity<glm::mat4>();
+    m_ViewMat = glm::rotate(m_ViewMat, glm::radians(-90.f), {1.0f, 0.0f, 0.0f});
+    m_ViewMat = glm::rotate(m_ViewMat, glm::radians(90.f), {0.0f, 0.0f, 1.0f});
+    m_ViewMat = glm::rotate(m_ViewMat, glm::radians(-m_vViewAngles.z), {1.0f, 0.0f, 0.0f});
+    m_ViewMat = glm::rotate(m_ViewMat, glm::radians(-m_vViewAngles.x), {0.0f, 1.0f, 0.0f});
+    m_ViewMat = glm::rotate(m_ViewMat, glm::radians(-m_vViewAngles.y), {0.0f, 0.0f, 1.0f});
+    m_ViewMat = glm::translate(m_ViewMat, {-m_vViewOrigin.x, -m_vViewOrigin.y, -m_vViewOrigin.z});
+}
+
+bool SceneRenderer::ViewContext::cullBox(glm::vec3 mins, glm::vec3 maxs) const {
+    if (m_Cull == Cull::None) {
+        return false;
+    }
+
+    for (const Plane &p : m_Frustum) {
+        switch (p.signbits) {
+        case 0:
+            if (p.vNormal[0] * maxs[0] + p.vNormal[1] * maxs[1] + p.vNormal[2] * maxs[2] <
+                p.fDist)
+                return true;
+            break;
+        case 1:
+            if (p.vNormal[0] * mins[0] + p.vNormal[1] * maxs[1] + p.vNormal[2] * maxs[2] <
+                p.fDist)
+                return true;
+            break;
+        case 2:
+            if (p.vNormal[0] * maxs[0] + p.vNormal[1] * mins[1] + p.vNormal[2] * maxs[2] <
+                p.fDist)
+                return true;
+            break;
+        case 3:
+            if (p.vNormal[0] * mins[0] + p.vNormal[1] * mins[1] + p.vNormal[2] * maxs[2] <
+                p.fDist)
+                return true;
+            break;
+        case 4:
+            if (p.vNormal[0] * maxs[0] + p.vNormal[1] * maxs[1] + p.vNormal[2] * mins[2] <
+                p.fDist)
+                return true;
+            break;
+        case 5:
+            if (p.vNormal[0] * mins[0] + p.vNormal[1] * maxs[1] + p.vNormal[2] * mins[2] <
+                p.fDist)
+                return true;
+            break;
+        case 6:
+            if (p.vNormal[0] * maxs[0] + p.vNormal[1] * mins[1] + p.vNormal[2] * mins[2] <
+                p.fDist)
+                return true;
+            break;
+        case 7:
+            if (p.vNormal[0] * mins[0] + p.vNormal[1] * mins[1] + p.vNormal[2] * mins[2] <
+                p.fDist)
+                return true;
+            break;
+        default:
+            return false;
+        }
+    }
+    return false;
+}
+
+bool SceneRenderer::ViewContext::cullSurface(const Surface &surface) const {
+    if (m_Cull == Cull::None) {
+        return false;
+    }
+
+    float dist = planeDiff(m_vViewOrigin, *surface.plane);
+
+    if (m_Cull == Cull::Back) {
+        // Back face culling
+        if (surface.flags & SURF_PLANEBACK) {
+            if (dist >= -BACKFACE_EPSILON)
+                return true; // wrong side
+        } else {
+            if (dist <= BACKFACE_EPSILON)
+                return true; // wrong side
+        }
+    } else if (m_Cull == Cull::Front) {
+        // Front face culling
+        if (surface.flags & SURF_PLANEBACK) {
+            if (dist <= BACKFACE_EPSILON)
+                return true; // wrong side
+        } else {
+            if (dist >= -BACKFACE_EPSILON)
+                return true; // wrong side
+        }
+    }
+
+    // Frustum culling
+    return cullBox(surface.vMins, surface.vMaxs);
+}
+
+void SceneRenderer::ViewContext::setupFrustum() {
+    // Build the transformation matrix for the given view angles
+    angleVectors(m_vViewAngles, &m_vForward, &m_vRight, &m_vUp);
+
+    // Setup frustum
+    // rotate m_vForward right by FOV_X/2 degrees
+    m_Frustum[0].vNormal = rotatePointAroundVector(m_vUp, m_vForward, -(90 - m_flHorFov / 2));
+    // rotate m_vForward left by FOV_X/2 degrees
+    m_Frustum[1].vNormal = rotatePointAroundVector(m_vUp, m_vForward, 90 - m_flHorFov / 2);
+    // rotate m_vForward up by FOV_Y/2 degrees
+    m_Frustum[2].vNormal = rotatePointAroundVector(m_vRight, m_vForward, 90 - m_flVertFov / 2);
+    // rotate m_vForward down by FOV_Y/2 degrees
+    m_Frustum[3].vNormal = rotatePointAroundVector(m_vRight, m_vForward, -(90 - m_flVertFov / 2));
+    // near clipping plane
+    m_Frustum[4].vNormal = m_vForward;
+
+    for (size_t i = 0; i < 5; i++) {
+        m_Frustum[i].fDist = glm::dot(m_vViewOrigin, m_Frustum[i].vNormal);
+        m_Frustum[i].signbits = signbitsForPlane(m_Frustum[i].vNormal);
+    }
+
+    // Far clipping plane
+    glm::vec3 farPoint = vectorMA(m_vViewOrigin, m_flFarZ, m_vForward);
+    m_Frustum[5].vNormal = -m_vForward;
+    m_Frustum[5].fDist = glm::dot(farPoint, m_Frustum[5].vNormal);
+    m_Frustum[5].signbits = signbitsForPlane(m_Frustum[5].vNormal);
+}
 
 //----------------------------------------------------------------
 // SceneRenderer
 //----------------------------------------------------------------
-SceneRenderer::SceneRenderer() {
-    createScreenQuad();
+SceneRenderer::SceneRenderer(bsp::Level &level, std::string_view path, IRendererEngine &engine)
+    : m_Level(level)
+    , m_Engine(engine) {
+    initSurfaces();
+    createBlitQuad();
     createGlobalUniform();
     createLightstyleBuffer();
-
-    m_SolidEntityList.reserve(MAX_VISIBLE_ENTS);
-    m_SortBuffer.reserve(MAX_TRANS_SURFS_PER_MODEL);
-
-    m_pSkyboxMaterial = MaterialSystem::get().createMaterial("Skybox");
-    m_pSkyboxMaterial->setSize(1, 1);
-    m_pSkyboxMaterial->setUsesGraphicalSettings(true);
-    m_pSkyboxMaterial->setShader(SHADER_TYPE_WORLD_IDX, &SceneShaders::Shaders::skybox);
-
-    m_pPatchesMaterial = MaterialSystem::get().createMaterial("Patches");
-    m_pPatchesMaterial->setSize(1, 1);
-    m_pPatchesMaterial->setShader(SHADER_TYPE_CUSTOM_IDX, &SceneShaders::Shaders::patches);
-
-    m_pWireframeMaterial = MaterialSystem::get().createMaterial("Wireframe");
-    m_pWireframeMaterial->setSize(1, 1);
-    m_pWireframeMaterial->setShader(SHADER_TYPE_BRUSH_MODEL_IDX, &SceneShaders::Shaders::brush);
+    createSurfaceBuffers();
+    loadLightmaps(path);
 }
 
 SceneRenderer::~SceneRenderer() {
-    MaterialSystem::get().destroyMaterial(m_pSkyboxMaterial);
-    m_pSkyboxMaterial = nullptr;
-}
-
-void SceneRenderer::beginLoading(const bsp::Level *level, std::string_view path) {
-    AFW_ASSERT(level);
-
-    if (m_pLevel == level) {
-        return;
-    }
-
-    unloadLevel();
-
-    m_Data.customLightmapPath = getFileSystem().findExistingFile(std::string(path) + ".lm", std::nothrow);
-
-    m_pLevel = level;
-    m_Surf.setLevel(m_pLevel);
-    loadTextures();
-    loadSkyBox();
-
-    m_pLoadingState = std::make_unique<LoadingState>();
-    m_LoadingStatus = LoadingStatus::CreateSurfaces;
-    m_pLoadingState->createSurfacesResult = std::async(std::launch::async, [this]() { asyncCreateSurfaces(); });
-}
-
-void SceneRenderer::optimizeBrushModel(Model *model) {
-    AFW_ASSERT(model->getType() == ModelType::Brush);
-    OptBrushModel om;
-
-    // Create a list of all surfaces of the brush
-    om.surfs.reserve(model->getFaceNum());
-    unsigned last = model->getFirstFace() + model->getFaceNum();
-    for (unsigned surfidx = model->getFirstFace(); surfidx < last; surfidx++) {
-        om.surfs.push_back(surfidx);
-    }
-
-    // Sort the list by material
-    std::sort(om.surfs.begin(), om.surfs.end(),
-              [this](const unsigned &lhsidx, const unsigned &rhsidx) {
-                  auto &lhs = m_Surf.getSurface(lhsidx);
-                  auto &rhs = m_Surf.getSurface(rhsidx);
-                  return lhs.uMaterialIdx < rhs.uMaterialIdx;
-              });
-
-    model->setOptModelIdx((unsigned)m_Data.optBrushModels.size());
-    m_Data.optBrushModels.push_back(std::move(om));
-}
-
-void SceneRenderer::unloadLevel() {
-    AFW_ASSERT(!isLoading());
-
-    if (isLoading()) {
-        throw std::logic_error("can't unload level while loading");
-    }
-
-    if (m_pLevel) {
-        m_pLoadingState = nullptr;
-        m_Data = LevelData();
-        m_Surf.setLevel(nullptr);
-        m_pLevel = nullptr;
-    }
-}
-
-bool SceneRenderer::loadingTick() { 
-    AFW_ASSERT(m_pLoadingState);
-
-    try {
-        switch (m_LoadingStatus) {
-        case LoadingStatus::CreateSurfaces: {
-            if (appfw::isFutureReady(m_pLoadingState->createSurfacesResult)) {
-                m_pLoadingState->createSurfacesResult.get();
-                m_pLoadingState->createSurfacesResult = std::future<void>();
-
-                // Start async tasks
-                m_LoadingStatus = LoadingStatus::AsyncTasks;
-
-                m_pLoadingState->loadBSPLightmapsResult =
-                    std::async(std::launch::async, [this]() { asyncLoadBSPLightmaps(); });
-
-                m_pLoadingState->loadCustomLightmapsResult =
-                    std::async(std::launch::async, [this]() { asyncLoadCustomLightmaps(); });
-            }
-            return false;
-        }
-        case LoadingStatus::AsyncTasks: {
-            if (!m_pLoadingState->loadBSPLightmapsFinished) {
-                if (appfw::isFutureReady(m_pLoadingState->loadBSPLightmapsResult)) {
-                    m_pLoadingState->loadBSPLightmapsResult.get();
-                    m_pLoadingState->loadBSPLightmapsResult = std::future<void>();
-                    finishLoadBSPLightmaps();
-                    m_pLoadingState->loadBSPLightmapsFinished = true;
-                }
-            }
-
-            if (!m_pLoadingState->loadCustomLightmapsFinished) {
-                if (appfw::isFutureReady(m_pLoadingState->loadCustomLightmapsResult)) {
-                    m_pLoadingState->loadCustomLightmapsResult.get();
-                    m_pLoadingState->loadCustomLightmapsResult = std::future<void>();
-                    finishLoadCustomLightmaps();
-                    m_pLoadingState->loadCustomLightmapsFinished = true;
-                }
-            }
-
-            bool isReady = m_pLoadingState->loadBSPLightmapsFinished && m_pLoadingState->loadCustomLightmapsFinished;
-
-            if (isReady) {
-                m_LoadingStatus = LoadingStatus::CreateSurfaceObjects;
-                m_pLoadingState->createSurfaceObjectsResult =
-                    std::async(std::launch::async, [this]() { asyncCreateSurfaceObjects(); });
-            }
-
-            return false;
-        }
-        case LoadingStatus::CreateSurfaceObjects: {
-            if (appfw::isFutureReady(m_pLoadingState->createSurfaceObjectsResult)) {
-                m_pLoadingState->createSurfaceObjectsResult.get();
-                m_pLoadingState->createSurfaceObjectsResult = std::future<void>();
-                finishCreateSurfaceObjects();
-                finishLoading();
-                return true;
-            }
-            return false;
-        }
-        }
-    }
-    catch (const std::exception &) {
-        m_pLoadingState = nullptr;
-        unloadLevel();
-        throw;
-    }
-
-    AFW_ASSERT(false);
-    return false;
-}
-
-void SceneRenderer::setPerspective(float fov, float aspect, float near, float far) {
-    m_Data.viewContext.setPerspective(fov, aspect, near, far);
-}
-
-void SceneRenderer::setPerspViewOrigin(const glm::vec3 &origin, const glm::vec3 &angles) {
-    m_Data.viewContext.setPerspViewOrigin(origin, angles);
+    destroyBackbuffer();
 }
 
 void SceneRenderer::setViewportSize(const glm::ivec2 &size) {
-    m_vViewportSize = size;
-    m_bNeedRefreshFB = true;
+    m_vTargetViewportSize = size;
 }
 
 void SceneRenderer::renderScene(GLint targetFb, float flSimTime, float flTimeDelta) {
-    appfw::Timer frameTimer;
-    frameTimer.start();
-
-    AFW_ASSERT(m_pLevel);
-    AFW_ASSERT(!isLoading());
-
-    appfw::Prof mainprof("Render Scene");
-
-    // Reset stats
+    appfw::Timer renderTimer;
+    appfw::Prof prof("Render Scene");
+    
     m_Stats = RenderingStats();
     m_uFrameCount++;
 
-    LightmapType newLmType = (LightmapType)std::clamp(r_lightmap.getValue(), 0, 1);
-
-    if (newLmType == LightmapType::Custom && !m_Data.bCustomLMLoaded) {
-        r_lightmap.setValue(0);
-        newLmType = LightmapType::BSP;
-        printw("Lightmap type set to BSP since custom lightmaps are not loaded");
-    }
-    
-    if (newLmType == LightmapType::BSP == 0 && m_pLevel->getLightMaps().size() == 0 && r_shading.getValue() == 2) {
-        r_shading.setValue(1);
-        printw("Lighting type set to shaded since no lightmaps are loaded");
-    }
-
-    if (m_Data.lightmapType != newLmType) {
-        m_Data.lightmapType = newLmType;
-        updateVao();
-    }
-
+    validateSettings();
     frameSetup(flSimTime, flTimeDelta);
-
-    if (r_drawworld.getValue()) {
-        drawWorldSurfaces();
-
-        if (r_drawsky.getValue()) {
-            drawSkySurfaces();
-        }
-    }
-
-    if (r_drawents.getValue()) {
-        appfw::Prof prof("Entities");
-        drawSolidEntities();
-        drawSolidTriangles();
-        drawTransEntities();
-        drawTransTriangles();
-    }
-
-    // Draw patches
-    if (m_Data.patchesVao.id() != 0 && r_patches.getValue()) {
-        drawPatches();
-    }
-
+    viewRenderingSetup();
+    // drawWorld();
+    // drawEntities();
+    viewRenderingEnd();
     frameEnd();
 
     glBindFramebuffer(GL_FRAMEBUFFER, targetFb);
-    doPostProcessing();
+    postProcessBlit();
 
-    frameTimer.stop();
-    m_Stats.flFrameTime = frameTimer.dseconds();
+    m_Stats.flFrameTime = renderTimer.dseconds();
 }
 
 void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
@@ -295,31 +245,30 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         ImGui::Text("Total: %.3f ms", m_Stats.flFrameTime * 1000);
         ImGui::Separator();
 
-        ImGui::Text("World: %u (%u + %u)", m_Stats.uRenderedWorldPolys + m_Stats.uRenderedSkyPolys,
-                    m_Stats.uRenderedWorldPolys, m_Stats.uRenderedSkyPolys);
-        ImGui::Text("Brush ent surfs: %u", m_Stats.uRenderedBrushEntPolys);
-        ImGui::Text("Draw calls: %u", m_Stats.uDrawCallCount);
+        ImGui::Text("World: %u (%u + %u)", m_Stats.uWorldPolys + m_Stats.uSkyPolys,
+                    m_Stats.uWorldPolys, m_Stats.uSkyPolys);
+        ImGui::Text("Brush ent surfs: %u", m_Stats.uBrushEntPolys);
+        ImGui::Text("Draw calls: %u", m_Stats.uDrawCalls);
         ImGui::Separator();
 
-        ImGui::Text("Entities: %u", m_uVisibleEntCount);
+        /*ImGui::Text("Entities: %u", m_uVisibleEntCount);
         ImGui::Text("    Solid: %lu", m_SolidEntityList.size());
-        ImGui::Text("    Trans: %lu", m_TransEntityList.size());
+        ImGui::Text("    Trans: %lu", m_TransEntityList.size());*/
         ImGui::Separator();
 
         CvarCheckbox("World", r_drawworld);
         ImGui::SameLine();
         CvarCheckbox("Sky", r_drawsky);
-        ImGui::SameLine();
-        CvarCheckbox("EBO", r_ebo);
 
         CvarCheckbox("Entities", r_drawents);
         ImGui::SameLine();
         CvarCheckbox("Patches", r_patches);
+        CvarCheckbox("Filter lightmaps", r_filter_lm);
 
-        int lighting = std::clamp(r_shading.getValue(), 0, 2);
+        int lighting = std::clamp(r_shading.getValue(), 0, (int)std::size(r_shading_values));
 
         if (ImGui::BeginCombo("Shading", r_shading_values[lighting])) {
-            for (int i = 0; i <= 2; i++) {
+            for (int i = 0; i <= (int)std::size(r_shading_values); i++) {
                 if (ImGui::Selectable(r_shading_values[i])) {
                     r_shading.setValue(i);
                 }
@@ -330,10 +279,10 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
             ImGui::EndCombo();
         }
 
-        int lightmap = std::clamp(r_lightmap.getValue(), 0, 2);
+        int lightmap = std::clamp(r_lightmap.getValue(), 0, (int)std::size(r_lightmap_values));
 
         if (ImGui::BeginCombo("Lightmaps", r_lightmap_values[lightmap])) {
-            for (int i = 0; i <= 1; i++) {
+            for (int i = 0; i <= (int)std::size(r_lightmap_values); i++) {
                 if (ImGui::Selectable(r_lightmap_values[i])) {
                     r_lightmap.setValue(i);
                 }
@@ -345,7 +294,7 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         }
 
         if (ImGui::Button("Reload lightmaps")) {
-            reloadCustomLightmaps();
+            loadCustomLightmap();
         }
 
         ImGui::End();
@@ -353,54 +302,109 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
 }
 
 void SceneRenderer::clearEntities() {
-    m_SolidEntityList.clear();
-    m_TransEntityList.clear();
-    m_uVisibleEntCount = 0;
+    // TODO:
 }
 
 bool SceneRenderer::addEntity(ClientEntity *pClent) {
-    if (m_uVisibleEntCount == MAX_VISIBLE_ENTS) {
-        return false;
-    }
-
-    if (pClent->isOpaque()) {
-        // Solid
-        m_SolidEntityList.push_back(pClent);
-    } else {
-        // Transparent
-        m_TransEntityList.push_back(pClent);
-    }
-    m_uVisibleEntCount++;
+    // TODO:
     return true;
 }
 
 Material *SceneRenderer::getSurfaceMaterial(int surface) {
-    return m_Data.surfaces[surface].m_pMat;
-}
-
-void SceneRenderer::reloadCustomLightmaps() {
-    AFW_ASSERT_REL(!m_pLoadingState);
-    m_pLoadingState = std::make_unique<LoadingState>();
-    asyncLoadCustomLightmaps();
-    finishLoadCustomLightmaps();
-    m_pLoadingState = nullptr;
+    return m_Surfaces[surface].material;
 }
 
 #ifdef RENDERER_SUPPORT_TINTING
 void SceneRenderer::setSurfaceTint(int surface, glm::vec4 color) {
-    Surface &surf = m_Data.surfaces[surface];
+    Surface &surf = m_Surfaces[surface];
     color.r = pow(color.r, 2.2f);
     color.g = pow(color.g, 2.2f);
     color.b = pow(color.b, 2.2f);
-    std::vector<glm::vec4> colors(surf.m_iVertexCount, color);
-    m_Data.surfTintBuf.bind();
-    m_Data.surfTintBuf.update(sizeof(glm::vec4) * surf.m_nFirstVertex,
-                              sizeof(glm::vec4) * colors.size(), colors.data());
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    std::vector<glm::vec4> colors(surf.vertexCount, color);
+    m_SurfaceTintBuffer.bind();
+    m_SurfaceTintBuffer.update(sizeof(glm::vec4) * surf.vertexOffset,
+                               sizeof(glm::vec4) * colors.size(), colors.data());
+    m_SurfaceTintBuffer.unbind();
 }
 #endif
 
-void SceneRenderer::createScreenQuad() {
+void SceneRenderer::initSurfaces() {
+    auto &lvlFaces = m_Level.getFaces();
+    auto &lvlSurfEdges = m_Level.getSurfEdges();
+    auto &lvlEdges = m_Level.getEdges();
+    auto &lvlVertices = m_Level.getVertices();
+    m_Surfaces.resize(lvlFaces.size());
+
+    for (size_t i = 0; i < m_Surfaces.size(); i++) {
+        Surface &surface = m_Surfaces[i];
+        const bsp::BSPFace &face = lvlFaces[i];
+
+        surface.plane = &m_Level.getPlanes().at(face.iPlane);
+
+        // Some flags
+        if (face.nPlaneSide) {
+            surface.flags |= SURF_PLANEBACK;
+        }
+        
+        // Create vertices and calculate bounds
+        surface.vMins = glm::vec3(999999.0f);
+        surface.vMaxs = glm::vec3(-999999.0f);
+        surface.vOrigin = glm::vec3(0, 0, 0);
+
+        for (int j = 0; j < face.nEdges; j++) {
+            if (j == MAX_SIDE_VERTS) {
+                printw("Surface {} is too large (exceeded {} vertices)", j, MAX_SIDE_VERTS);
+                break;
+            }
+
+            glm::vec3 vertex;
+            bsp::BSPSurfEdge iEdgeIdx = lvlSurfEdges.at((size_t)face.iFirstEdge + j);
+
+            if (iEdgeIdx > 0) {
+                const bsp::BSPEdge &edge = lvlEdges.at(iEdgeIdx);
+                vertex = lvlVertices.at(edge.iVertex[0]);
+            } else {
+                const bsp::BSPEdge &edge = lvlEdges.at(-iEdgeIdx);
+                vertex = lvlVertices.at(edge.iVertex[1]);
+            }
+
+            surface.faceVertices.push_back(vertex);
+
+            // Add vertex to bounds
+            for (int k = 0; k < 3; k++) {
+                float val = vertex[k];
+
+                if (val < surface.vMins[k])
+                    surface.vMins[k] = val;
+
+                if (val > surface.vMaxs[k])
+                    surface.vMaxs[k] = val;
+            }
+
+            // Add vertex to origin
+            surface.vOrigin += vertex;
+        }
+
+        surface.faceVertices.shrink_to_fit();
+        surface.vOrigin /= (float)surface.faceVertices.size();
+
+        // Find material
+        const bsp::BSPTextureInfo &texInfo = m_Level.getTexInfo().at(face.iTextureInfo);
+        const bsp::BSPMipTex &tex = m_Level.getTextures().at(texInfo.iMiptex);
+        auto [material, materialIdx] = getMaterialForTexture(tex);
+        surface.material = material;
+        surface.materialIdx = materialIdx;
+
+        if (!appfw::strncasecmp(tex.szName, "sky", 3)) {
+            // Sky surface
+            surface.flags |= SURF_DRAWSKY;
+        }
+
+        surface.color = glm::vec3(rand() % 256, rand() % 256, rand() % 256) / 255.0f;
+    }
+}
+
+void SceneRenderer::createBlitQuad() {
     // clang-format off
     const float quadVertices[] = {
         // positions        // texture Coords
@@ -411,12 +415,12 @@ void SceneRenderer::createScreenQuad() {
     };
     // clang-format on
 
-    m_nQuadVao.create();
-    m_nQuadVbo.create(GL_ARRAY_BUFFER, "SceneRenderer: Quad VBO");
+    m_BlitQuadVao.create();
+    m_BlitQuadVbo.create(GL_ARRAY_BUFFER, "SceneRenderer: Blit Quad VBO");
 
-    glBindVertexArray(m_nQuadVao);
-    m_nQuadVbo.bind();
-    m_nQuadVbo.init(sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glBindVertexArray(m_BlitQuadVao);
+    m_BlitQuadVbo.bind();
+    m_BlitQuadVbo.init(sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(1);
@@ -432,536 +436,190 @@ void SceneRenderer::createGlobalUniform() {
 }
 
 void SceneRenderer::createLightstyleBuffer() {
-    m_LightstyleBuffer.create(GL_TEXTURE_BUFFER, "Lightstyles");
-    m_LightstyleBuffer.init(sizeof(LevelData::flLightstyleScale), nullptr, GL_DYNAMIC_DRAW);
+    m_LightstyleBuffer.create(GL_TEXTURE_BUFFER, "SceneRenderer: Lightstyles");
+    m_LightstyleBuffer.init(sizeof(m_flLightstyleScales), nullptr, GL_DYNAMIC_DRAW);
 
     m_LightstyleTexture.create();
     glBindTexture(GL_TEXTURE_BUFFER, m_LightstyleTexture);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, m_LightstyleBuffer.getId());
 }
 
-void SceneRenderer::recreateFramebuffer() {
-    destroyFramebuffer();
-
-    // Create FP color buffer
-    m_nColorBuffer.create("SceneRenderer: Backbuffer color buffer");
-    m_nColorBuffer.initTexture(GraphicsFormat::RGBA16F, m_vViewportSize.x, m_vViewportSize.y, false,
-                               GL_RGBA, GL_FLOAT, nullptr);
-
-    // Create depth buffer
-    m_nRenderBuffer.create("SceneRenderer: Backbuffer depth buffer");
-    m_nRenderBuffer.init(GraphicsFormat::Depth32, m_vViewportSize.x, m_vViewportSize.y);
-
-    // Attach buffers
-    m_nHdrFramebuffer.create();
-    glBindFramebuffer(GL_FRAMEBUFFER, m_nHdrFramebuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_nColorBuffer.getId(), 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_nRenderBuffer.getId());
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        throw std::runtime_error("SceneRenderer::recreateFramebuffer(): HDR framebuffer not complete");
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-void SceneRenderer::destroyFramebuffer() {
-    m_nHdrFramebuffer.destroy();
-    m_nColorBuffer.destroy();
-    m_nRenderBuffer.destroy();
-}
-
-void SceneRenderer::asyncCreateSurfaces() {
-    printi("Creating surfaces...");
-
-    m_Data.surfaces.resize(m_Surf.getSurfaceCount());
-
-    for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
-        Surface &surf = m_Data.surfaces[i];
-        const SurfaceRenderer::Surface &baseSurf = m_Surf.getSurface(i);
-        
-        surf.m_pMat = baseSurf.pMaterial;
-        surf.m_iVertexCount = (GLsizei)baseSurf.vVertices.size();
-
-        auto fnGetRandColor = []() { return (rand() % 256) / 255.f; };
-        surf.m_Color = {fnGetRandColor(), fnGetRandColor(), fnGetRandColor()};
-    }
-}
-
-void SceneRenderer::asyncLoadBSPLightmaps() {
-    if (m_pLevel->getLightMaps().size() == 0) {
-        printi("BSP lightmaps: no lightmaps in the map file");
-        return;
-    }
-
-    printi("BSP lightmaps: loading...");
-    appfw::Timer timer;
-    std::vector<stbrp_rect> rects;
-    rects.reserve(m_Data.surfaces.size());
-    int totalLightmapArea = 0;
-
-    for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
-        Surface &surf = m_Data.surfaces[i];
-        const SurfaceRenderer::Surface &baseSurf = m_Surf.getSurface(i);
-
-        // Calculate texture extents
-        glm::vec2 mins = {999999, 999999};
-        glm::vec2 maxs = {-99999, -99999};
-
-        for (size_t j = 0; j < baseSurf.vVertices.size(); j++) {
-            glm::vec3 vert = baseSurf.vVertices[j];
-
-            float vals = glm::dot(vert, baseSurf.pTexInfo->vS) + baseSurf.pTexInfo->fSShift;
-            mins.s = std::min(mins.s, vals);
-            maxs.s = std::max(maxs.s, vals);
-
-            float valt = glm::dot(vert, baseSurf.pTexInfo->vT) + baseSurf.pTexInfo->fTShift;
-            mins.t = std::min(mins.t, valt);
-            maxs.t = std::max(maxs.t, valt);
-        }
-        
-        // Calculate lightmap texture extents
-        glm::vec2 texmins = {floor(mins.x / BSP_LIGHTMAP_DIVISOR), floor(mins.y / BSP_LIGHTMAP_DIVISOR)};
-        glm::vec2 texmaxs = {ceil(maxs.x / BSP_LIGHTMAP_DIVISOR), ceil(maxs.y / BSP_LIGHTMAP_DIVISOR)};
-        surf.m_vTextureMins = texmins * (float)BSP_LIGHTMAP_DIVISOR; // This one used in the engine (I think)
-        //surf.m_vTextureMins = mins; // This one makes more sense. I don't see any difference in-game between them though
-
-        // Calculate size
-        int wide = (int)((texmaxs - texmins).x + 1);
-        int tall = (int)((texmaxs - texmins).y + 1);
-        surf.m_BSPLMSize = {wide, tall};
-
-        // Skip surfaces without lightmaps
-        if (baseSurf.nLightmapOffset == bsp::NO_LIGHTMAP_OFFSET) {
-            continue;
-        }
-
-        // Calculate are of the lightmap, it is used to guess lightmap size
-        int maxDim = std::max(wide, tall);
-        totalLightmapArea += maxDim * maxDim;
-
-        // Add to pack list
-        stbrp_rect rect;
-        rect.id = (int)i;
-        rect.w = wide + 2 * BSP_LIGHTMAP_PADDING;
-        rect.h = tall + 2 * BSP_LIGHTMAP_PADDING;
-        rects.push_back(rect);
-    }
-
-    // Estimate texture size
-    int squareSize = (int)ceil(totalLightmapArea / (1 - BSP_LIGHTMAP_BLOCK_WASTED));
-    int textureSize = std::min((int)sqrt(squareSize), MAX_BSP_LIGHTMAP_BLOCK_SIZE);
-
-    if (textureSize % 4 != 0) {
-        textureSize += (4 - textureSize % 4); // round up so it's divisable by 4
-    }
-
-    // Pack lightmaps
-    stbrp_context packContext; 
-    std::vector<stbrp_node> packNodes(2 * textureSize);
-    stbrp_init_target(&packContext, textureSize, textureSize, packNodes.data(),
-                      (int)packNodes.size());
-
-    stbrp_pack_rects(&packContext, rects.data(), (int)rects.size());
-
-    // Create bitmaps
-    Bitmap<glm::u8vec3> bitmaps[bsp::NUM_LIGHTSTYLES];
-    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
-        bitmaps[i].init(textureSize, textureSize);
-    }
-
-    // Add lightmaps to bitmaps
-    int failedCount = 0;
-    for (const stbrp_rect &rect : rects) {
-        if (rect.was_packed) {
-            Surface &surf = m_Data.surfaces[rect.id];
-            const bsp::BSPFace &face = m_pLevel->getFaces()[rect.id];
-            const glm::u8vec3 *pixels = reinterpret_cast<const glm::u8vec3 *>(
-                m_pLevel->getLightMaps().data() + face.nLightmapOffset);
-
-            for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
-                if (face.nStyles[i] == 255) {
-                    break;
-                }
-
-                bitmaps[i].copyPixels(rect.x, rect.y,
-                                      surf.m_BSPLMSize.x, surf.m_BSPLMSize.y, pixels,
-                                      BSP_LIGHTMAP_PADDING);
-                pixels += surf.m_BSPLMSize.x * surf.m_BSPLMSize.y;
-            }
-
-            surf.m_BSPLMOffset.x = rect.x + BSP_LIGHTMAP_PADDING;
-            surf.m_BSPLMOffset.y = rect.y + BSP_LIGHTMAP_PADDING;
-        } else {
-            failedCount++;
-        }
-    }
-
-    // Combine bitmaps
-    std::vector<glm::u8vec3> &finalImage = m_pLoadingState->bspLightmapBlock;
-    size_t imageSize = textureSize * textureSize;
-    finalImage.resize(imageSize * bsp::NUM_LIGHTSTYLES);
-
-    for (int i = 0; i < bsp::NUM_LIGHTSTYLES; i++) {
-        auto &pixels = bitmaps[i].getPixels();
-        std::copy(pixels.begin(), pixels.end(), finalImage.begin() + imageSize * i);
-    }
-
-    m_pLoadingState->iBspLightmapSize = textureSize;
-
-    timer.stop();
-    printi("BSP lightmaps: block {:.3f} s, size {}x{}", timer.dseconds(), textureSize, textureSize);
-
-    if (failedCount != 0) {
-        printw("BSP Lightmaps: {} faces failed to pack.", failedCount);
-    }
-}
-
-void SceneRenderer::finishLoadBSPLightmaps() {
-    // Create the texture
-    Texture2DArray &texture = m_Data.bspLightmapBlockTex;
-    TextureFilter filter =
-        r_filter_lm.getValue() ? TextureFilter::Bilinear : TextureFilter::Nearest;
-    texture.create("SceneRenderer: BSP lightmap block");
-    texture.setWrapMode(TextureWrapMode::Clamp);
-    texture.setFilter(filter);
-
-    // Upload to the GPU
-    texture.initTexture(GraphicsFormat::RGB8, m_pLoadingState->iBspLightmapSize,
-                        m_pLoadingState->iBspLightmapSize, bsp::NUM_LIGHTSTYLES, false, GL_RGB,
-                        GL_UNSIGNED_BYTE, m_pLoadingState->bspLightmapBlock.data());
+void SceneRenderer::createSurfaceBuffers() {
+    AFW_ASSERT(m_uMaxEboSize == 0);
+    std::vector<SurfaceVertex> vertexBuffer;
+    vertexBuffer.reserve(bsp::MAX_MAP_VERTS);
     
-    printi("BSP lightmaps: loaded.");
-}
+    for (size_t i = 0; i < m_Surfaces.size(); i++) {
+        Surface &surf = m_Surfaces[i];
 
-void SceneRenderer::asyncLoadCustomLightmaps() {
-    m_Data.bCustomLMLoaded = false;
-    fs::path &lmPath = m_Data.customLightmapPath;
+        surf.vertexOffset = (int)vertexBuffer.size();
+        surf.vertexCount = (int)surf.faceVertices.size();
+        m_uMaxEboSize += surf.vertexCount + 1;
 
-    if (lmPath.empty()) {
-        printi("Custom lightmaps: file not found - not loading.");
-        return;
-    }
-
-    printi("Custom lightmaps: loading...");
-
-    try {
-        appfw::BinaryInputFile file(lmPath);
-
-        // Magic
-        uint8_t magic[sizeof(LightmapFileFormat::MAGIC)];
-        file.readBytes(magic, sizeof(magic));
-
-        if (memcmp(magic, LightmapFileFormat::MAGIC, sizeof(magic))) {
-            throw std::runtime_error("Invalid magic");
-        }
-
-        // Level & lightmap info
-        uint32_t faceCount = file.readUInt32(); // Face count
-
-        if (faceCount != m_Data.surfaces.size()) {
-            throw std::runtime_error(fmt::format("Face count mismatch: expected {}, got {}",
-                                                 m_Data.surfaces.size(), faceCount));
-        }
-
-        file.readUInt32(); // Lightmap count
-        glm::ivec2 lightmapBlockSize;
-        lightmapBlockSize.x = file.readInt32(); // Lightmap texture wide
-        lightmapBlockSize.y = file.readInt32(); // Lightmap texture tall
-        m_pLoadingState->customLightmapTexSize = lightmapBlockSize;
-        LightmapFileFormat::Format format = (LightmapFileFormat::Format)file.readByte();
-
-        if (format != LightmapFileFormat::Format::RGBF32) {
-            throw std::runtime_error("Unsupported lightmap format, expected RGBF32");
-        }
-
-        LightmapFileFormat::Compression compression =
-            (LightmapFileFormat::Compression)file.readByte();
-
-        if (compression != LightmapFileFormat::Compression::None) {
-            throw std::runtime_error("Unsupported lightmap compression");
-        }
-
-        // Lightmap texture
-        size_t textureBlockSize = lightmapBlockSize.x * lightmapBlockSize.y * bsp::NUM_LIGHTSTYLES;
-        m_pLoadingState->customLightmapTex.resize(textureBlockSize);
-        file.readBytes(reinterpret_cast<uint8_t *>(m_pLoadingState->customLightmapTex.data()),
-                       textureBlockSize * sizeof(glm::vec3));
-
-        auto &patchBuf = m_pLoadingState->patchBuffer;
-        patchBuf.clear();
-        patchBuf.reserve(80000);
-
-        // Face info
-        for (uint32_t i = 0; i < faceCount; i++) {
-            Surface &surf = m_Data.surfaces[i];
-
-            uint32_t vertCount = file.readUInt32(); // Vertex count
-
-            if (vertCount != (uint32_t)surf.m_iVertexCount) {
-                throw std::runtime_error(
-                    fmt::format("Face {}: Vertex count mismatch: expected {}, got {}", i,
-                                surf.m_iVertexCount, vertCount));
-            }
-
-            glm::vec3 vI = file.readVec<glm::vec3>(); // vI
-            glm::vec3 vJ = file.readVec<glm::vec3>(); // vJ
-            glm::vec3 vPlaneOrigin = file.readVec<glm::vec3>(); // World position of (0, 0) plane coord.
-            file.readVec<glm::vec2>(); // Offset of (0, 0) to get to plane coords
-            file.readVec<glm::vec2>(); // Face size
-
-            // Lightstyles
-            glm::ivec4 lightstyles = glm::ivec4(255);
-            for (int j = 0; j < bsp::NUM_LIGHTSTYLES; j++) {
-                lightstyles[j] = file.readByte();
-            }
-
-            bool hasLightmap = file.readByte(); // Has lightmap
-
-            if (hasLightmap) {
-                glm::ivec2 lmSize = file.readVec<glm::ivec2>(); // Lightmap size
-                surf.m_CustomVertData.resize(surf.m_iVertexCount);
-
-                // Lightmap tex coords
-                for (uint32_t j = 0; j < vertCount; j++) {
-                    LightmapVertexData vertData;
-                    glm::vec2 texCoords = file.readVec<glm::vec2>(); // Tex coord in luxels
-                    vertData.texture = texCoords / glm::vec2(lightmapBlockSize);
-                    vertData.lightstyle = lightstyles;
-                    surf.m_CustomVertData[j] = vertData;
-                }
-
-                // Patches
-                uint32_t patchCount = file.readUInt32(); // Patch count
-
-                for (uint32_t j = 0; j < patchCount; j++) {
-                    glm::vec2 coord = file.readVec<glm::vec2>();
-                    float size = file.readFloat();
-                    float k = size / 2.0f;
-
-                    glm::vec3 org = vPlaneOrigin + coord.x * vI + coord.y * vJ;
-                    glm::vec3 corners[4];
-
-                    corners[0] = org - vI * k - vJ * k;
-                    corners[1] = org + vI * k - vJ * k;
-                    corners[2] = org + vI * k + vJ * k;
-                    corners[3] = org - vI * k + vJ * k;
-
-                    patchBuf.push_back(corners[0]);
-                    patchBuf.push_back(corners[1]);
-
-                    patchBuf.push_back(corners[1]);
-                    patchBuf.push_back(corners[2]);
-
-                    patchBuf.push_back(corners[2]);
-                    patchBuf.push_back(corners[3]);
-
-                    patchBuf.push_back(corners[3]);
-                    patchBuf.push_back(corners[0]);
-                }
-            }
-        }
-
-        patchBuf.shrink_to_fit();
-        printi("Custom lightmaps: Patches use {:.1f} MiB of VRAM",
-               patchBuf.size() * sizeof(patchBuf[0]) / 1024.0 / 1024.0);
-    } catch (const std::exception &e) {
-        printw("Custom lightmaps: failed to load: {}", e.what());
-        m_pLoadingState->customLightmapTex.clear();
-    }
-}
-
-void SceneRenderer::finishLoadCustomLightmaps() {
-    if (m_pLoadingState->customLightmapTex.empty()) {
-        return;
-    }
-
-    auto &blockSize = m_pLoadingState->customLightmapTexSize;
-    auto &blockData = m_pLoadingState->customLightmapTex;
-
-    // Create the texture
-    Texture2DArray &texture = m_Data.customLightmapBlockTex;
-    TextureFilter filter =
-        r_filter_lm.getValue() ? TextureFilter::Bilinear : TextureFilter::Nearest;
-    texture.create("SceneRenderer: custom lightmap block");
-    texture.setWrapMode(TextureWrapMode::Clamp);
-    texture.setFilter(filter);
-
-    texture.initTexture(GraphicsFormat::RGB16F, blockSize.x, blockSize.y, bsp::NUM_LIGHTSTYLES,
-                        false, GL_RGB, GL_FLOAT, blockData.data());
-
-    blockData.clear();
-
-    // Load patches into the GPU
-    auto &patchBuf = m_pLoadingState->patchBuffer;
-    if (!patchBuf.empty()) {
-        m_Data.patchesVerts = (uint32_t)patchBuf.size();
-        m_Data.patchesVao.create();
-        m_Data.patchesVbo.create(GL_ARRAY_BUFFER , "SceneRenderer: Patches");
-
-        glBindVertexArray(m_Data.patchesVao);
-        m_Data.patchesVbo.bind();
-        m_Data.patchesVbo.init(m_Data.patchesVerts * sizeof(glm::vec3), patchBuf.data(),
-                               GL_STATIC_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
-    }
-
-    m_Data.bCustomLMLoaded = true;
-    printi("Custom lightmaps: loaded");
-}
-
-void SceneRenderer::asyncCreateSurfaceObjects() {
-    printi("Surface objects: creating");
-
-    std::vector<SurfaceVertex> vertices;
-    m_pLoadingState->allVertices.reserve(bsp::MAX_MAP_VERTS);
-    unsigned maxEboSize = 0; // Sum of vertex counts of all surfaces + surface count (to account for primitive restart element)
-
-    m_pLoadingState->surfVertices.resize(m_Data.surfaces.size());
-    m_pLoadingState->bspVertData.reserve(bsp::MAX_MAP_VERTS);
-    m_pLoadingState->customVertData.reserve(bsp::MAX_MAP_VERTS);
-
-    for (size_t i = 0; i < m_Data.surfaces.size(); i++) {
-        Surface &surf = m_Data.surfaces[i];
-        const SurfaceRenderer::Surface &baseSurf = m_Surf.getSurface(i);
-
-        vertices.clear();
-        vertices.reserve(surf.m_iVertexCount);
-        maxEboSize += surf.m_iVertexCount + 1; //!< +1 to account for primitive reset
-        surf.m_nFirstVertex = (uint16_t)m_pLoadingState->allVertices.size();
-
-        glm::vec3 normal = baseSurf.pPlane->vNormal;
-        if (baseSurf.iFlags & SURF_PLANEBACK) {
+        glm::vec3 normal = surf.plane->vNormal;
+        if (surf.flags & SURF_PLANEBACK) {
             normal = -normal;
         }
 
-        const bsp::BSPFace &face = m_pLevel->getFaces()[i];
-        const bsp::BSPTextureInfo &texInfo = *baseSurf.pTexInfo;
-        const Material &material = *surf.m_pMat;
+        const bsp::BSPFace &face = m_Level.getFaces()[i];
+        const bsp::BSPTextureInfo &texInfo = m_Level.getTexInfo().at(face.iTextureInfo);
 
-        for (size_t j = 0; j < baseSurf.vVertices.size(); j++) {
+        for (size_t j = 0; j < surf.faceVertices.size(); j++) {
             SurfaceVertex v;
 
             // Position
-            v.position = baseSurf.vVertices[j];
+            v.position = surf.faceVertices[j];
 
             // Normal
             v.normal = normal;
 
             // Texture
             v.texture.s = glm::dot(v.position, texInfo.vS) + texInfo.fSShift;
-            v.texture.s /= material.getWide();
+            v.texture.s /= surf.material->getWide();
 
             v.texture.t = glm::dot(v.position, texInfo.vT) + texInfo.fTShift;
-            v.texture.t /= material.getTall();
+            v.texture.t /= surf.material->getTall();
 
-
-            // BSP lightmap data
-            LightmapVertexData bspData;
-            if (surf.m_BSPLMSize.x != 0) {
-                bspData.texture.s = glm::dot(v.position, texInfo.vS);
-                bspData.texture.t = glm::dot(v.position, texInfo.vT);
-                bspData.texture += glm::vec2(texInfo.fSShift, texInfo.fTShift);
-                bspData.texture -= surf.m_vTextureMins;
-                bspData.texture += glm::vec2(BSP_LIGHTMAP_DIVISOR / 2); // Shift by half-texel
-                bspData.texture += surf.m_BSPLMOffset * BSP_LIGHTMAP_DIVISOR;
-                bspData.texture /= m_Data.bspLightmapBlockTex.getWide() * BSP_LIGHTMAP_DIVISOR;
-            }
-
-            for (int k = 0; k < bsp::NUM_LIGHTSTYLES; k++) {
-                bspData.lightstyle[k] = face.nStyles[k];
-            }
-
-            m_pLoadingState->bspVertData.push_back(bspData);
-
-            // Custom lightmap texture
-            LightmapVertexData customData;
-            if (m_Data.bCustomLMLoaded && !surf.m_CustomVertData.empty()) {
-                customData = surf.m_CustomVertData[j];
-            }
-            m_pLoadingState->customVertData.push_back(customData);
-
-            vertices.push_back(v);
-
-            if (m_pLoadingState->allVertices.size() >= std::numeric_limits<uint16_t>::max()) {
-                printe("Surface objects: vertex limit reached.");
-                throw std::runtime_error("vertex limit reached");
-            }
-
-            m_pLoadingState->allVertices.push_back(v);
+            vertexBuffer.push_back(v);
         }
-
-        auto fnGetRandColor = []() { return (rand() % 256) / 255.f; };
-        surf.m_Color = {fnGetRandColor(), fnGetRandColor(), fnGetRandColor()};
-
-        m_pLoadingState->surfVertices[i] = std::move(vertices);
     }
 
-    m_pLoadingState->maxEboSize = maxEboSize;
-}
-
-void SceneRenderer::finishCreateSurfaceObjects() {
-    unsigned maxEboSize = m_pLoadingState->maxEboSize;
-    auto &allVertices = m_pLoadingState->allVertices;
-
-    // Lightmap coord buffers
-    m_Data.bspLightmapSurfData.create(GL_ARRAY_BUFFER, "BSP lm coords");
-    m_Data.bspLightmapSurfData.bind();
-    m_Data.bspLightmapSurfData.init(sizeof(LightmapVertexData) *
-                                        m_pLoadingState->bspVertData.size(),
-                                    m_pLoadingState->bspVertData.data(), GL_STATIC_DRAW);
-
-    m_Data.customLightmapSurfData.create(GL_ARRAY_BUFFER, "Custom lm coords");
-    m_Data.customLightmapSurfData.bind();
-    m_Data.customLightmapSurfData.init(sizeof(LightmapVertexData) *
-                                           m_pLoadingState->customVertData.size(),
-                                       m_pLoadingState->customVertData.data(), GL_STATIC_DRAW);
-
-    // Surface vertices
-    m_Data.surfVbo.create(GL_ARRAY_BUFFER, "SceneRenderer: Surface vertices");
-    m_Data.surfVbo.bind();
-    m_Data.surfVbo.init(sizeof(SurfaceVertex) * allVertices.size(), allVertices.data(),
-                        GL_STATIC_DRAW);
-    m_Data.surfVbo.unbind();
-
-    // Set lightmap type
-    if (m_Data.customLightmapBlockTex.getId()) {
-        m_Data.lightmapType = LightmapType::Custom;
-    } else {
-        m_Data.lightmapType = LightmapType::BSP;
+    if (vertexBuffer.size() > MAX_SURF_VERTEX_COUNT) {
+        printe("Surface vertex limit of {} reached. There are {} vertices.", MAX_SURF_VERTEX_COUNT,
+               vertexBuffer.size());
+        throw std::runtime_error("vertex limit reached");
     }
 
-    // Tinting colors
+    // Upload
+    int64_t surfaceBuffersSize = 0;
+    m_SurfaceVertexBuffer.create(GL_ARRAY_BUFFER, "SceneRenderer: Surface vertices");
+    m_SurfaceVertexBuffer.init(sizeof(SurfaceVertex) * vertexBuffer.size(), vertexBuffer.data(),
+                               GL_STATIC_DRAW);
+    surfaceBuffersSize += m_SurfaceVertexBuffer.getMemUsage();
+    m_uSurfaceVertexBufferSize = (unsigned)vertexBuffer.size();
+
 #ifdef RENDERER_SUPPORT_TINTING
-    {
-        std::vector<glm::vec4> defaultTint(allVertices.size(), glm::vec4(0, 0, 0, 0));
-        m_Data.surfTintBuf.create(GL_ARRAY_BUFFER, "Surface tinting");
-        m_Data.surfTintBuf.init(sizeof(glm::vec4) * defaultTint.size(), defaultTint.data(),
-                                GL_DYNAMIC_DRAW);
-    }
+    // Tinting buffer
+    std::vector<glm::vec4> defaultTint(m_uSurfaceVertexBufferSize, glm::vec4(0, 0, 0, 0));
+    m_SurfaceTintBuffer.create(GL_ARRAY_BUFFER, "SceneRenderer: Surface tinting");
+    m_SurfaceTintBuffer.init(sizeof(glm::vec4) * defaultTint.size(), defaultTint.data(),
+                             GL_DYNAMIC_DRAW);
+    surfaceBuffersSize += m_SurfaceTintBuffer.getMemUsage();
 #endif
 
-    // Update the VAO
-    updateVao();
-
-    // Create EBO
-    printi("Maximum EBO size: {} B", maxEboSize * sizeof(uint16_t));
-    printi("Vertex count: {}", allVertices.size());
-    m_Data.surfEboData.resize(maxEboSize);
-    m_Data.surfEbo.create(GL_ELEMENT_ARRAY_BUFFER, "SceneRenderer: Surface vertex indices");
-    m_Data.surfEbo.bind();
-    m_Data.surfEbo.init(maxEboSize * sizeof(uint16_t), nullptr, GL_DYNAMIC_DRAW);
-    m_Data.surfEbo.unbind();
-
-    printi("Surface objects: finished");
+    printi("Surfaces: {} vertices, {:.1f} KiB", vertexBuffer.size(), surfaceBuffersSize / 1024.0);
 }
 
-void SceneRenderer::updateVao() {
-    static_assert(sizeof(SurfaceVertex) == sizeof(float) * 8, "Size of Vertex is invalid");
+void SceneRenderer::loadLightmaps(std::string_view levelPath) {
+    // Fake lightmap
+    m_pFakeLightmap = std::make_unique<FakeLightmap>(*this);
 
-    m_Data.surfVao.create();
-    glBindVertexArray(m_Data.surfVao);
+    // BSP lightmap
+    try {
+        m_pBSPLightmap = std::make_unique<BSPLightmap>(*this);
+    } catch (const std::exception &e) {
+        printw("{}", e.what());
+    }
+
+    // Custom lightmaps
+    m_CustomLightmapPath =
+        getFileSystem().findExistingFile(std::string(levelPath) + ".lm", std::nothrow);
+
+    loadCustomLightmap();
+}
+
+void SceneRenderer::loadCustomLightmap() {
+    if (!m_CustomLightmapPath.empty()) {
+        try {
+            m_pCustomLightmap = std::make_unique<CustomLightmap>(*this);
+        } catch (const std::exception &e) {
+            printw("Custom lightmap: failed to load");
+            printw("Custom lightmap: {}", e.what());
+        }
+    }
+}
+
+std::pair<Material *, unsigned> SceneRenderer::getMaterialForTexture(const bsp::BSPMipTex &miptex) {
+    Material *mat = m_Engine.getMaterial(miptex);
+
+    if (!mat) {
+        mat = MaterialSystem::get().getNullMaterial();
+    }
+
+    auto it = m_MaterialIndexes.find(mat);
+
+    if (it != m_MaterialIndexes.end()) {
+        return *it;
+    } else {
+        unsigned idx = m_uNextMaterialIndex++;
+        m_MaterialIndexes.insert({mat, idx});
+        return {mat, idx};
+    }
+}
+
+void SceneRenderer::validateSettings() {
+    // Update lightmap
+    ILightmap *oldLightmap = m_pCurrentLightmap;
+    ILightmap *newLightmap = nullptr;
+
+    if (r_shading.getValue() == 2) {
+        newLightmap = selectLightmap();
+
+        if (!newLightmap) {
+            r_shading.setValue(1);
+            newLightmap = m_pFakeLightmap.get();
+        }
+    }
+
+    if (newLightmap != oldLightmap) {
+        m_pCurrentLightmap = newLightmap;
+        updateSurfaceVao();
+    }
+
+    // Lightmap filtering
+    m_pCurrentLightmap->updateFilter(r_filter_lm.getValue());
+
+    // Update backbuffer
+    if (m_vViewportSize != m_vTargetViewportSize) {
+        createBackbuffer();
+    }
+}
+
+SceneRenderer::ILightmap *SceneRenderer::selectLightmap() {
+    ILightmap *returnValue = nullptr;
+    int targetLightmap = std::clamp(r_lightmap.getValue(), 0, 1);
+
+    if (targetLightmap == 1) {
+        if (m_pCustomLightmap) {
+            returnValue = m_pCustomLightmap.get();
+        } else {
+            printw("Custom lightmap not available, falling back to BSP lightmap.");
+            targetLightmap = 0;
+        }
+    }
+
+    if (targetLightmap == 0) {
+        if (m_pBSPLightmap) {
+            returnValue = m_pBSPLightmap.get();
+        } else {
+            printw("BSP lightmap not available, falling back to simple shading.");
+        }
+    }
+
+    // Update r_lightmap if changed
+    if (r_lightmap.getValue() != targetLightmap) {
+        r_lightmap.setValue(targetLightmap);
+    }
+
+    return returnValue;
+}
+
+void SceneRenderer::updateSurfaceVao() {
+    m_SurfaceVao.create();
+    glBindVertexArray(m_SurfaceVao);
 
     // Common attributes
-    m_Data.surfVbo.bind();
+    m_SurfaceVertexBuffer.bind();
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
@@ -973,22 +631,17 @@ void SceneRenderer::updateVao() {
                           reinterpret_cast<void *>(offsetof(SurfaceVertex, texture)));
 
     // Lightmap attributes
-    if (m_Data.lightmapType == LightmapType::BSP) {
-        m_Data.bspLightmapSurfData.bind();
-    } else {
-        m_Data.customLightmapSurfData.bind();
-    }
-
+    m_pCurrentLightmap->bindVertBuffer();
     glEnableVertexAttribArray(3);
     glEnableVertexAttribArray(4);
-    glVertexAttribIPointer(3, 4, GL_INT, sizeof(LightmapVertexData),
-                           reinterpret_cast<void *>(offsetof(LightmapVertexData, lightstyle)));
-    glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(LightmapVertexData),
-                          reinterpret_cast<void *>(offsetof(LightmapVertexData, texture)));
+    glVertexAttribIPointer(3, 4, GL_INT, sizeof(LightmapVertex),
+                           reinterpret_cast<void *>(offsetof(LightmapVertex, lightstyle)));
+    glVertexAttribPointer(4, 2, GL_FLOAT, false, sizeof(LightmapVertex),
+                          reinterpret_cast<void *>(offsetof(LightmapVertex, texture)));
 
 #ifdef RENDERER_SUPPORT_TINTING
     // Tinting
-    m_Data.surfTintBuf.bind();
+    m_SurfaceTintBuffer.bind();
     glEnableVertexAttribArray(5);
     glVertexAttribPointer(5, 4, GL_FLOAT, false, sizeof(glm::vec4), reinterpret_cast<void *>(0));
 #endif
@@ -997,766 +650,73 @@ void SceneRenderer::updateVao() {
     glBindVertexArray(0);
 }
 
-void SceneRenderer::loadTextures() {
-    size_t surfCount = m_Surf.getSurfaceCount();
-    for (size_t i = 0; i < surfCount; i++) {
-        const SurfaceRenderer::Surface &surf = m_Surf.getSurface(i);
-        const bsp::BSPMipTex &tex = m_pLevel->getTextures().at(surf.pTexInfo->iMiptex);
-        Material *mat = m_pEngine->getMaterial(tex);
-
-        if (!mat) {
-            mat = MaterialSystem::get().getNullMaterial();
-        }
-
-        m_Surf.setSurfaceMaterial(i, mat);
-    }
-
-    m_Surf.refreshMaterialIndexes();
-}
-
-void SceneRenderer::loadSkyBox() {
-    auto texture = std::make_unique<TextureCube>();
-    texture->create("Skybox");
-
-    // Filename suffix for side
-    constexpr const char *suffixes[] = {"rt", "lf", "up", "dn", "bk", "ft"};
-
-    // Get sky name
-    bsp::EntityKeyValuesDict entities(m_pLevel->getEntitiesLump());
-    const bsp::EntityKeyValues &worldspawn = entities[0];
-    int skynameIdx = worldspawn.indexOf("skyname");
-    std::string skyname = skynameIdx != -1 ? worldspawn.get(skynameIdx).asString() : "desert";
-
-    // Load images
-    int loadedSidesCount = 0;
-    std::vector<uint8_t> sidesData[6];
-    int cubeWide = 0, cubeTall = 0;
-
-    for (int i = 0; i < 6; i++) {
-        // Try TGA first
-        fs::path path = getFileSystem().findExistingFile(
-            "assets:gfx/env/" + skyname + suffixes[i] + ".tga", std::nothrow);
-
-        if (path.empty()) {
-            // Try BMP instead
-            path = getFileSystem().findExistingFile(
-                "assets:gfx/env/" + skyname + suffixes[i] + ".bmp", std::nothrow);
-        }
-
-        if (path.empty()) {
-            printe("Sky {}{} not found", skyname, suffixes[i]);
-            continue;
-        }
-
-        int width, height, channelNum;
-        uint8_t *data = stbi_load(path.u8string().c_str(), &width, &height, &channelNum, 3);
-
-        if (!data) {
-            printe("Failed to load {}: ", path.u8string(), stbi_failure_reason());
-            continue;
-        }
-
-        // Validate size
-        if (width != height) {
-            printe("{}: image is not square", path.u8string());
-            continue;
-        } else if (cubeWide == 0 || cubeTall == 0) {
-            // Set the cubemap size
-            cubeWide = width;
-            cubeTall = height;
-        } else if (cubeWide != width) {
-            printe("{}: image size is different ({} vs {})", path.u8string(), width,
-                    cubeWide);
-            continue;
-        }
-
-        // Save the data
-        if (i == 2) {
-            // Top sky texture needs to be rotated CCW
-            sidesData[i] = rotateImage90CCW(data, width, height);
-        } else if (i == 3) {
-            // Bottom sky texture needs to be rotated CW
-            sidesData[i] = rotateImage90CW(data, width, height);
-        } else {
-            sidesData[i].resize(width * height * 3);
-            std::copy(data, data + sidesData[i].size(), sidesData[i].begin());
-        }
-
-        stbi_image_free(data);
-        loadedSidesCount++;
-    }
-
-    if (loadedSidesCount == 6) {
-        // Load the cubemap
-        const void *datas[6];
-
-        for (int i = 0; i < 6; i++) {
-            datas[i] = sidesData[i].data();
-        }
-
-        texture->initTexture(GraphicsFormat::RGB8, cubeWide, cubeTall, true, GL_RGB,
-                             GL_UNSIGNED_BYTE, datas);
-    } else {
-        // Load error cubemap
-        int size = CheckerboardImage::get().size;
-        const void *data = CheckerboardImage::get().data.data();
-        const void *datas[6];
-        std::fill(datas, datas + 6, data);
-
-        texture->initTexture(GraphicsFormat::RGB8, size, size, true, GL_RGB, GL_UNSIGNED_BYTE,
-                             datas);
-    }
-
-    texture->setWrapMode(TextureWrapMode::Clamp);
-    m_pSkyboxMaterial->setTexture(0, std::move(texture));
-}
-
-void SceneRenderer::finishLoading() {
-    m_LoadingStatus = LoadingStatus::NotLoading;
-    m_pLoadingState = nullptr;
-}
-
-std::vector<uint8_t> SceneRenderer::rotateImage90CW(uint8_t *data, int wide, int tall) {
-    std::vector<uint8_t> newData(3 * wide * tall);
-
-    auto fnGetPixelPtr = [](uint8_t *data, int wide, [[maybe_unused]] int tall, int col, int row) {
-        return data + row * wide * 3 + col * 3;
-    };
-
-    for (int col = 0; col < wide; col++) {
-        for (int row = 0; row < tall; row++) {
-            uint8_t *pold = fnGetPixelPtr(data, wide, tall, col, tall - row - 1);
-            uint8_t *pnew = fnGetPixelPtr(newData.data(), tall, wide, row, col);
-            memcpy(pnew, pold, 3);
-        }
-    }
-
-    return newData;
-}
-
-std::vector<uint8_t> SceneRenderer::rotateImage90CCW(uint8_t *data, int wide, int tall) {
-    std::vector<uint8_t> newData(3 * wide * tall);
-
-    auto fnGetPixelPtr = [](uint8_t *data, int wide, [[maybe_unused]] int tall, int col, int row) {
-        return data + row * wide * 3 + col * 3;
-    };
-
-    for (int col = 0; col < wide; col++) {
-        for (int row = 0; row < tall; row++) {
-            uint8_t *pold = fnGetPixelPtr(data, wide, tall, wide - col - 1, row);
-            uint8_t *pnew = fnGetPixelPtr(newData.data(), tall, wide, row, col);
-            memcpy(pnew, pold, 3);
-        }
-    }
-
-    return newData;
-}
-
 void SceneRenderer::frameSetup(float flSimTime, float flTimeDelta) {
     appfw::Prof prof("Frame Setup");
-
-    prepareHdrFramebuffer();
-    setupViewContext();
-
-    // Depth test
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
-    // Backface culling
-    if (m_Data.viewContext.getCulling() != SurfaceRenderer::Cull::None) {
-        glEnable(GL_CULL_FACE);
-        glFrontFace(GL_CW);
-        glCullFace(m_Data.viewContext.getCulling() == SurfaceRenderer::Cull::Back ? GL_BACK : GL_FRONT);
-    }
 
     // Seamless cubemap filtering
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
     // Fill global uniform object
-    m_GlobalUniform.mMainProj = m_Data.viewContext.getProjectionMatrix();
-    m_GlobalUniform.mMainView = m_Data.viewContext.getViewMatrix();
-    m_GlobalUniform.vMainViewOrigin = glm::vec4(m_Data.viewContext.getViewOrigin(), 0);
+    m_GlobalUniform.mMainProj = m_ViewContext.getProjectionMatrix();
+    m_GlobalUniform.mMainView = m_ViewContext.getViewMatrix();
+    m_GlobalUniform.vMainViewOrigin = glm::vec4(m_ViewContext.getViewOrigin(), 0);
     m_GlobalUniform.vflParams1.x = r_texgamma.getValue();
     m_GlobalUniform.vflParams1.y = r_gamma.getValue();
     m_GlobalUniform.vflParams1.z = flSimTime;
     m_GlobalUniform.vflParams1.w = flTimeDelta;
     m_GlobalUniform.viParams1.x = r_texture.getValue();
     m_GlobalUniform.viParams1.y = r_shading.getValue();
+    m_GlobalUniform.vflParams2.x = m_pCurrentLightmap->getGamma();
 
-    // Lightmap gamma
-    if (m_Data.lightmapType == LightmapType::BSP) {
-        m_GlobalUniform.vflParams2.x = 2.0f;
-    } else {
-        m_GlobalUniform.vflParams2.x = 1.0f;
-    }
-    
+    // Upload it to the GPU
     m_GlobalUniformBuffer.bind();
     m_GlobalUniformBuffer.update(0, sizeof(m_GlobalUniform), &m_GlobalUniform);
     glBindBufferBase(GL_UNIFORM_BUFFER, GLOBAL_UNIFORM_BIND, m_GlobalUniformBuffer.getId());
 
-    // Bind lightmap - will be used for world and brush ents
-    bindLightmapBlock();
-    bindLightstyles();
+    // Upload lightstyles
+    m_LightstyleBuffer.update(0, sizeof(m_flLightstyleScales), m_flLightstyleScales);
 }
 
 void SceneRenderer::frameEnd() {
+    glBindBufferBase(GL_UNIFORM_BUFFER, GLOBAL_UNIFORM_BIND, 0);
     glDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
 }
 
-void SceneRenderer::prepareHdrFramebuffer() {
-    if (m_bNeedRefreshFB) {
-        recreateFramebuffer();
-        m_bNeedRefreshFB = false;
-    }
+void SceneRenderer::viewRenderingSetup() {
+    appfw::Prof prof("View Setup");
 
-    glBindFramebuffer(GL_FRAMEBUFFER, m_nHdrFramebuffer);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // Set up backbuffer
+    m_HdrBackbuffer.bind(GL_FRAMEBUFFER);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glViewport(0, 0, m_vViewportSize.x, m_vViewportSize.y);
-}
 
-void SceneRenderer::setupViewContext() {
-    if (r_cull.getValue() <= 0) {
-        m_Data.viewContext.setCulling(SurfaceRenderer::Cull::None);
-    } else if (r_cull.getValue() == 1) {
-        m_Data.viewContext.setCulling(SurfaceRenderer::Cull::Back);
-    } else if (r_cull.getValue() >= 2) {
-        m_Data.viewContext.setCulling(SurfaceRenderer::Cull::Front);
+    // Depth test
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // Backface culling
+    if (m_ViewContext.getCulling() != ViewContext::Cull::None) {
+        glEnable(GL_CULL_FACE);
+        glFrontFace(GL_CW);
+        glCullFace(m_ViewContext.getCulling() == ViewContext::Cull::Back ? GL_BACK : GL_FRONT);
     }
-}
 
-void SceneRenderer::bindLightmapBlock() {
-    // Bind lightmap block texture
-    if (m_Data.lightmapType == LightmapType::BSP) {
-        if (m_Data.bspLightmapBlockTex.getId() != 0) {
-            glActiveTexture(GL_TEXTURE0 + TEX_LIGHTMAP);
-            m_Data.bspLightmapBlockTex.bind();
-        }
-    } else {
-        if (m_Data.customLightmapBlockTex.getId() != 0) {
-            glActiveTexture(GL_TEXTURE0 + TEX_LIGHTMAP);
-            m_Data.customLightmapBlockTex.bind();
-        }
-    }
-}
+    // Bind lightmap
+    glActiveTexture(GL_TEXTURE0 + TEX_BRUSH_LIGHTMAP);
+    m_pCurrentLightmap->bindTexture();
 
-void SceneRenderer::bindLightstyles() {
-    m_LightstyleBuffer.update(0, sizeof(m_Data.flLightstyleScale), m_Data.flLightstyleScale);
+    // Bind lightstyles texture
     glActiveTexture(GL_TEXTURE0 + TEX_LIGHTSTYLES);
     glBindTexture(GL_TEXTURE_BUFFER, m_LightstyleTexture);
 }
 
-void SceneRenderer::drawWorldSurfaces() {
-    // Prepare list of visible world surfaces
-    {
-        appfw::Prof prof("BSP traverse");
-        m_Surf.setContext(&m_Data.viewContext);
-        m_Surf.calcWorldSurfaces();
-    }
-
-    // Draw visible surfaces
-    appfw::Prof prof("Draw world");
-
-    if (r_ebo.getValue()) {
-        drawWorldSurfacesIndexed();
-    } else {
-        drawWorldSurfacesVao();
-    }
+void SceneRenderer::viewRenderingEnd() {
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS); // In case it was changed and wasn't changed back
 }
 
-void SceneRenderer::drawWorldSurfacesVao() {
-    auto &textureChain = m_Data.viewContext.getWorldTextureChain();
-    auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
-    unsigned frame = m_Data.viewContext.getWorldTextureChainFrame();
-    unsigned drawnSurfs = 0;
-
-    glBindVertexArray(m_Data.surfVao);
-
-    for (size_t i = 0; i < textureChain.size(); i++) {
-        if (textureChainFrames[i] != frame) {
-            continue;
-        }
-
-        // Bind material
-        const Material &mat = *m_Data.surfaces[textureChain[i][0]].m_pMat;
-        mat.activateTextures();
-        mat.enableShader(SHADER_TYPE_WORLD_IDX, m_uFrameCount);
-
-        for (unsigned j : textureChain[i]) {
-            Surface &surf = m_Data.surfaces[j];
-            glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
-        }
-
-        drawnSurfs += (unsigned)textureChain[i].size();
-    }
-
-    glBindVertexArray(0);
-
-    m_Stats.uRenderedWorldPolys = drawnSurfs;
-    m_Stats.uDrawCallCount += drawnSurfs;
-}
-
-void SceneRenderer::drawWorldSurfacesIndexed() {
-    AFW_ASSERT(!m_Data.surfEboData.empty());
-
-    auto &textureChain = m_Data.viewContext.getWorldTextureChain();
-    auto &textureChainFrames = m_Data.viewContext.getWorldTextureChainFrames();
-    unsigned frame = m_Data.viewContext.getWorldTextureChainFrame();
-    unsigned drawnSurfs = 0;
-
-    // Bind buffers
-    glBindVertexArray(m_Data.surfVao);
-    m_Data.surfEbo.bind();
-    glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
-    glEnable(GL_PRIMITIVE_RESTART);
-
-    for (size_t i = 0; i < textureChain.size(); i++) {
-        if (textureChainFrames[i] != frame) {
-            continue;
-        }
-
-        // Bind material
-        const Material &mat = *m_Data.surfaces[textureChain[i][0]].m_pMat;
-        mat.activateTextures();
-        mat.enableShader(SHADER_TYPE_WORLD_IDX, m_uFrameCount);
-
-        // Fill the EBO
-        unsigned eboIdx = 0;
-
-        for (unsigned j : textureChain[i]) {
-            Surface &surf = m_Data.surfaces[j];
-            uint16_t vertCount = (uint16_t)surf.m_iVertexCount;
-
-            for (uint16_t k = 0; k < vertCount; k++) {
-                m_Data.surfEboData[eboIdx + k] = surf.m_nFirstVertex + k;
-            }
-
-            eboIdx += vertCount;
-            m_Data.surfEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
-            eboIdx++;
-        }
-
-        // Decrement EBO size to remove last PRIMITIVE_RESTART_IDX
-        eboIdx--;
-
-        // Update EBO
-        m_Data.surfEbo.update(0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
-
-        // Draw elements
-        glDrawElements(GL_TRIANGLE_FAN, eboIdx, GL_UNSIGNED_SHORT, nullptr);
-
-        drawnSurfs += (unsigned)textureChain[i].size();
-        m_Stats.uDrawCallCount++;
-    }
-
-    if (r_wireframe.getValue()) {
-        unsigned eboIdx = 0;
-
-        // Fill EBO with all visible surfaces
-        for (size_t i = 0; i < textureChain.size(); i++) {
-            if (textureChainFrames[i] != frame) {
-                continue;
-            }
-
-            for (unsigned j : textureChain[i]) {
-                Surface &surf = m_Data.surfaces[j];
-                uint16_t vertCount = (uint16_t)surf.m_iVertexCount;
-
-                for (uint16_t k = 0; k < vertCount; k++) {
-                    m_Data.surfEboData[eboIdx + k] = surf.m_nFirstVertex + k;
-                }
-
-                eboIdx += vertCount;
-                m_Data.surfEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
-                eboIdx++;
-            }
-        }
-
-        if (eboIdx > 0) {
-            // Decrement EBO size to remove last PRIMITIVE_RESTART_IDX
-            eboIdx--;
-
-            // Enable shader
-            auto &shaderInfo =
-                m_pWireframeMaterial->enableShader(SHADER_TYPE_BRUSH_MODEL_IDX, m_uFrameCount)
-                    ->getShader<SceneShaders::BrushShader>();
-            shaderInfo.setRenderMode(kRenderTransColor);
-            shaderInfo.setRenderFx(1.0, {1.0, 1.0, 1.0});
-
-            // Update EBO
-            m_Data.surfEbo.update(0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
-
-            // Draw elements
-            glEnable(GL_POLYGON_OFFSET_LINE);
-            glPolygonOffset(-1.0f, -1.f);
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-            glDrawElements(GL_TRIANGLE_FAN, eboIdx, GL_UNSIGNED_SHORT, nullptr);
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-            glDisable(GL_POLYGON_OFFSET_LINE);
-            m_Stats.uDrawCallCount++;
-        }
-    }
-
-    glDisable(GL_PRIMITIVE_RESTART);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-    m_Stats.uRenderedWorldPolys = drawnSurfs;
-}
-
-void SceneRenderer::drawSkySurfaces() {
-    appfw::Prof prof("Draw sky");
-
-    if (!m_Data.viewContext.getSkySurfaces().empty()) {
-        glDepthFunc(GL_LEQUAL);
-
-        m_pSkyboxMaterial->activateTextures();
-        m_pSkyboxMaterial->enableShader(SHADER_TYPE_WORLD_IDX, m_uFrameCount);
-
-        if (r_ebo.getValue()) {
-            drawSkySurfacesIndexed();
-        } else {
-            drawSkySurfacesVao();
-        }
-
-        glDepthFunc(GL_LESS);
-    }
-}
-
-void SceneRenderer::drawSkySurfacesVao() {
-    glBindVertexArray(m_Data.surfVao);
-
-    for (unsigned i : m_Data.viewContext.getSkySurfaces()) {
-        Surface &surf = m_Data.surfaces[i];
-        glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
-    }
-
-    glBindVertexArray(0);
-    m_Stats.uRenderedSkyPolys = (unsigned)m_Data.viewContext.getSkySurfaces().size();
-    m_Stats.uDrawCallCount += m_Stats.uRenderedSkyPolys;}
-
-void SceneRenderer::drawSkySurfacesIndexed() {
-    AFW_ASSERT(!m_Data.surfEboData.empty());
-
-    // Bind buffers
-    glBindVertexArray(m_Data.surfVao);
-    m_Data.surfEbo.bind();
-    glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
-    glEnable(GL_PRIMITIVE_RESTART);
-
-    // Fill the EBO
-    unsigned eboIdx = 0;
-
-    for (unsigned j : m_Data.viewContext.getSkySurfaces()) {
-        Surface &surf = m_Data.surfaces[j];
-        uint16_t vertCount = (uint16_t)surf.m_iVertexCount;
-
-        for (uint16_t k = 0; k < vertCount; k++) {
-            m_Data.surfEboData[eboIdx + k] = surf.m_nFirstVertex + k;
-        }
-
-        eboIdx += vertCount;
-        m_Data.surfEboData[eboIdx] = PRIMITIVE_RESTART_IDX;
-        eboIdx++;
-    }
-
-    // Decrement EBO size to remove last PRIMITIVE_RESTART_IDX
-    eboIdx--;
-
-    // Update EBO
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, eboIdx * sizeof(uint16_t), m_Data.surfEboData.data());
-
-    // Draw elements
-    glDrawElements(GL_TRIANGLE_FAN, eboIdx, GL_UNSIGNED_SHORT, nullptr);
-
-    m_Stats.uRenderedSkyPolys = (unsigned)m_Data.viewContext.getSkySurfaces().size();
-    m_Stats.uDrawCallCount++;
-
-    glDisable(GL_PRIMITIVE_RESTART);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
-
-void SceneRenderer::drawSolidEntities() {
-    appfw::Prof prof("Solid");
-
-    // Sort opaque entities
-    auto sortFn = [this](ClientEntity *const &lhs, ClientEntity *const &rhs) {
-        // Sort by model type
-        int lhsmodel = (int)lhs->getModel()->getType();
-        int rhsmodel = (int)rhs->getModel()->getType();
-
-        if (lhsmodel > rhsmodel) {
-            return false;
-        } else if (lhsmodel < rhsmodel) {
-            return true;
-        }
-
-        // Sort by render mode
-        return lhs->getRenderModeRank() < lhs->getRenderModeRank();
-    };
-
-    std::sort(m_SolidEntityList.begin(), m_SolidEntityList.end(), sortFn);
-
-    for (ClientEntity *pClent : m_SolidEntityList) {
-        switch (pClent->getModel()->getType()) {
-        case ModelType::Brush: {
-            drawSolidBrushEntity(pClent);
-            break;
-        }
-        }
-    }
-
-    setRenderMode(kRenderNormal);
-}
-
-void SceneRenderer::drawSolidTriangles() {
-    appfw::Prof prof("Solid Triangles");
-    m_pEngine->drawNormalTriangles(m_Stats.uDrawCallCount);
-}
-
-void SceneRenderer::drawTransEntities() {
-    appfw::Prof prof("Trans");
-
-    if (!r_nosort.getValue()) {
-        // Sort entities based on render mode and distance
-        auto sortFn = [this](ClientEntity *const &lhs, ClientEntity *const &rhs) {
-            // Sort by render mode
-            int lhsRank = lhs->getRenderModeRank();
-            int rhsRank = lhs->getRenderModeRank();
-
-            if (lhsRank > rhsRank) {
-                return false;
-            } else if (lhsRank < rhsRank) {
-                return true;
-            }
-
-            // Sort by distance
-            auto fnGetOrigin = [](const ClientEntity *ent) {
-                Model *model = ent->getModel();
-                if (model->getType() == ModelType::Brush) {
-                    glm::vec3 avg = (model->getMins() + model->getMaxs()) * 0.5f;
-                    return ent->getOrigin() + avg;
-                } else {
-                    return ent->getOrigin();
-                }
-            };
-
-            glm::vec3 org1 = fnGetOrigin(lhs) - m_Data.viewContext.getViewOrigin();
-            glm::vec3 org2 = fnGetOrigin(rhs) - m_Data.viewContext.getViewOrigin();
-            float dist1 = glm::length2(org1);
-            float dist2 = glm::length2(org2);
-
-            return dist1 > dist2;
-        };
-
-        std::sort(m_TransEntityList.begin(), m_TransEntityList.end(), sortFn);
-    }
-
-    for (ClientEntity *pClent : m_TransEntityList) {
-        switch (pClent->getModel()->getType()) {
-        case ModelType::Brush: {
-            drawBrushEntity(pClent);
-            break;
-        }
-        }
-    }
-
-    setRenderMode(kRenderNormal);
-}
-
-void SceneRenderer::drawTransTriangles() {
-    appfw::Prof prof("Trans Triangles");
-    m_pEngine->drawTransTriangles(m_Stats.uDrawCallCount);
-}
-
-void SceneRenderer::drawSolidBrushEntity(ClientEntity *clent) {
-    Model *model = clent->getModel();
-
-    // Frustum culling
-    glm::vec3 mins, maxs;
-
-    if (isVectorNull(clent->getAngles())) {
-        mins = clent->getOrigin() + model->getMins();
-        maxs = clent->getOrigin() + model->getMaxs();
-    } else {
-        glm::vec3 radius = glm::vec3(model->getRadius());
-        mins = clent->getOrigin() - radius;
-        maxs = clent->getOrigin() + radius;
-    }
-
-    if (m_Surf.cullBox(mins, maxs)) {
-        return;
-    }
-
-    // Model transformation matrix
-    glm::mat4 modelMat = glm::identity<glm::mat4>();
-    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().z), {1.0f, 0.0f, 0.0f});
-    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
-    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
-    modelMat = glm::translate(modelMat, clent->getOrigin());
-
-    // Render mode
-    AFW_ASSERT(clent->getRenderMode() == kRenderNormal || clent->getRenderMode() == kRenderTransAlpha);
-    setRenderMode(clent->getRenderMode());
-
-    // Draw surfaces
-    auto &surfs = m_Data.optBrushModels[model->getOptModelIdx()].surfs;
-    Material *lastMat = nullptr;
-
-    for (unsigned i : surfs) {
-        Surface &surf = m_Data.surfaces[i];
-
-        // TODO: cullSurface doesn't account for translations/rotations
-        //if (m_Surf.cullSurface(m_Surf.getSurface(i))) {
-        //    continue;
-        //}
-
-        // Bind material
-        if (lastMat != surf.m_pMat) {
-            lastMat = surf.m_pMat;
-            lastMat->activateTextures();
-            auto &shader = lastMat->enableShader(SHADER_TYPE_BRUSH_MODEL_IDX, m_uFrameCount)
-                               ->getShader<SceneShaders::BrushShader>();
-            shader.setModelMatrix(modelMat);
-            shader.setRenderMode(clent->getRenderMode());
-            shader.setRenderFx(clent->getFxAmount() / 255.f, {0, 0, 0});
-        }
-
-        glBindVertexArray(m_Data.surfVao);
-        glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
-        m_Stats.uDrawCallCount++;
-        m_Stats.uRenderedBrushEntPolys++;
-    }
-}
-
-void SceneRenderer::drawBrushEntity(ClientEntity *clent) {
-    Model *model = clent->getModel();
-
-    // Frustum culling
-    glm::vec3 mins, maxs;
-
-    if (isVectorNull(clent->getAngles())) {
-        mins = clent->getOrigin() + model->getMins();
-        maxs = clent->getOrigin() + model->getMaxs();
-    } else {
-        glm::vec3 radius = glm::vec3(model->getRadius());
-        mins = clent->getOrigin() - radius;
-        maxs = clent->getOrigin() + radius;
-    }
-
-    if (m_Surf.cullBox(mins, maxs)) {
-        return;
-    }
-
-    // Model transformation matrix
-    glm::mat4 modelMat = glm::identity<glm::mat4>();
-    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().z), {1.0f, 0.0f, 0.0f});
-    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().x), {0.0f, 1.0f, 0.0f});
-    modelMat = glm::rotate(modelMat, glm::radians(clent->getAngles().y), {0.0f, 0.0f, 1.0f});
-    modelMat = glm::translate(modelMat, clent->getOrigin());
-
-    RenderMode renderMode = kRenderNormal;
-    float fxAmount = 1;
-    glm::vec3 fxColor = glm::vec3(0, 0, 0);
-
-    // Render mode
-    if (!r_notrans.getValue()) {
-        setRenderMode(clent->getRenderMode());
-        renderMode = clent->getRenderMode();
-        fxAmount = clent->getFxAmount() / 255.f;
-        fxColor = glm::vec3(clent->getFxColor()) / 255.f;
-    } else {
-        setRenderMode(kRenderNormal);
-    }
-
-    bool needSort = false;
-
-    switch (clent->getRenderMode()) {
-    case kRenderTransTexture:
-    case kRenderTransAdd:
-        m_SortBuffer.clear();
-        needSort = true;
-        break;
-    }
-
-    // Draw surfaces of prepare them for sorting
-    unsigned from = model->getFirstFace();
-    unsigned to = from + model->getFaceNum();
-
-    Material *pLastMaterial = nullptr;
-    auto fnActivateMaterial = [&](Material *mat) {
-        if (pLastMaterial != mat) {
-            pLastMaterial = mat;
-            mat->activateTextures();
-            auto &shader = mat->enableShader(SHADER_TYPE_BRUSH_MODEL_IDX, m_uFrameCount)
-                               ->getShader<SceneShaders::BrushShader>();
-            shader.setModelMatrix(modelMat);
-            shader.setRenderMode(renderMode);
-            shader.setRenderFx(fxAmount, fxColor);
-        }
-    };
-
-    for (unsigned i = from; i < to; i++) {
-        Surface &surf = m_Data.surfaces[i];
-
-        // TODO: cullSurface doesn't account for translations/rotations
-        //if (m_Surf.cullSurface(m_Surf.getSurface(i))) {
-        //    continue;
-        //}
-
-        if (needSort && !r_nosort.getValue()) {
-            // Add to sorting list
-            m_SortBuffer.push_back(i);
-        } else {
-            // Draw now
-            fnActivateMaterial(surf.m_pMat);
-            drawBrushEntitySurface(surf);
-        }
-    }
-
-    // Sort and draw
-    if (needSort && !r_nosort.getValue()) {
-        auto sortFn = [this, clent](const size_t &lhsIdx, const size_t &rhsIdx) {
-            glm::vec3 lhsOrg = m_Surf.getSurface(lhsIdx).vOrigin + clent->getOrigin();
-            glm::vec3 rhsOrg = m_Surf.getSurface(rhsIdx).vOrigin + clent->getOrigin();
-            float lhsDist = glm::dot(lhsOrg, m_Data.viewContext.getViewForward());
-            float rhsDist = glm::dot(rhsOrg, m_Data.viewContext.getViewForward());
-
-            return lhsDist > rhsDist;
-        };
-
-        std::sort(m_SortBuffer.begin(), m_SortBuffer.end(), sortFn);
-
-        for (size_t i : m_SortBuffer) {
-            Surface &surf = m_Data.surfaces[i];
-            fnActivateMaterial(surf.m_pMat);
-            drawBrushEntitySurface(surf);
-        }
-    }
-}
-
-void SceneRenderer::drawBrushEntitySurface(Surface &surf) {
-    glBindVertexArray(m_Data.surfVao);
-    glDrawArrays(GL_TRIANGLE_FAN, surf.m_nFirstVertex, (GLsizei)surf.m_iVertexCount);
-    m_Stats.uDrawCallCount++;
-    m_Stats.uRenderedBrushEntPolys++;
-}
-
-void SceneRenderer::drawPatches() {
-    appfw::Prof prof("Patches");
-
-    m_pPatchesMaterial->activateTextures();
-    m_pPatchesMaterial->enableShader(SHADER_TYPE_CUSTOM_IDX, m_uFrameCount);
-
-    glBindVertexArray(m_Data.patchesVao);
-    glPointSize(5);
-    glDrawArrays(GL_LINES, 0, m_Data.patchesVerts);
-    m_Stats.uDrawCallCount++;
-    glBindVertexArray(0);
-}
-
-void SceneRenderer::doPostProcessing() {
+void SceneRenderer::postProcessBlit() {
     appfw::Prof prof("Post-Processing");
 
     ShaderInstance *shaderInstance =
@@ -1764,31 +724,39 @@ void SceneRenderer::doPostProcessing() {
     shaderInstance->enable(m_uFrameCount);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_nColorBuffer.getId());
+    m_HdrColorbuffer.bind();
 
-    glBindVertexArray(m_nQuadVao);
+    glBindVertexArray(m_BlitQuadVao);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
 }
 
-void SceneRenderer::setRenderMode(RenderMode mode) {
-    switch (mode) {
-    case kRenderNormal:
-    default:
-        glDisable(GL_BLEND);
-        break;
-    case kRenderTransColor:
-    case kRenderTransTexture:
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        break;
-    case kRenderTransAlpha:
-        glDisable(GL_BLEND);
-        break;
-    case kRenderGlow:
-    case kRenderTransAdd:
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-        break;
+void SceneRenderer::createBackbuffer() {
+    destroyBackbuffer();
+    m_vViewportSize = m_vTargetViewportSize;
+
+    m_HdrColorbuffer.create("SceneRenderer: view color buffer");
+    m_HdrColorbuffer.setFilter(TextureFilter::Bilinear);
+    m_HdrColorbuffer.setAnisoLevel(0);
+    m_HdrColorbuffer.initTexture(GraphicsFormat::RGBA16F, m_vViewportSize.x, m_vViewportSize.y,
+                                 false, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+    m_HdrDepthbuffer.create("SceneRenderer: view depth buffer");
+    m_HdrDepthbuffer.init(GraphicsFormat::Depth24, m_vViewportSize.x, m_vViewportSize.y);
+
+    m_HdrBackbuffer.create("SceneRenderer: HDR backbuffer");
+    m_HdrBackbuffer.attachColor(&m_HdrColorbuffer, 0);
+    m_HdrBackbuffer.attachDepth(&m_HdrDepthbuffer);
+
+    if (!m_HdrBackbuffer.isComplete()) {
+        throw std::logic_error(
+            fmt::format("SceneRenderer HDR backbuffer is not complete. Status: {}",
+                        (int)m_HdrBackbuffer.checkStatus()));
     }
+}
+
+void SceneRenderer::destroyBackbuffer() {
+    m_HdrBackbuffer.destroy();
+    m_HdrColorbuffer.destroy();
+    m_HdrDepthbuffer.destroy();
 }

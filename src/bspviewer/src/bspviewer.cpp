@@ -205,6 +205,7 @@ void BSPViewer::loadingTick() {
             // Loading has finished
             LevelAssetRef level = m_pLevelLoader->getLevel();
             m_pLevelLoader = nullptr;
+            MainViewRenderer::get().loadLevel(level);
             m_pWorldState = std::make_unique<WorldState>(level);
 
             for (EditorMode *mode : m_EditorModes) {

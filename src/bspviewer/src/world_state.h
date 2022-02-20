@@ -91,7 +91,6 @@ private:
     // Level loading
     void loadBrushModels();
     void loadEntities();
-    void optimizeBrushModels();
 
     void initLightStyles();
     void animateLights();

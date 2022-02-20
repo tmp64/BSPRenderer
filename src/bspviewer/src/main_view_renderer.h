@@ -36,7 +36,7 @@ public:
 
     //! @returns the material used by the surface.
     inline Material *getSurfaceMaterial(int surface) {
-        return m_SceneRenderer.getSurfaceMaterial(surface);
+        return m_pSceneRenderer->getSurfaceMaterial(surface);
     }
 
     //! Loads the level, path is passed to scene renderer to load custom lightmaps
@@ -48,22 +48,11 @@ public:
     //! Shows dialogs and processes input
     void tick();
 
-    /**
-     * Should be called during loading from main thread.
-     * @return  Whether loading has finished or not
-     */
-    bool loadingTick();
-
     //! Renders the viewport
     void renderMainView();
 
-    /**
-     * Creates an optimized model for a brush model for more effficient solid rendering.
-     */
-    void optimizeBrushModel(Model *model);
-
     inline void setLightstyleScale(int lightstyle, float scale) {
-        m_SceneRenderer.setLightstyleScale(lightstyle, scale);
+        m_pSceneRenderer->setLightstyleScale(lightstyle, scale);
     }
 
     inline glm::vec3 getCameraPos() { return m_vPosition; }
@@ -87,7 +76,7 @@ private:
     };
 
     glm::ivec2 m_vViewportSize = glm::ivec2(0, 0);
-    SceneRenderer m_SceneRenderer;
+    std::unique_ptr<SceneRenderer> m_pSceneRenderer;
     unsigned m_uFrameCount = 0;
 
     // Entities to render

@@ -76,6 +76,9 @@ public:
     //! Resets filtering and wrapping properties to defaults.
     virtual void resetProperties();
 
+    //! @returns estimated texture size in bytes
+    inline int64_t getMemoryUsage() const { return m_MemUsage.get(); }
+
     inline GLuint getId() const { return m_Texture; }
     inline GLenum getGLTarget() const { return m_Target; }
     inline TextureDimension getDimension() const { return m_Dimension; }

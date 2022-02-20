@@ -1,23 +1,25 @@
-set(RNDR_PUBLIC_HEADERS
+set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/client_entity.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/const.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/model.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/renderer_engine_interface.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_shaders.h
-	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/surface_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/utils.h
-)
 
-set(RNDR_PRIVATE_SOURCES
+	${CMAKE_CURRENT_SOURCE_DIR}/src/bsp_lightmap.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/bsp_lightmap.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/custom_lightmap.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/custom_lightmap.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/fake_lightmap.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/fake_lightmap.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/lightmap_iface.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_renderer.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/src/surface_renderer.cpp
 )
 
 add_library(renderer STATIC
 	${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt
-	${RNDR_PUBLIC_HEADERS}
-	${RNDR_PRIVATE_SOURCES}
+	${SOURCE_FILES}
 )
 
 appfw_module(renderer)
@@ -61,6 +63,4 @@ elseif (COMPILER_GNU)
 	)
 endif()
 
-source_group("Public Headers" FILES ${RNDR_PUBLIC_HEADERS})
-source_group("Private Headers" FILES ${RNDR_PRIVATE_HEADERS})
-source_group("Private Sources" FILES ${RNDR_PRIVATE_SOURCES})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})

@@ -79,7 +79,6 @@ MainViewRenderer::MainViewRenderer() {
     AFW_ASSERT(!m_spInstance);
     m_spInstance = this;
 
-    m_SceneRenderer.setEngine(this);
     m_VisEnts.resize(MAX_VISIBLE_ENTS);
 
     // Imported from blender
@@ -185,12 +184,11 @@ bool MainViewRenderer::showTriggers() {
 
 void MainViewRenderer::setSurfaceTint(int surface, glm::vec4 color) {
     AFW_ASSERT(WorldState::get());
-    m_SceneRenderer.setSurfaceTint(surface, color);
+    m_pSceneRenderer->setSurfaceTint(surface, color);
 }
 
 void MainViewRenderer::loadLevel(LevelAssetRef &level) {
-    AFW_ASSERT(m_SceneRenderer.getLevel() == nullptr);
-    m_SceneRenderer.beginLoading(&level->getLevel(), level->getPath());
+    m_pSceneRenderer = std::make_unique<SceneRenderer>(level->getLevel(), level->getPath(), *this);
 }
 
 void MainViewRenderer::unloadLevel() {
@@ -199,9 +197,9 @@ void MainViewRenderer::unloadLevel() {
     }
 
     m_iCurSelSurface = -1;
-    m_SceneRenderer.unloadLevel();
     m_vPosition = glm::vec3(0, 0, 0);
     m_vRotation = glm::vec3(0, 0, 0);
+    m_pSceneRenderer = nullptr;
 }
 
 void MainViewRenderer::tick() {
@@ -241,7 +239,7 @@ void MainViewRenderer::tick() {
                     vViewportSize.y > 0) {
                     m_vViewportSize = vViewportSize;
                     refreshFramebuffer();
-                    m_SceneRenderer.setViewportSize(vViewportSize);
+                    m_pSceneRenderer->setViewportSize(vViewportSize);
                 }
 
                 ImVec2 oldCursor = ImGui::GetCursorPos();
@@ -299,7 +297,7 @@ void MainViewRenderer::tick() {
     ImGui::PopStyleVar();
 
     if (WorldState::get()) {
-        m_SceneRenderer.showDebugDialog("Renderer");
+        m_pSceneRenderer->showDebugDialog("Renderer");
     } else {
         if (ImGui::Begin("Renderer")) {
             ImGui::TextUnformatted("Not loaded.");
@@ -307,11 +305,6 @@ void MainViewRenderer::tick() {
 
         ImGui::End();
     }
-}
-
-bool MainViewRenderer::loadingTick() {
-    AFW_ASSERT(m_SceneRenderer.isLoading());
-    return m_SceneRenderer.loadingTick();
 }
 
 void MainViewRenderer::renderMainView() {
@@ -329,15 +322,12 @@ void MainViewRenderer::renderMainView() {
     m_flLastFOV = fovx;
     m_uFrameCount++;
 
-    m_SceneRenderer.setPerspective(fovx, aspect, 4, 8192);
-    m_SceneRenderer.setPerspViewOrigin(m_vPosition, m_vRotation);
+    SceneRenderer::ViewContext &viewContext = m_pSceneRenderer->getViewContext();
+    viewContext.setPerspective(fovx, aspect, 4, 8192);
+    viewContext.setPerspViewOrigin(m_vPosition, m_vRotation);
     updateVisibleEnts();
-    m_SceneRenderer.renderScene(m_Framebuffer.getId(), 0, 0);
+    m_pSceneRenderer->renderScene(m_Framebuffer.getId(), 0, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-void MainViewRenderer::optimizeBrushModel(Model *model) {
-    m_SceneRenderer.optimizeBrushModel(model);
 }
 
 Material *MainViewRenderer::getMaterial(const bsp::BSPMipTex &tex) {
@@ -367,7 +357,7 @@ void MainViewRenderer::drawTransTriangles(unsigned &) {}
 
 void MainViewRenderer::updateVisibleEnts() {
     appfw::Prof prof("Entity List");
-    m_SceneRenderer.clearEntities();
+    m_pSceneRenderer->clearEntities();
     auto &ents = WorldState::get()->getEntList();
     unsigned entCount = 0;
     m_uBoxCount = 0;
@@ -421,7 +411,7 @@ void MainViewRenderer::updateVisibleEnts() {
             pClent->m_vFxColor = pEnt->getFxColor();
             pClent->m_pModel = pEnt->getModel();
 
-            m_SceneRenderer.addEntity(pClent);
+            m_pSceneRenderer->addEntity(pClent);
             entCount++;
         }
     }

@@ -7,6 +7,11 @@ void Framebuffer::create(std::string_view name) {
 
 void Framebuffer::destroy() {
     m_Fb.destroy();
+
+    // Forget all attachments
+    std::fill(std::begin(m_pColorBuffers), std::end(m_pColorBuffers), nullptr);
+    m_pDepthBuffer = nullptr;
+    m_pDepthStencilBuffer = nullptr;
 }
 
 FramebufferStatus Framebuffer::checkStatus() const {
