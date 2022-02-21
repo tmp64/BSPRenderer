@@ -6,6 +6,8 @@
 #include "entities/player_start_entity.h"
 #include "entities/trigger_entity.h"
 
+ConVar<std::string> sv_skyname("sv_skyname", "", "Current sky name");
+
 WorldState::WorldState(LevelAssetRef level) {
     AFW_ASSERT(!m_spInstance);
     m_spInstance = this;
@@ -15,11 +17,17 @@ WorldState::WorldState(LevelAssetRef level) {
 
     loadBrushModels();
     loadEntities();
+    loadDefaultSky();
     m_Vis.setLevel(m_pLevel);
     m_MaterialLoader.init(BSPViewer::get().getMapName(), "assets:sound/materials.txt",
                           "assets:materials");
 
     initLightStyles();
+
+    sv_skyname.setCallback([&](const std::string &, const std::string &newVal) {
+        MainViewRenderer::get().setSkyName(newVal);
+        return true;
+    });
 }
 
 WorldState::~WorldState() {
@@ -167,6 +175,13 @@ void WorldState::loadEntities() {
     if (fail > 0) {
         printw("{} entities failed to load", fail);
     }
+}
+
+void WorldState::loadDefaultSky() {
+    const bsp::EntityKeyValues &worldspawn = m_LevelEntityDict[0];
+    int skynameIdx = worldspawn.indexOf("skyname");
+    std::string skyname = skynameIdx != -1 ? worldspawn.get(skynameIdx).asString() : "desert";
+    MainViewRenderer::get().setSkyName(skyname);
 }
 
 void WorldState::initLightStyles() {

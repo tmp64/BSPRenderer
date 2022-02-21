@@ -91,6 +91,7 @@ private:
     // Level loading
     void loadBrushModels();
     void loadEntities();
+    void loadDefaultSky();
 
     void initLightStyles();
     void animateLights();

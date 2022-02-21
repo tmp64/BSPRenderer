@@ -45,6 +45,9 @@ public:
     //! Unloads the level
     void unloadLevel();
 
+    //! Sets the sky texture
+    void setSkyName(std::string_view skyname);
+
     //! Shows dialogs and processes input
     void tick();
 
@@ -77,6 +80,7 @@ private:
 
     glm::ivec2 m_vViewportSize = glm::ivec2(0, 0);
     std::unique_ptr<SceneRenderer> m_pSceneRenderer;
+    Material *m_pSkyboxMaterial = nullptr;
     unsigned m_uFrameCount = 0;
 
     // Entities to render

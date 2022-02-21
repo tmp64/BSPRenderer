@@ -92,6 +92,9 @@ public:
         //! @returns true if the surface is culled and not drawn.
         bool cullSurface(const Surface &surface) const;
 
+        //! Sets up frustum for current origin and angles. Must be called before usage.
+        void setupFrustum();
+
     private:
         struct Plane {
             glm::vec3 vNormal;
@@ -123,8 +126,6 @@ public:
         //! 4 - near
         //! 5 - far
         Plane m_Frustum[6];
-
-        void setupFrustum();
     };
 
     SceneRenderer(bsp::Level &level, std::string_view path, IRendererEngine &engine);
@@ -132,6 +133,9 @@ public:
 
     //! Sets size of the viewport.
     void setViewportSize(const glm::ivec2 &size);
+
+    //! Sets the material used for the skybox.
+    inline void setSkyboxMaterial(Material *material) { m_pSkyboxMaterial = material; }
 
     //! @returns the view context.
     inline ViewContext &getViewContext() { return m_ViewContext; }
@@ -172,10 +176,14 @@ private:
     class FakeLightmap;
     class BSPLightmap;
     class CustomLightmap;
+    class WorldRenderer;
 
-    //! Maximum number of vertices. Limited by two byte vertex index in hte EBO,
+    //! Maximum number of vertices. Limited by two byte vertex index in the EBO,
     //! (2^16 - 1) is reserved for primitive restart.
     static constexpr uint16_t MAX_SURF_VERTEX_COUNT = std::numeric_limits<uint16_t>::max() - 1;
+
+    //! Vertex index for primitive restart.
+    static constexpr uint16_t PRIMITIVE_RESTART_IDX = std::numeric_limits<uint16_t>::max();
 
     struct SurfaceVertex {
         glm::vec3 position;
@@ -226,6 +234,8 @@ private:
     fs::path m_CustomLightmapPath;
     RenderingStats m_Stats;
 
+    std::unique_ptr<WorldRenderer> m_pWorldRenderer;
+
     // Viewport
     GLVao m_BlitQuadVao;
     GPUBuffer m_BlitQuadVbo;
@@ -248,11 +258,13 @@ private:
     unsigned m_uSurfaceVertexBufferSize = 0; //!< Number of brush vertices
     unsigned m_uMaxEboSize = 0;              //!< Maximum number of elelements in the EBO
     GLVao m_SurfaceVao;
+    Material *m_pSkyboxMaterial = nullptr;
 
 #ifdef RENDERER_SUPPORT_TINTING
     GPUBuffer m_SurfaceTintBuffer;
 #endif
 
+    // Baked lighting
     std::unique_ptr<FakeLightmap> m_pFakeLightmap;
     std::unique_ptr<BSPLightmap> m_pBSPLightmap;
     std::unique_ptr<CustomLightmap> m_pCustomLightmap;

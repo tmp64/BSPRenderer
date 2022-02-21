@@ -8,6 +8,7 @@
 #include "bsp_lightmap.h"
 #include "custom_lightmap.h"
 #include "fake_lightmap.h"
+#include "world_renderer.h"
 
 ConVar<bool> r_drawworld("r_drawworld", true, "Draw world surfaces");
 ConVar<bool> r_drawsky("r_drawsky", true, "Draw skybox");
@@ -201,6 +202,8 @@ SceneRenderer::SceneRenderer(bsp::Level &level, std::string_view path, IRenderer
     createLightstyleBuffer();
     createSurfaceBuffers();
     loadLightmaps(path);
+
+    m_pWorldRenderer = std::make_unique<WorldRenderer>(*this);
 }
 
 SceneRenderer::~SceneRenderer() {
@@ -221,13 +224,14 @@ void SceneRenderer::renderScene(GLint targetFb, float flSimTime, float flTimeDel
     validateSettings();
     frameSetup(flSimTime, flTimeDelta);
     viewRenderingSetup();
-    // drawWorld();
+    drawWorld();
     // drawEntities();
     viewRenderingEnd();
-    frameEnd();
 
     glBindFramebuffer(GL_FRAMEBUFFER, targetFb);
     postProcessBlit();
+
+    frameEnd();
 
     m_Stats.flFrameTime = renderTimer.dseconds();
 }
@@ -265,10 +269,10 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         CvarCheckbox("Patches", r_patches);
         CvarCheckbox("Filter lightmaps", r_filter_lm);
 
-        int lighting = std::clamp(r_shading.getValue(), 0, (int)std::size(r_shading_values));
+        int lighting = std::clamp(r_shading.getValue(), 0, (int)std::size(r_shading_values) - 1);
 
         if (ImGui::BeginCombo("Shading", r_shading_values[lighting])) {
-            for (int i = 0; i <= (int)std::size(r_shading_values); i++) {
+            for (int i = 0; i < (int)std::size(r_shading_values); i++) {
                 if (ImGui::Selectable(r_shading_values[i])) {
                     r_shading.setValue(i);
                 }
@@ -279,10 +283,10 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
             ImGui::EndCombo();
         }
 
-        int lightmap = std::clamp(r_lightmap.getValue(), 0, (int)std::size(r_lightmap_values));
+        int lightmap = std::clamp(r_lightmap.getValue(), 0, (int)std::size(r_lightmap_values) - 1);
 
         if (ImGui::BeginCombo("Lightmaps", r_lightmap_values[lightmap])) {
-            for (int i = 0; i <= (int)std::size(r_lightmap_values); i++) {
+            for (int i = 0; i < (int)std::size(r_lightmap_values); i++) {
                 if (ImGui::Selectable(r_lightmap_values[i])) {
                     r_lightmap.setValue(i);
                 }
@@ -569,6 +573,8 @@ void SceneRenderer::validateSettings() {
             r_shading.setValue(1);
             newLightmap = m_pFakeLightmap.get();
         }
+    } else {
+        newLightmap = m_pFakeLightmap.get();
     }
 
     if (newLightmap != oldLightmap) {
@@ -675,6 +681,9 @@ void SceneRenderer::frameSetup(float flSimTime, float flTimeDelta) {
 
     // Upload lightstyles
     m_LightstyleBuffer.update(0, sizeof(m_flLightstyleScales), m_flLightstyleScales);
+
+    // Setup main view context
+    m_ViewContext.setupFrustum();
 }
 
 void SceneRenderer::frameEnd() {
@@ -714,6 +723,25 @@ void SceneRenderer::viewRenderingEnd() {
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS); // In case it was changed and wasn't changed back
+}
+
+void SceneRenderer::drawWorld() {
+    if (!r_drawworld.getValue()) {
+        return;
+    }
+
+    {
+        appfw::Prof prof("World BSP");
+        m_pWorldRenderer->getTexturedWorldSurfaces(m_ViewContext,
+                                                   m_pWorldRenderer->m_MainWorldSurfList);
+    }
+
+    appfw::Prof prof("World Draw");
+    m_pWorldRenderer->drawTexturedWorld(m_ViewContext, m_pWorldRenderer->m_MainWorldSurfList);
+
+    if (r_drawsky.getValue()) {
+        m_pWorldRenderer->drawSkybox(m_ViewContext, m_pWorldRenderer->m_MainWorldSurfList);
+    }
 }
 
 void SceneRenderer::postProcessBlit() {

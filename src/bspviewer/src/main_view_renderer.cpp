@@ -1,6 +1,8 @@
 #include <appfw/str_utils.h>
 #include <material_system/shader.h>
 #include <renderer/utils.h>
+#include <renderer/scene_shaders.h>
+#include <renderer/envmap.h>
 #include <imgui_impl_shaders.h>
 #include "main_view_renderer.h"
 #include "world_state.h"
@@ -157,11 +159,19 @@ MainViewRenderer::MainViewRenderer() {
     m_pBackbufferMat->setShader(SHADER_TYPE_IMGUI_IDX, &s_MainViewShader);
     m_pBackbufferMat->setShader(SHADER_TYPE_IMGUI_LINEAR_IDX, &s_MainViewShader);
     m_pBackbufferMat->setTexture(0, std::make_unique<Texture2D>());
+
+    // Skybox
+    m_pSkyboxMaterial = MaterialSystem::get().createMaterial("Skybox");
+    m_pSkyboxMaterial->setSize(1, 1);
+    m_pSkyboxMaterial->setShader(SHADER_TYPE_WORLD_IDX, &SceneShaders::Shaders::skybox);
 }
 
 MainViewRenderer::~MainViewRenderer() {
     AFW_ASSERT(m_spInstance == this);
     m_spInstance = nullptr;
+
+    MaterialSystem::get().destroyMaterial(m_pSkyboxMaterial);
+    m_pSkyboxMaterial = nullptr;
     MaterialSystem::get().destroyMaterial(m_pBoxMaterial);
     m_pBoxMaterial = nullptr;
 
@@ -189,6 +199,7 @@ void MainViewRenderer::setSurfaceTint(int surface, glm::vec4 color) {
 
 void MainViewRenderer::loadLevel(LevelAssetRef &level) {
     m_pSceneRenderer = std::make_unique<SceneRenderer>(level->getLevel(), level->getPath(), *this);
+    m_pSceneRenderer->setSkyboxMaterial(m_pSkyboxMaterial);
 }
 
 void MainViewRenderer::unloadLevel() {
@@ -200,6 +211,20 @@ void MainViewRenderer::unloadLevel() {
     m_vPosition = glm::vec3(0, 0, 0);
     m_vRotation = glm::vec3(0, 0, 0);
     m_pSceneRenderer = nullptr;
+}
+
+void MainViewRenderer::setSkyName(std::string_view skyname) {
+    std::string skyPath = "assets:gfx/env/" + std::string(skyname);
+    std::unique_ptr<Texture> cubemap;
+
+    try {
+        cubemap = std::make_unique<TextureCube>(loadEnvMapImage("Skybox", skyPath));
+    } catch (const std::exception &e) {
+        printe("Failed to load sky '{}': {}", skyname, e.what());
+        cubemap = std::make_unique<TextureCube>(createErrorEnvMap("Skybox"));
+    }
+
+    m_pSkyboxMaterial->setTexture(0, std::move(cubemap));
 }
 
 void MainViewRenderer::tick() {

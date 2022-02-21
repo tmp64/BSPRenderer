@@ -1,6 +1,7 @@
 set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/client_entity.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/const.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/envmap.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/model.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/renderer_engine_interface.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_renderer.h
@@ -11,10 +12,13 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/bsp_lightmap.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/custom_lightmap.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/custom_lightmap.h
+	${CMAKE_CURRENT_SOURCE_DIR}/src/envmap.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/fake_lightmap.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/fake_lightmap.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/lightmap_iface.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_renderer.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/world_renderer.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/world_renderer.h
 )
 
 add_library(renderer STATIC
