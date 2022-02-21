@@ -1,4 +1,5 @@
 #include <renderer/utils.h>
+#include <renderer/scene_shaders.h>
 #include "world_renderer.h"
 
 ConVar<bool> r_lockpvs("r_lockpvs", false, "Lock current PVS to let devs see where it ends");
@@ -30,8 +31,7 @@ void SceneRenderer::WorldRenderer::getTexturedWorldSurfaces(ViewContext &context
     recursiveWorldNodesTextured(context, surfList, 0);
 }
 
-void SceneRenderer::WorldRenderer::drawTexturedWorld(ViewContext &,
-                                                     WorldSurfaceList &surfList) {
+void SceneRenderer::WorldRenderer::drawTexturedWorld(WorldSurfaceList &surfList) {
     auto &textureChain = surfList.textureChain;
     auto &textureChainFrames = surfList.textureChainFrames;
     unsigned frame = surfList.textureChainFrame;
@@ -98,7 +98,7 @@ void SceneRenderer::WorldRenderer::drawTexturedWorld(ViewContext &,
     glDisable(GL_PRIMITIVE_RESTART);
 }
 
-void SceneRenderer::WorldRenderer::drawSkybox(ViewContext &, WorldSurfaceList &surfList) {
+void SceneRenderer::WorldRenderer::drawSkybox(WorldSurfaceList &surfList) {
     AFW_ASSERT(m_Renderer.m_pSkyboxMaterial);
 
     if (surfList.skySurfaces.empty()) {
@@ -146,6 +146,79 @@ void SceneRenderer::WorldRenderer::drawSkybox(ViewContext &, WorldSurfaceList &s
 
     // Restore GL
     glDepthFunc(GL_LESS);
+    glDisable(GL_PRIMITIVE_RESTART);
+}
+
+void SceneRenderer::WorldRenderer::drawWireframe(WorldSurfaceList &surfList, bool drawSky) {
+    auto &textureChain = surfList.textureChain;
+    auto &textureChainFrames = surfList.textureChainFrames;
+    unsigned frame = surfList.textureChainFrame;
+    
+    // Fill the EBO with world surfaces
+    unsigned eboIdx = 0;
+
+    for (size_t i = 0; i < textureChain.size(); i++) {
+        if (textureChainFrames[i] != frame) {
+            continue;
+        }
+
+        for (unsigned surfIdx : textureChain[i]) {
+            Surface &surf = m_Renderer.m_Surfaces[surfIdx];
+            uint16_t vertCount = (uint16_t)surf.vertexCount;
+
+            for (uint16_t j = 0; j < vertCount; j++) {
+                m_WorldEboBuf[eboIdx + j] = (uint16_t)surf.vertexOffset + j;
+            }
+
+            eboIdx += vertCount;
+            m_WorldEboBuf[eboIdx] = PRIMITIVE_RESTART_IDX;
+            eboIdx++;
+        }
+    }
+
+    // Fill the EBO with sky surfaces
+    if (drawSky) {
+        for (unsigned surfIdx : surfList.skySurfaces) {
+            Surface &surf = m_Renderer.m_Surfaces[surfIdx];
+            uint16_t vertCount = (uint16_t)surf.vertexCount;
+
+            for (uint16_t j = 0; j < vertCount; j++) {
+                m_WorldEboBuf[eboIdx + j] = (uint16_t)surf.vertexOffset + j;
+            }
+
+            eboIdx += vertCount;
+            m_WorldEboBuf[eboIdx] = PRIMITIVE_RESTART_IDX;
+            eboIdx++;
+        }
+    }
+
+    if (eboIdx == 0) {
+        return;
+    }
+
+    // Set up GL
+    glBindVertexArray(m_Renderer.m_SurfaceVao);
+    m_WorldEbo.bind();
+    glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
+    glEnable(GL_PRIMITIVE_RESTART);
+
+    // Enable shader
+    ShaderInstance *shaderInstance =
+        SceneShaders::Shaders::brushWireframe.getShaderInstance(SHADER_TYPE_CUSTOM_IDX);
+    shaderInstance->enable(m_Renderer.m_uFrameCount);
+    shaderInstance->getShader<SceneShaders::BrushWireframeShader>().setColor(glm::vec3(0.8f));
+
+    // Decrement EBO size to remove last PRIMITIVE_RESTART_IDX
+    eboIdx--;
+
+    // Update EBO
+    m_WorldEbo.update(0, eboIdx * sizeof(uint16_t), m_WorldEboBuf.data());
+
+    // Draw elements
+    glDrawElements(GL_LINE_LOOP, eboIdx, GL_UNSIGNED_SHORT, nullptr);
+    m_Renderer.m_Stats.uDrawCalls++;
+
+    // Restore GL
     glDisable(GL_PRIMITIVE_RESTART);
 }
 

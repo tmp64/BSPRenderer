@@ -115,11 +115,33 @@ private:
     TextureVar m_HdrBuffer;
 };
 
+//! Wireframe shader for brushes.
+class BrushWireframeShader : public ShaderT<BrushWireframeShader> {
+public:
+    BrushWireframeShader(unsigned type = 0)
+        : BaseClass(type) {
+        setTitle("SceneShaders::PatchesShader");
+        setVert("assets:shaders/scene/brush_wireframe.vert");
+        setFrag("assets:shaders/scene/brush_wireframe.frag");
+        setTypes(SHADER_TYPE_CUSTOM);
+
+        addUniform(m_uGlobalUniform, "GlobalUniform", SceneRenderer::GLOBAL_UNIFORM_BIND);
+        addUniform(m_uColor, "u_vColor");
+    }
+
+    void setColor(glm::vec3 color) { m_uColor.set(color); }
+
+private:
+    UniformBlock m_uGlobalUniform;
+    Var<glm::vec3> m_uColor;
+};
+
 struct Shaders {
     static inline BrushShader brush;
     static inline SkyboxShader skybox;
     static inline PatchesShader patches;
     static inline PostProcessShader postprocess;
+    static inline BrushWireframeShader brushWireframe;
 };
 
 } // namespace SceneShaders

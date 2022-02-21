@@ -263,6 +263,8 @@ void SceneRenderer::showDebugDialog(const char *title, bool *isVisible) {
         CvarCheckbox("World", r_drawworld);
         ImGui::SameLine();
         CvarCheckbox("Sky", r_drawsky);
+        ImGui::SameLine();
+        CvarCheckbox("Wire", r_wireframe);
 
         CvarCheckbox("Entities", r_drawents);
         ImGui::SameLine();
@@ -737,10 +739,15 @@ void SceneRenderer::drawWorld() {
     }
 
     appfw::Prof prof("World Draw");
-    m_pWorldRenderer->drawTexturedWorld(m_ViewContext, m_pWorldRenderer->m_MainWorldSurfList);
+    m_pWorldRenderer->drawTexturedWorld(m_pWorldRenderer->m_MainWorldSurfList);
 
     if (r_drawsky.getValue()) {
-        m_pWorldRenderer->drawSkybox(m_ViewContext, m_pWorldRenderer->m_MainWorldSurfList);
+        m_pWorldRenderer->drawSkybox(m_pWorldRenderer->m_MainWorldSurfList);
+    }
+
+    if (r_wireframe.getValue()) {
+        m_pWorldRenderer->drawWireframe(m_pWorldRenderer->m_MainWorldSurfList,
+                                        r_drawsky.getValue());
     }
 }
 

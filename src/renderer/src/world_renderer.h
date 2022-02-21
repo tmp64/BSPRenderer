@@ -26,10 +26,13 @@ public:
     void getTexturedWorldSurfaces(ViewContext &context, WorldSurfaceList &surfList) const;
 
     //! Renders the world, performs batching.
-    void drawTexturedWorld(ViewContext &context, WorldSurfaceList &surfList);
+    void drawTexturedWorld(WorldSurfaceList &surfList);
 
     //! Renders the sky polygons in one batch.
-    void drawSkybox(ViewContext &context, WorldSurfaceList &surfList);
+    void drawSkybox(WorldSurfaceList &surfList);
+    
+    //! Renders world and sky polygons as wireframe.
+    void drawWireframe(WorldSurfaceList &surfList, bool drawSky);
 
     //! Surf list for main view
     WorldSurfaceList m_MainWorldSurfList;
