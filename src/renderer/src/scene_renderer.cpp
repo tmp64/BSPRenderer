@@ -764,6 +764,7 @@ void SceneRenderer::postProcessBlit() {
     glBindVertexArray(m_BlitQuadVao);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
+    m_Stats.uDrawCalls++;
 }
 
 void SceneRenderer::createBackbuffer() {

@@ -296,13 +296,15 @@ void SceneRenderer::WorldRenderer::markLeaves(ViewContext &context,
     surfList.visFrame++;
     unsigned visFrame = surfList.visFrame;
 
-    uint8_t vis[bsp::MAX_MAP_LEAFS / 8];
+    uint8_t visBuf[bsp::MAX_MAP_LEAFS / 8];
+    const uint8_t *vis = nullptr;
 
     if (r_novis.getValue()) {
-        AFW_ASSERT_REL(((m_Leaves.size() + 7) >> 3) <= sizeof(vis));
-        memset(vis, 0xFF, (m_Leaves.size() + 7) >> 3);
+        AFW_ASSERT_REL(((m_Leaves.size() + 7) >> 3) <= sizeof(visBuf));
+        memset(visBuf, 0xFF, (m_Leaves.size() + 7) >> 3);
+        vis = visBuf;
     } else {
-        m_Renderer.m_Level.leafPVS(viewleaf, vis);
+        vis = m_Renderer.m_Level.leafPVS(viewleaf, visBuf);
     }
 
     // Node 0 is always visible
