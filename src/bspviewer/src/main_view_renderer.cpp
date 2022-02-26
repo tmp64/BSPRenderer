@@ -412,15 +412,15 @@ void MainViewRenderer::updateVisibleEnts() {
             m_uBoxCount++;
         }
 
-        if (pEnt->getModel() && pEnt->getModel()->getType() == ModelType::Brush) {
+        if (pEnt->getModel() && pEnt->getModel()->type == ModelType::Brush) {
             if (entCount == MAX_VISIBLE_ENTS) {
                 continue;
             }
 
             // Check if visible in PVS
             {
-                glm::vec3 mins = pEnt->getOrigin() + pEnt->getModel()->getMins();
-                glm::vec3 maxs = pEnt->getOrigin() + pEnt->getModel()->getMaxs();
+                glm::vec3 mins = pEnt->getOrigin() + pEnt->getModel()->vMins;
+                glm::vec3 maxs = pEnt->getOrigin() + pEnt->getModel()->vMaxs;
                 if (!Vis::get().boxInPvs(m_vPosition, mins, maxs)) {
                     continue;
                 }
@@ -428,13 +428,13 @@ void MainViewRenderer::updateVisibleEnts() {
 
 
             ClientEntity *pClent = &m_VisEnts[entCount];
-            pClent->m_vOrigin = pEnt->getOrigin();
-            pClent->m_vAngles = pEnt->getAngles();
-            pClent->m_iRenderMode = pEnt->getRenderMode();
-            pClent->m_iRenderFx = pEnt->getRenderFx();
-            pClent->m_iFxAmount = pEnt->getFxAmount();
-            pClent->m_vFxColor = pEnt->getFxColor();
-            pClent->m_pModel = pEnt->getModel();
+            pClent->vOrigin = pEnt->getOrigin();
+            pClent->vAngles = pEnt->getAngles();
+            pClent->iRenderMode = pEnt->getRenderMode();
+            pClent->iRenderFx = pEnt->getRenderFx();
+            pClent->iFxAmount = pEnt->getFxAmount();
+            pClent->vFxColor = pEnt->getFxColor();
+            pClent->pModel = pEnt->getModel();
 
             m_pSceneRenderer->addEntity(pClent);
             entCount++;

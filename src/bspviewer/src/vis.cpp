@@ -192,7 +192,7 @@ bool Vis::raycastToEntitySurface(const Ray &inputRay, SurfaceRaycastHit &hit, bo
             continue;
         }
 
-        if (pEnt->getModel() && pEnt->getModel()->getType() == ModelType::Brush) {
+        if (pEnt->getModel() && pEnt->getModel()->type == ModelType::Brush) {
             BrushModel &model = static_cast<BrushModel &>(*pEnt->getModel());
 
             SurfaceRaycastHit testHit;
@@ -201,7 +201,7 @@ bool Vis::raycastToEntitySurface(const Ray &inputRay, SurfaceRaycastHit &hit, bo
             Ray ray = inputRay;
             ray.origin -= pEnt->getOrigin();
 
-            raycastRecursiveWorldNodes(model.m_iHeadnodes[0], ray, testHit);
+            raycastRecursiveWorldNodes(model.iHeadnodes[0], ray, testHit);
 
             if (testHit.surface != -1) {
                 hit = testHit;
@@ -244,7 +244,7 @@ bool Vis::raycastToEntity(const Ray &inputRay, EntityRaycastHit &hit, bool ignor
         } else if (pEnt->getModel()) {
             Model &baseModel = *pEnt->getModel();
 
-            if (baseModel.getType() == ModelType::Brush) {
+            if (baseModel.type == ModelType::Brush) {
                 BrushModel &model = static_cast<BrushModel &>(*pEnt->getModel());
 
                 SurfaceRaycastHit testHit;
@@ -253,7 +253,7 @@ bool Vis::raycastToEntity(const Ray &inputRay, EntityRaycastHit &hit, bool ignor
                 Ray ray = inputRay;
                 ray.origin -= pEnt->getOrigin();
 
-                raycastRecursiveWorldNodes(model.m_iHeadnodes[0], ray, testHit);
+                raycastRecursiveWorldNodes(model.iHeadnodes[0], ray, testHit);
 
                 if (testHit.surface != -1) {
                     hit.point = testHit.point + pEnt->getOrigin();

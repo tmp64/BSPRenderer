@@ -79,13 +79,13 @@ void EntitySelectTool::tick() {
 void EntitySelectTool::showTinting() {
     BaseEntity *pEnt = WorldState::get()->getEntity(m_iEntIdx);
 
-    if (pEnt->getModel() && pEnt->getModel()->getType() == ModelType::Brush) {
+    if (pEnt->getModel() && pEnt->getModel()->type == ModelType::Brush) {
         BrushModel &model = static_cast<BrushModel &>(*pEnt->getModel());
 
-        int firstFace = model.getFirstFace();
-        int lastFace = firstFace + model.getFaceNum();
+        unsigned firstFace = model.uFirstFace;
+        unsigned lastFace = firstFace + model.uFaceNum;
 
-        for (int i = firstFace; i < lastFace; i++) {
+        for (unsigned i = firstFace; i < lastFace; i++) {
             MainViewRenderer::get().setSurfaceTint(i, SELECTION_COLOR);
         }
     } else {
@@ -96,13 +96,13 @@ void EntitySelectTool::showTinting() {
 void EntitySelectTool::clearTinting() {
     BaseEntity *pEnt = WorldState::get()->getEntity(m_iEntIdx);
 
-    if (pEnt->getModel() && pEnt->getModel()->getType() == ModelType::Brush) {
+    if (pEnt->getModel() && pEnt->getModel()->type == ModelType::Brush) {
         BrushModel &model = static_cast<BrushModel &>(*pEnt->getModel());
 
-        int firstFace = model.getFirstFace();
-        int lastFace = firstFace + model.getFaceNum();
+        unsigned firstFace = model.uFirstFace;
+        unsigned lastFace = firstFace + model.uFaceNum;
 
-        for (int i = firstFace; i < lastFace; i++) {
+        for (unsigned i = firstFace; i < lastFace; i++) {
             MainViewRenderer::get().setSurfaceTint(i, glm::vec4(0));
         }
     } else {

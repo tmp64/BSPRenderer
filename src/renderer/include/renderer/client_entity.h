@@ -7,41 +7,6 @@
 class ClientEntity {
 public:
     /**
-     * Returns entity position in the world.
-     */
-    const glm::vec3 &getOrigin() const;
-
-    /**
-     * Returns entity rotation angles in degrees (pitch, yaw, roll).
-     */
-    const glm::vec3 &getAngles() const;
-
-    /**
-     * Returns render mode.
-     */
-    RenderMode getRenderMode() const;
-
-    /**
-     * Returns render effect.
-     */
-    RenderFx getRenderFx() const;
-
-    /**
-     * Returns FX Amount [0; 255].
-     */
-    int getFxAmount() const;
-
-    /**
-     * Returns FX Color, each component is in [0; 255].
-     */
-    glm::ivec3 getFxColor() const;
-
-    /**
-     * Returns a pointer to the model.
-     */
-    Model *getModel() const;
-
-    /**
      * Returns whether the entity is non-transparent.
      */
     bool isOpaque() const;
@@ -56,33 +21,25 @@ public:
      */
     int getRenderModeRank() const;
 
-    glm::vec3 m_vOrigin;
-    glm::vec3 m_vAngles;
-    int m_iRenderMode;
-    int m_iRenderFx;
-    int m_iFxAmount;
-    glm::ivec3 m_vFxColor;
-    Model *m_pModel;
+    glm::vec3 vOrigin;
+    glm::vec3 vAngles;
+    RenderMode iRenderMode;
+    RenderFx iRenderFx;
+    int iFxAmount;
+    glm::ivec3 vFxColor;
+    Model *pModel;
 };
 
-inline const glm::vec3 &ClientEntity::getOrigin() const { return m_vOrigin; }
-inline const glm::vec3 &ClientEntity::getAngles() const { return m_vAngles; }
-inline RenderMode ClientEntity::getRenderMode() const { return (RenderMode)m_iRenderMode; }
-inline RenderFx ClientEntity::getRenderFx() const { return (RenderFx)m_iRenderFx; }
-inline int ClientEntity::getFxAmount() const { return m_iFxAmount; }
-inline glm::ivec3 ClientEntity::getFxColor() const { return m_vFxColor; }
-inline Model *ClientEntity::getModel() const { return m_pModel; }
-
 inline bool ClientEntity::isOpaque() const {
-    if (getRenderMode() == kRenderNormal) {
+    if (iRenderMode == kRenderNormal) {
         return true;
     }
 
-    if (getModel()->getType() == ModelType::Sprite) {
+    if (pModel->type == ModelType::Sprite) {
         return false;
     }
 
-    if (getRenderMode() == kRenderTransAlpha && getFxAmount() == 255) {
+    if (iRenderMode == kRenderTransAlpha && iFxAmount == 255) {
         return true;
     }
 
@@ -90,7 +47,7 @@ inline bool ClientEntity::isOpaque() const {
 }
 
 inline int ClientEntity::getRenderModeRank() const {
-    switch (getRenderMode()) {
+    switch (iRenderMode) {
     case kRenderTransTexture:
         return 1; // draw second
     case kRenderTransAdd:

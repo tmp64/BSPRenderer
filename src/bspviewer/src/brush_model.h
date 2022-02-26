@@ -2,13 +2,12 @@
 #define BRUSH_MODEL_H
 #include <renderer/model.h>
 
-class BrushModel : public Model {
-public:
+struct BrushModel : public Model {
     BrushModel();
 
-    glm::vec3 m_vOrigin;
-    int32_t m_iHeadnodes[bsp::MAX_MAP_HULLS];
-    int32_t m_nVisLeafs;
+    glm::vec3 vOrigin;
+    int32_t iHeadnodes[bsp::MAX_MAP_HULLS];
+    int32_t nVisLeafs;
 };
 
 #endif

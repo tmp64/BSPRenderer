@@ -117,17 +117,17 @@ void WorldState::loadBrushModels() {
         auto &levelModel = models[i];
         auto &model = m_BrushModels[i];
 
-        model.m_vMins = levelModel.nMins;
-        model.m_vMaxs = levelModel.nMaxs;
-        model.m_vOrigin = levelModel.vOrigin;
-        std::copy(levelModel.iHeadnodes, levelModel.iHeadnodes + std::size(levelModel.iHeadnodes), model.m_iHeadnodes);
-        model.m_nVisLeafs = levelModel.nVisLeafs;
-        model.m_iFirstFace = levelModel.iFirstFace;
-        model.m_iFaceNum = levelModel.nFaces;
+        model.vMins = levelModel.nMins;
+        model.vMaxs = levelModel.nMaxs;
+        model.vOrigin = levelModel.vOrigin;
+        std::copy(levelModel.iHeadnodes, levelModel.iHeadnodes + std::size(levelModel.iHeadnodes), model.iHeadnodes);
+        model.nVisLeafs = levelModel.nVisLeafs;
+        model.uFirstFace = levelModel.iFirstFace;
+        model.uFaceNum = levelModel.nFaces;
 
-        if (model.m_iFirstFace + model.m_iFaceNum > faces.size()) {
-            throw std::runtime_error(fmt::format("model {}: invalid faces [{};{})", i, model.m_iFirstFace,
-                                                 model.m_iFirstFace + model.m_iFaceNum));
+        if (model.uFirstFace + model.uFaceNum > faces.size()) {
+            throw std::runtime_error(fmt::format("model {}: invalid faces [{};{})", i, model.uFirstFace,
+                                                 model.uFirstFace + model.uFaceNum));
         }
 
         // Calculate radius
@@ -135,7 +135,7 @@ void WorldState::loadBrushModels() {
         auto &lvlSurfEdges = m_pLevel->getSurfEdges();
         auto &lvlVertices = m_pLevel->getVertices();
 
-        for (int faceidx = model.m_iFirstFace; faceidx < model.m_iFirstFace + model.m_iFaceNum; faceidx++) {
+        for (unsigned faceidx = model.uFirstFace; faceidx < model.uFirstFace + model.uFaceNum; faceidx++) {
             const bsp::BSPFace &face = m_pLevel->getFaces().at(faceidx);
             for (int j = 0; j < face.nEdges; j++) {
                 glm::vec3 vertex;
@@ -156,7 +156,7 @@ void WorldState::loadBrushModels() {
 
         }
 
-        model.m_flRadius = radius;
+        model.flRadius = radius;
     }
 }
 
