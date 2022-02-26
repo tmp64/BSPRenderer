@@ -200,6 +200,10 @@ void MainViewRenderer::setSurfaceTint(int surface, glm::vec4 color) {
 void MainViewRenderer::loadLevel(LevelAssetRef &level) {
     m_pSceneRenderer = std::make_unique<SceneRenderer>(level->getLevel(), level->getPath(), *this);
     m_pSceneRenderer->setSkyboxMaterial(m_pSkyboxMaterial);
+
+    if (m_vViewportSize != glm::ivec2(0, 0)) {
+        m_pSceneRenderer->setViewportSize(m_vViewportSize);
+    }
 }
 
 void MainViewRenderer::unloadLevel() {
