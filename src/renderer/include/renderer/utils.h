@@ -151,4 +151,8 @@ inline float planeDiff(glm::vec3 point, const bsp::BSPPlane &plane) {
     return res - plane.fDist;
 }
 
+inline bool isVectorNull(const glm::vec3 &v) {
+    return v.x == 0.f && v.y == 0.f && v.z == 0.f;
+}
+
 #endif

@@ -8,6 +8,8 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_shaders.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/utils.h
 
+	${CMAKE_CURRENT_SOURCE_DIR}/src/brush_renderer.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/brush_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/bsp_lightmap.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/bsp_lightmap.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/custom_lightmap.cpp

@@ -177,6 +177,7 @@ private:
     class BSPLightmap;
     class CustomLightmap;
     class WorldRenderer;
+    class BrushRenderer;
 
     //! Maximum number of vertices. Limited by two byte vertex index in the EBO,
     //! (2^16 - 1) is reserved for primitive restart.
@@ -226,6 +227,7 @@ private:
         unsigned uSkyPolys = 0;
         unsigned uBrushEntPolys = 0;
         unsigned uDrawCalls = 0;
+        unsigned uEboOverflows = 0;
         double flFrameTime = 0;
     };
 
@@ -235,6 +237,7 @@ private:
     RenderingStats m_Stats;
 
     std::unique_ptr<WorldRenderer> m_pWorldRenderer;
+    std::unique_ptr<BrushRenderer> m_pBrushRenderer;
 
     // Viewport
     GLVao m_BlitQuadVao;
@@ -273,6 +276,11 @@ private:
     float m_flLightstyleScales[MAX_LIGHTSTYLES] = {};
     GPUBuffer m_LightstyleBuffer;
     GLTexture m_LightstyleTexture;
+
+    // Entities
+    std::vector<ClientEntity *> m_SolidEntityList;
+    std::vector<ClientEntity *> m_TransEntityList;
+    unsigned m_uVisibleEntCount = 0;
 
     ViewContext m_ViewContext;
 
@@ -334,8 +342,17 @@ private:
     //! Renders entities
     void drawEntities();
 
+    //! Renders opaque entities
+    void drawSolidEntities();
+
+    //! Renders transparent entities
+    void drawTransEntities();
+
     //! Blits the HDR backbuffer into current framebuffer.
     void postProcessBlit();
+
+    //! Sets OpenGL options for a render mode.
+    void setRenderMode(RenderMode mode);
 
     //----------------------------------------------------------------
     // Backbuffer

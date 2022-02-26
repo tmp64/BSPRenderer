@@ -40,8 +40,6 @@ void SceneRenderer::WorldRenderer::drawTexturedWorld(WorldSurfaceList &surfList)
     // Set up GL
     glBindVertexArray(m_Renderer.m_SurfaceVao);
     m_WorldEbo.bind();
-    glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
-    glEnable(GL_PRIMITIVE_RESTART);
 
     // Draw texture chains
     unsigned eboIdx = 0;
@@ -93,9 +91,6 @@ void SceneRenderer::WorldRenderer::drawTexturedWorld(WorldSurfaceList &surfList)
     }
 
     m_Renderer.m_Stats.uWorldPolys += drawnSurfs;
-
-    // Restore GL
-    glDisable(GL_PRIMITIVE_RESTART);
 }
 
 void SceneRenderer::WorldRenderer::drawSkybox(WorldSurfaceList &surfList) {
@@ -108,8 +103,6 @@ void SceneRenderer::WorldRenderer::drawSkybox(WorldSurfaceList &surfList) {
     // Set up GL
     glBindVertexArray(m_Renderer.m_SurfaceVao);
     m_WorldEbo.bind();
-    glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
-    glEnable(GL_PRIMITIVE_RESTART);
     glDepthFunc(GL_LEQUAL);
 
     // Bind material
@@ -146,7 +139,6 @@ void SceneRenderer::WorldRenderer::drawSkybox(WorldSurfaceList &surfList) {
 
     // Restore GL
     glDepthFunc(GL_LESS);
-    glDisable(GL_PRIMITIVE_RESTART);
 }
 
 void SceneRenderer::WorldRenderer::drawWireframe(WorldSurfaceList &surfList, bool drawSky) {
@@ -199,8 +191,6 @@ void SceneRenderer::WorldRenderer::drawWireframe(WorldSurfaceList &surfList, boo
     // Set up GL
     glBindVertexArray(m_Renderer.m_SurfaceVao);
     m_WorldEbo.bind();
-    glPrimitiveRestartIndex(PRIMITIVE_RESTART_IDX);
-    glEnable(GL_PRIMITIVE_RESTART);
 
     // Enable shader
     ShaderInstance *shaderInstance =
@@ -217,9 +207,6 @@ void SceneRenderer::WorldRenderer::drawWireframe(WorldSurfaceList &surfList, boo
     // Draw elements
     glDrawElements(GL_LINE_LOOP, eboIdx, GL_UNSIGNED_SHORT, nullptr);
     m_Renderer.m_Stats.uDrawCalls++;
-
-    // Restore GL
-    glDisable(GL_PRIMITIVE_RESTART);
 }
 
 void SceneRenderer::WorldRenderer::createLeaves() {
