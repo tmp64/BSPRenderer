@@ -46,6 +46,7 @@ public:
 private:
     static constexpr float NORMAL_DPI = 96;
 
+    char m_szConfigPath[256];
     float m_flScale = 0;
     void setupScale();
 };

@@ -112,6 +112,11 @@ ImGuiComponent::ImGuiComponent() {
     // io.ConfigViewportsNoAutoMerge = true;
     // io.ConfigViewportsNoTaskBarIcon = true;
 
+    // ImGui config path
+    snprintf(m_szConfigPath, sizeof(m_szConfigPath), "%s",
+             getFileSystem().getFilePath("config:imgui.ini").u8string().c_str());
+    io.IniFilename = m_szConfigPath;
+
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
     // ImGui::StyleColorsClassic();
