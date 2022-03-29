@@ -7,6 +7,12 @@
 
 class Shader;
 
+struct MaterialDeleter {
+    void operator()(Material *mat);
+};
+
+using MaterialPtr = std::unique_ptr<Material, MaterialDeleter>;
+
 class MaterialSystem : public AppComponentBase<MaterialSystem> {
 public:
     class GraphicsSettings {
@@ -49,7 +55,7 @@ public:
     Material *getNullMaterial();
 
     //! Creates a new material.
-    Material *createMaterial(std::string_view name);
+    MaterialPtr createMaterial(std::string_view name);
 
     //! Destroys a material. mat will become an invalid pointer.
     void destroyMaterial(Material *mat);
@@ -87,6 +93,7 @@ private:
 
     // Materials
     std::list<Material> m_Materials;
+    MaterialPtr m_NullMaterial;
 
     GraphicsSettings m_Settings;
 

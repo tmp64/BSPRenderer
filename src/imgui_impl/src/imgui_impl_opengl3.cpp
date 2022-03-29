@@ -182,8 +182,8 @@ struct ImGui_ImplOpenGL3_Data
     char            GlslVersionString[32];   // Specified by user or detected based on compile time GL settings.
     unsigned int    VboHandle, ElementsHandle;
     bool            HasClipOrigin;
-    Material *MainMaterial;
-    Material *FontMaterial;
+    MaterialPtr MainMaterial;
+    MaterialPtr FontMaterial;
     bool bLinearRendering;
 
     Material *CurrentMaterial;
@@ -399,7 +399,7 @@ static void ImGui_ImplOpenGL3_SetupRenderState(ImDrawData* draw_data, int fb_wid
 
 static void updateMaterial(ImGui_ImplOpenGL3_Data *bd, Material *material) {
     if (!material) {
-        material = bd->FontMaterial;
+        material = bd->FontMaterial.get();
     }
 
     if (bd->CurrentMaterial != material) {
@@ -580,7 +580,7 @@ bool ImGui_ImplOpenGL3_CreateFontsTexture()
     bd->FontMaterial->setShader(SHADER_TYPE_IMGUI_LINEAR_IDX, &ImGuiShaderPrototype);
     bd->FontMaterial->setTexture(0, std::move(fontTexture));
 
-    io.Fonts->SetTexID(bd->FontMaterial);
+    io.Fonts->SetTexID(bd->FontMaterial.get());
 
     return true;
 }
@@ -591,7 +591,6 @@ void ImGui_ImplOpenGL3_DestroyFontsTexture()
     ImGui_ImplOpenGL3_Data* bd = ImGui_ImplOpenGL3_GetBackendData();
     if (bd->FontMaterial)
     {
-        MaterialSystem::get().destroyMaterial(bd->FontMaterial);
         bd->FontMaterial = nullptr;
         io.Fonts->SetTexID(nullptr);
     }
@@ -638,10 +637,7 @@ void    ImGui_ImplOpenGL3_DestroyDeviceObjects()
     if (bd->VboHandle)      { glDeleteBuffers(1, &bd->VboHandle); bd->VboHandle = 0; }
     if (bd->ElementsHandle) { glDeleteBuffers(1, &bd->ElementsHandle); bd->ElementsHandle = 0; }
 
-    if (bd->MainMaterial) {
-        MaterialSystem::get().destroyMaterial(bd->MainMaterial);
-        bd->MainMaterial = nullptr;
-    }
+    bd->MainMaterial = nullptr;
 
     ImGui_ImplOpenGL3_DestroyFontsTexture();
 }

@@ -16,6 +16,12 @@ ConCommand
     cmd_mat_reloadshaders("mat_reloadshaders",
                           "Reloads all shaders. If any fail to compile, they won't be reloaded.");
 
+void MaterialDeleter::operator()(Material *mat) {
+    if (mat) {
+        MaterialSystem::get().destroyMaterial(mat);
+    }
+}
+
 MaterialSystem::MaterialSystem() {
     setTickEnabled(true);
 
@@ -109,10 +115,10 @@ Material *MaterialSystem::getNullMaterial() {
     return &(*m_Materials.begin());
 }
 
-Material *MaterialSystem::createMaterial(std::string_view name) {
+MaterialPtr MaterialSystem::createMaterial(std::string_view name) {
     auto it = m_Materials.emplace(m_Materials.end(), name);
     it->m_Iter = it;
-    return &(*it);
+    return MaterialPtr(&(*it));
 }
 
 void MaterialSystem::destroyMaterial(Material *mat) {
@@ -150,11 +156,11 @@ void MaterialSystem::unloadShaders() {
 
 void MaterialSystem::createNullMaterial() {
     int size = CheckerboardImage::get().size;
-    Material *mat = createMaterial("Null Material");
-    mat->setSize(size, size);
-    mat->setTexture(0, std::make_unique<Texture2D>());
+    m_NullMaterial = createMaterial("Null Material");
+    m_NullMaterial->setSize(size, size);
+    m_NullMaterial->setTexture(0, std::make_unique<Texture2D>());
     
-    auto tex = static_cast<Texture2D *>(mat->getTexture(0));
+    auto tex = static_cast<Texture2D *>(m_NullMaterial->getTexture(0));
     tex->create("Null Texture");
     tex->initTexture(GraphicsFormat::RGB8, size, size, false, GL_RGB, GL_UNSIGNED_BYTE,
                      CheckerboardImage::get().data.data());
