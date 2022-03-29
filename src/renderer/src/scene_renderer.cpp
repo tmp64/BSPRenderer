@@ -740,8 +740,6 @@ void SceneRenderer::viewRenderingSetup() {
     // Bind lightstyles texture
     glActiveTexture(GL_TEXTURE0 + TEX_LIGHTSTYLES);
     glBindTexture(GL_TEXTURE_BUFFER, m_LightstyleTexture);
-
-    m_pBrushRenderer->beginRendering();
 }
 
 void SceneRenderer::viewRenderingEnd() {
@@ -786,6 +784,7 @@ void SceneRenderer::drawEntities() {
 
 void SceneRenderer::drawSolidEntities() {
     appfw::Prof prof("Solid");
+    m_pBrushRenderer->beginRendering();
 
     // Sort opaque entities
     auto sortFn = [this](ClientEntity *const &lhs, ClientEntity *const &rhs) {
@@ -822,6 +821,7 @@ void SceneRenderer::drawSolidEntities() {
 
 void SceneRenderer::drawTransEntities() {
     appfw::Prof prof("Trans");
+    m_pBrushRenderer->beginRendering();
 
     if (!r_nosort.getValue()) {
         // Sort entities based on render mode and distance
