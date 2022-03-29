@@ -30,20 +30,7 @@ void bsp::Level::loadFromFile(const fs::path &filename) {
     }
 
     std::vector<uint8_t> data;
-    data.reserve(64 * 1024 * 1024); // Set capacity to 4 MB
-
-    for (;;) {
-        uint8_t c;
-        file.read((char *)&c, 1);
-        if (file.eof()) {
-            break;
-        }
-        data.push_back(c);
-    }
-
-    file.close();
-    data.shrink_to_fit();
-
+    appfw::readFileContents(file, data);
     loadFromBytes(data);
 }
 
