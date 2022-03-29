@@ -522,6 +522,7 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     glDeleteVertexArrays(1, &vertex_array_object);
 #endif
 
+    ShaderInstance::disable();
     bd->CurrentMaterial = nullptr;
 
     // Restore modified GL state
