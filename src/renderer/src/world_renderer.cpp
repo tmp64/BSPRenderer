@@ -76,7 +76,7 @@ void SceneRenderer::WorldRenderer::drawTexturedWorld(WorldSurfaceList &surfList)
         vertexCount--;
 
         AFW_ASSERT(eboIdx - eboOffset == vertexCount);
-        AFW_ASSERT(eboOffset + eboIdx < m_WorldEboBuf.size());
+        AFW_ASSERT(eboOffset + vertexCount < m_WorldEboBuf.size());
 
         // Update EBO
         m_WorldEbo.update(eboOffset * sizeof(uint16_t), vertexCount * sizeof(uint16_t),
