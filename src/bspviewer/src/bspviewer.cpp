@@ -70,13 +70,6 @@ BSPViewer::BSPViewer() {
 
 BSPViewer::~BSPViewer() {
     AFW_ASSERT(m_sSingleton);
-
-    if (m_pLevelLoader) {
-        // Abort loading process. This may block.
-        printw("Level is still loading. Shutdown may take a while.");
-        m_pLevelLoader = nullptr;
-    }
-
     unloadLevel();
     m_sSingleton = nullptr;
 }
@@ -93,15 +86,14 @@ void BSPViewer::tick() {
     showModeSelection();
     showToolSelection();
     handleSwitchModesKey();
-    MainViewRenderer::get().tick();
+    showMainView();
     showInspector();
 
     if (m_pLevelLoader) {
         // Level is loading
-        AFW_ASSERT(!m_pWorldState);
         loadingTick();
-    } else if (m_pWorldState) {
-        m_pWorldState->tick();
+    } else if (m_pLevelWorldState) {
+        m_pLevelWorldState->tick(getTimeDelta());
         tickModes();
     }
 }
@@ -109,8 +101,8 @@ void BSPViewer::tick() {
 void BSPViewer::drawBackground() {
     BaseClass::drawBackground();
 
-    if (m_pWorldState) {
-        MainViewRenderer::get().renderMainView();
+    if (MainView::get()) {
+        MainView::get()->renderBackBuffer();
     }
 }
 
@@ -120,41 +112,38 @@ void BSPViewer::onWindowSizeChange(int wide, int tall) {
 }
 
 void BSPViewer::loadLevel(const std::string &name) {
-    if (m_pLevelLoader) {
-        printe("Can't load a level while loading another level.");
-        return;
-    }
-
     unloadLevel();
 
     std::string path = "assets:maps/" + name + ".bsp";    
     printi("Loading map {}", path);
+    m_bLevelLoadFailed = false;
 
     try {
         m_MapName = name;
-        m_pLevelLoader = std::make_unique<LevelLoader>(path);
+        m_pLevelLoader = std::make_unique<AssetLoader>();
+        m_Level = m_pLevelLoader->loadLevel(path);
     } catch (const std::exception &e) {
-        printe("Failed to load the map: {}", e.what());
-        return;
+        unloadLevel();
+        m_bLevelLoadFailed = true;
+        m_LevelLoadError = e.what();
+        printe("Failed to load the map: {}", m_LevelLoadError);
     }
 }
 
 void BSPViewer::unloadLevel() {
     if (m_pLevelLoader) {
-        // Level loading can't be aborted
-        // Can't block until it finished either: event loop must be running for asset loading to
-        // finish
-        AFW_ASSERT(!m_pWorldState);
-        throw std::logic_error("can't unload while loading");
-    }
+        m_pLevelLoader = nullptr;
+        m_Level = LevelAsset();
+    } else if (m_pLevelWorldState) {
+        AFW_ASSERT(m_pLevelMainView);
 
-    if (m_pWorldState) {
         for (EditorMode *mode : m_EditorModes) {
             mode->onLevelUnloaded();
         }
 
-        m_pWorldState = nullptr;
-        return;
+        m_pLevelMainView->setWorldState(nullptr);
+        m_pLevelWorldState = nullptr;
+        m_pLevelMainView = nullptr;
     }
 }
 
@@ -201,22 +190,30 @@ void BSPViewer::showMainMenuBar() {
 
 void BSPViewer::loadingTick() {
     try {
-        if (m_pLevelLoader->tick()) {
-            // Loading has finished
-            LevelAssetRef level = m_pLevelLoader->getLevel();
-            m_pLevelLoader = nullptr;
-            MainViewRenderer::get().loadLevel(level);
-            m_pWorldState = std::make_unique<WorldState>(level);
+        m_pLevelLoader->processQueue();
 
-            for (EditorMode *mode : m_EditorModes) {
-                mode->onLevelLoaded();
-            }
+        if (m_pLevelLoader->isFinished()) {
+            onLevelLoadingFinished();
         }
     } catch (const std::exception &e) {
-        printe("Failed to load the map: {}", e.what());
-        m_pLevelLoader = nullptr;
-        m_pWorldState = nullptr;
+        m_bLevelLoadFailed = true;
+        m_LevelLoadError = e.what();
+        printe("Failed to load the map: {}", m_LevelLoadError);
     }
+}
+
+void BSPViewer::onLevelLoadingFinished() {
+    appfw::Timer timer;
+    m_pLevelLoader = nullptr;
+    m_pLevelMainView = std::make_unique<MainView>(m_Level);
+    m_pLevelWorldState = std::make_unique<WorldState>(m_Level.getLevel(), m_pLevelMainView.get());
+    m_pLevelMainView->setWorldState(m_pLevelWorldState.get());
+
+    for (EditorMode *mode : m_EditorModes) {
+        mode->onLevelLoaded();
+    }
+
+    printi("Finished loading in {:.3f} ms", timer.dseconds() * 1000.0);
 }
 
 void BSPViewer::registerMode(EditorMode *mode) {
@@ -286,9 +283,32 @@ void BSPViewer::handleSwitchModesKey() {
     }
 }
 
+void BSPViewer::showMainView() {
+    if (!ImGui::Begin("Scene")) {
+        ImGui::End();
+    }
+
+    if (m_bLevelLoadFailed) {
+        ImGui::TextUnformatted("Map failed to load:");
+        ImGui::TextUnformatted(m_LevelLoadError.c_str());
+    } else if (m_pLevelLoader) {
+        int finishedCount = m_pLevelLoader->getFinishedItemCount();
+        int totalCount = m_pLevelLoader->getTotalItemCount();
+        float percent = totalCount == 0 ? 0.0f : (float)finishedCount / totalCount;
+        ImGui::Text("Loading %.f (%d/%d): %s", percent * 100, finishedCount, totalCount,
+                    m_pLevelLoader->getLastItemName().c_str());
+        ImGui::ProgressBar(percent);
+    } else if (m_pLevelWorldState) {
+        AFW_ASSERT(m_pLevelMainView);
+        m_pLevelMainView->showImage();
+    }
+
+    ImGui::End();
+}
+
 void BSPViewer::showInspector() {
     if (ImGui::Begin("Inspector")) {
-        if (m_pWorldState && m_pActiveMode) {
+        if (m_pLevelWorldState && m_pActiveMode) {
             m_pActiveMode->showInspector();
         }
     }

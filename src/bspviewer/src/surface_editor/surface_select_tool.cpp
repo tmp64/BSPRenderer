@@ -1,7 +1,8 @@
 #include <input/key_bind.h>
+#include <hlviewer/vis.h>
 #include "surface_select_tool.h"
-#include "../main_view_renderer.h"
-#include "../vis.h"
+#include "main_view.h"
+#include "world_state.h"
 
 KeyBind key_clear_selection("Clear selection", KeyCode::D, KMOD_CTRL);
 
@@ -59,18 +60,19 @@ void SurfaceSelectTool::onDeactivated() {
 void SurfaceSelectTool::onMainViewClicked(const glm::vec2 &position) {
     clearSelection();
 
-    auto &mainView = MainViewRenderer::get();
+    auto &mainView = *MainView::get();
+    auto &vis = WorldState::get()->getVis();
     bool drawWorld = mainView.isWorldRenderingEnabled();
     bool drawEntities = mainView.isEntityRenderingEnabled();
-    Ray ray = mainView.screenPointToRay(position);
+    Ray ray = mainView.viewportPointToRay(position);
     SurfaceRaycastHit hit;
 
     if (drawWorld && drawEntities) {
-        Vis::get().raycastToSurface(ray, hit, !mainView.showTriggers());
+        vis.raycastToSurface(ray, hit, !mainView.showTriggers());
     } else if (drawWorld) {
-        Vis::get().raycastToWorldSurface(ray, hit);
+        vis.raycastToWorldSurface(ray, hit);
     } else if (drawEntities) {
-        Vis::get().raycastToEntitySurface(ray, hit, !mainView.showTriggers());
+        vis.raycastToEntitySurface(ray, hit, !mainView.showTriggers());
     }
 
     if (hit.surface != -1) {
@@ -85,9 +87,9 @@ void SurfaceSelectTool::tick() {
 }
 
 void SurfaceSelectTool::showTinting() {
-    MainViewRenderer::get().setSurfaceTint(m_iSurface, SELECTION_COLOR);
+    MainView::get()->setSurfaceTint(m_iSurface, SELECTION_COLOR);
 }
 
 void SurfaceSelectTool::clearTinting() {
-    MainViewRenderer::get().setSurfaceTint(m_iSurface, glm::vec4(0, 0, 0, 0));
+    MainView::get()->setSurfaceTint(m_iSurface, glm::vec4(0, 0, 0, 0));
 }

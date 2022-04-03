@@ -1,11 +1,10 @@
 #ifndef APP_H
 #define APP_H
 #include <gui_app_base/gui_app_base.h>
-#include <renderer/scene_renderer.h>
-#include "assets/asset_manager.h"
+#include <hlviewer/assets/asset_manager.h>
+#include <hlviewer/assets/asset_loader.h>
+#include "main_view.h"
 #include "world_state.h"
-#include "main_view_renderer.h"
-#include "level_loader.h"
 #include "editor_mode.h"
 #include "surface_editor/surface_edit_mode.h"
 #include "entity_editor/entity_edit_mode.h"
@@ -42,10 +41,15 @@ public:
 
 private:
     AssetManager m_AssetManager;
-    MainViewRenderer m_Renderer;
-    std::unique_ptr<LevelLoader> m_pLevelLoader;
-    std::unique_ptr<WorldState> m_pWorldState;
+
+    // Level loading and display
     std::string m_MapName;
+    LevelAsset m_Level;
+    std::unique_ptr<AssetLoader> m_pLevelLoader;
+    std::unique_ptr<MainView> m_pLevelMainView;
+    std::unique_ptr<WorldState> m_pLevelWorldState;
+    std::string m_LevelLoadError;
+    bool m_bLevelLoadFailed = false;
 
     // Editor mode support
     std::vector<EditorMode *> m_EditorModes;
@@ -57,6 +61,7 @@ private:
     void showDockSpace();
     void showMainMenuBar();
     void loadingTick();
+    void onLevelLoadingFinished();
 
     //! Adds the mode to the list.
     void registerMode(EditorMode *mode);
@@ -70,6 +75,7 @@ private:
     void showModeSelection();
     void showToolSelection();
     void handleSwitchModesKey();
+    void showMainView();
     void showInspector();
 
     static inline BSPViewer *m_sSingleton = nullptr;

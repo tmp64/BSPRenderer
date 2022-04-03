@@ -1,25 +1,5 @@
 set(SOURCE_FILES
 	CMakeLists.txt
-	src/assets/asset.cpp
-	src/assets/asset.h
-	src/assets/asset_future.h
-	src/assets/asset_manager.cpp
-	src/assets/asset_manager.h
-	src/assets/level_asset.cpp
-	src/assets/level_asset.h
-	src/assets/wad_asset.cpp
-	src/assets/wad_asset.h
-	src/assets/wad_material_asset.cpp
-	src/assets/wad_material_asset.h
-	
-	src/entities/base_entity.cpp
-	src/entities/base_entity.h
-	src/entities/light_entity.cpp
-	src/entities/light_entity.h
-	src/entities/player_start_entity.cpp
-	src/entities/player_start_entity.h
-	src/entities/trigger_entity.cpp
-	src/entities/trigger_entity.h
 
 	src/entity_editor/entity_edit_mode.cpp
 	src/entity_editor/entity_edit_mode.h
@@ -31,21 +11,15 @@ set(SOURCE_FILES
 	src/surface_editor/surface_edit_mode.h
 	src/surface_editor/surface_select_tool.cpp
 	src/surface_editor/surface_select_tool.h
-
-	src/brush_model.cpp
-	src/brush_model.h
+	
 	src/bspviewer.cpp
 	src/bspviewer.h
 	src/editor_mode.cpp
 	src/editor_mode.h
 	src/editor_tool.cpp
 	src/editor_tool.h
-	src/level_loader.cpp
-	src/level_loader.h
-	src/main_view_renderer.cpp
-	src/main_view_renderer.h
-	src/vis.cpp
-	src/vis.h
+	src/main_view.cpp
+	src/main_view.h
 	src/world_state.cpp
 	src/world_state.h
 )
@@ -65,7 +39,7 @@ target_link_libraries(bspviewer
 	gui_app_base
 	app_gui_launcher
 	material_props
-	renderer
+	hlviewer_shared
 )
 
 target_precompile_headers(bspviewer PRIVATE

@@ -1,7 +1,7 @@
 #include <input/key_bind.h>
+#include <hlviewer/vis.h>
 #include "entity_select_tool.h"
-#include "main_view_renderer.h"
-#include "vis.h"
+#include "main_view.h"
 #include "world_state.h"
 
 extern KeyBind key_clear_selection;
@@ -56,13 +56,13 @@ void EntitySelectTool::onDeactivated() {
 void EntitySelectTool::onMainViewClicked(const glm::vec2 &position) {
     clearSelection();
 
-    auto &mainView = MainViewRenderer::get();
+    auto &mainView = *MainView::get();
     bool drawEntities = mainView.isEntityRenderingEnabled();
-    Ray ray = mainView.screenPointToRay(position);
+    Ray ray = mainView.viewportPointToRay(position);
     EntityRaycastHit hit;
 
     if (drawEntities) {
-        Vis::get().raycastToEntity(ray, hit, !mainView.showTriggers());
+        WorldState::get()->getVis().raycastToEntity(ray, hit, !mainView.showTriggers());
     }
 
     if (hit.entity != -1) {
@@ -86,7 +86,7 @@ void EntitySelectTool::showTinting() {
         unsigned lastFace = firstFace + model.uFaceNum;
 
         for (unsigned i = firstFace; i < lastFace; i++) {
-            MainViewRenderer::get().setSurfaceTint(i, SELECTION_COLOR);
+            MainView::get()->setSurfaceTint(i, SELECTION_COLOR);
         }
     } else {
         pEnt->setAABBTintColor(SELECTION_COLOR);
@@ -103,7 +103,7 @@ void EntitySelectTool::clearTinting() {
         unsigned lastFace = firstFace + model.uFaceNum;
 
         for (unsigned i = firstFace; i < lastFace; i++) {
-            MainViewRenderer::get().setSurfaceTint(i, glm::vec4(0));
+            MainView::get()->setSurfaceTint(i, glm::vec4(0));
         }
     } else {
         pEnt->setAABBTintColor(glm::vec4(0));

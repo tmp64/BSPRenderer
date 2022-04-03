@@ -1,0 +1,24 @@
+gui:
+    win_title: Half-Life Asset Viewer
+    win_width: 1600
+    win_height: 900
+    
+    imgui_scale: 0 # zero to auto scale based on display DPI
+    imgui_font_path: "assets:fonts/CascadiaMono-Regular.ttf"
+    imgui_font_size: 14.0  # Size without scaling
+
+appfw:
+    extcon_port: 27333
+
+commands:
+    - app_fps_max 240
+
+filesystem:
+    assets:
+        - hlviewer
+        - bspviewer
+        - base
+        - E:\\Steam\\steamapps\\common\\Half-Life\\valve
+        - E:\\Steam\\steamapps\\common\\Half-Life\\valve_downloads
+    config:
+        - hlviewer/cfg

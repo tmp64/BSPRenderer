@@ -1,7 +1,6 @@
 #include <imgui.h>
 #include "entity_edit_mode.h"
 #include "world_state.h"
-#include "main_view_renderer.h"
 #include "bspviewer.h"
 
 static constexpr float TEXTURE_PREVIEW_SIZE = 96.0f;

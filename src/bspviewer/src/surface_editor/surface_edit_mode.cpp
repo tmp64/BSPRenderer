@@ -1,7 +1,7 @@
 #include <imgui.h>
 #include "surface_edit_mode.h"
 #include "../world_state.h"
-#include "../main_view_renderer.h"
+#include "../main_view.h"
 #include "../bspviewer.h"
 
 static constexpr float TEXTURE_PREVIEW_SIZE = 96.0f;
@@ -15,7 +15,7 @@ SurfaceEditMode::SurfaceData::SurfaceData(SurfaceEditMode *editor, int surfIdx)
     m_iIdx = surfIdx;
 
     auto &matload = WorldState::get()->getMaterialLoader();
-    Material *material = m_pMaterial = MainViewRenderer::get().getSurfaceMaterial(surfIdx);
+    Material *material = m_pMaterial = MainView::get()->getSurfaceMaterial(surfIdx);
 
     loadMaterial(matload.getWadYamlPath(material->getName(), material->getWadName()), m_Wad,
                  m_OrigWad);
@@ -266,7 +266,7 @@ void SurfaceEditMode::showInspector() {
         ImGui::PushID("surface info");
         if (ImGui::BeginTable("table", 2, ImGuiTableFlags_SizingFixedFit)) {
             ImGui::TableNextColumn();
-            Material *material = MainViewRenderer::get().getSurfaceMaterial(surfIdx);
+            Material *material = MainView::get()->getSurfaceMaterial(surfIdx);
             float width, height;
 
             if (material->getWide() <= material->getTall()) {

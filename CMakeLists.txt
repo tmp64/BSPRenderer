@@ -74,9 +74,11 @@ add_subdirectory(src/gui_app_base)
 add_subdirectory(src/bsp)
 add_subdirectory(src/rad)
 add_subdirectory(src/renderer)
+add_subdirectory(src/hlviewer_shared)
 
 # Executables
 add_subdirectory(src/bspviewer)
 add_subdirectory(src/graphics_test)
+add_subdirectory(src/hlviewer)
 add_subdirectory(src/playground)
 add_subdirectory(src/rad_launcher)
