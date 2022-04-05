@@ -240,8 +240,6 @@ private:
     std::unique_ptr<BrushRenderer> m_pBrushRenderer;
 
     // Viewport
-    GLVao m_BlitQuadVao;
-    GPUBuffer m_BlitQuadVbo;
     glm::ivec2 m_vViewportSize = glm::ivec2(0, 0);
     glm::ivec2 m_vTargetViewportSize = glm::ivec2(800, 600);
     Texture2D m_HdrColorbuffer;
@@ -289,9 +287,6 @@ private:
     //----------------------------------------------------------------
     //! Initializes m_Surfaces.
     void initSurfaces();
-
-    //! Creates the screen-wide quad for blitting.
-    void createBlitQuad();
 
     //! Creates global uniform buffer.
     void createGlobalUniform();

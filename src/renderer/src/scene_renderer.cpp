@@ -198,7 +198,6 @@ SceneRenderer::SceneRenderer(bsp::Level &level, std::string_view path, IRenderer
     : m_Level(level)
     , m_Engine(engine) {
     initSurfaces();
-    createBlitQuad();
     createGlobalUniform();
     createLightstyleBuffer();
     createSurfaceBuffers();
@@ -424,30 +423,6 @@ void SceneRenderer::initSurfaces() {
 
         surface.color = glm::vec3(rand() % 256, rand() % 256, rand() % 256) / 255.0f;
     }
-}
-
-void SceneRenderer::createBlitQuad() {
-    // clang-format off
-    const float quadVertices[] = {
-        // positions        // texture Coords
-        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-         1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-         1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-    };
-    // clang-format on
-
-    m_BlitQuadVao.create();
-    m_BlitQuadVbo.create(GL_ARRAY_BUFFER, "SceneRenderer: Blit Quad VBO");
-
-    glBindVertexArray(m_BlitQuadVao);
-    m_BlitQuadVbo.bind();
-    m_BlitQuadVbo.init(sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
-    glBindVertexArray(0);
 }
 
 void SceneRenderer::createGlobalUniform() {
@@ -896,9 +871,7 @@ void SceneRenderer::postProcessBlit() {
     glActiveTexture(GL_TEXTURE0);
     m_HdrColorbuffer.bind();
 
-    glBindVertexArray(m_BlitQuadVao);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glBindVertexArray(0);
+    GraphicsStack::get().blit();
     m_Stats.uDrawCalls++;
 }
 

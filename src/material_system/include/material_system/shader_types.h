@@ -9,7 +9,8 @@ constexpr unsigned SHADER_TYPE_CUSTOM = 1 << SHADER_TYPE_CUSTOM_IDX;
 
 //! Blit shader.
 //! Vertex inputs:
-//!		TODO
+//!	  layout (location = 0) in vec3 aPos;
+//!	  layout (location = 1) in vec2 aTexCoords;
 constexpr unsigned SHADER_TYPE_BLIT_IDX = 1;
 constexpr unsigned SHADER_TYPE_BLIT = 1 << SHADER_TYPE_BLIT_IDX;
 

@@ -18,6 +18,9 @@ public:
     //! Clears the bitmap.
     void clear();
 
+    //! Fills the bitmap with one color.
+    void fill(T color);
+
     //! Copies wide*tall pixels from a buffer to the bitmap.
     //! No bounds checks are performed. Source must be contained by the target completely.
     //! @param  x       Target X coord, accounting for padding
@@ -46,6 +49,11 @@ inline void Bitmap<T>::clear() {
     m_iWide = 0;
     m_iTall = 0;
     m_Pixels.clear();
+}
+
+template <typename T>
+inline void Bitmap<T>::fill(T color) {
+    std::fill(m_Pixels.begin(), m_Pixels.end(), color);
 }
 
 template <typename T>

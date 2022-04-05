@@ -23,7 +23,6 @@ private:
     std::vector<WADAsset *> m_Wads;
 
     //! Loads the level from file.
-    //! Called by AssetManager from the worker thread.
     void loadFromFile(AssetManager &assMgr, std::string_view path);
 
     //! Returns the WAD files needed for the level.

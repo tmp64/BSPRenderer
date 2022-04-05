@@ -1,5 +1,8 @@
 #include "hlviewer.h"
+#include "error_dialog.h"
 #include "map_viewer.h"
+#include "sprite_analyzer.h"
+#include "sprite_viewer.h"
 
 static ConCommand cmd_open("open", "Open a file", [](const CmdString &args) {
     if (args.size() < 2) {
@@ -10,6 +13,10 @@ static ConCommand cmd_open("open", "Open a file", [](const CmdString &args) {
     if (!HLViewer::get().openDialogForFile("assets:" + args[1])) {
         printe("Unsupported file.");
     }
+});
+
+static ConCommand cmd_analyze_sprites("analyze_sprites", "Opens the sprite analyzer.", []() {
+    HLViewer::get().addNewDialog(std::make_unique<SpriteAnalyzer>());
 });
 
 const AppInitInfo &app_getInitInfo() {
@@ -32,11 +39,16 @@ bool HLViewer::isFileSupported(std::string_view filename) {
         extension = filename.substr(extpos + 1);
     }
 
-    if (extension == "bsp") {
+    if (extension == "bsp" || extension == "spr") {
         return true;
     }
 
     return false;
+}
+
+void HLViewer::addNewDialog(std::unique_ptr<DialogBase> &&dialog) {
+    m_Dialogs.push_back(std::move(dialog));
+    // TODO: Sort them by title
 }
 
 DialogBase *HLViewer::openDialogForFile(std::string_view path) {
@@ -49,8 +61,16 @@ DialogBase *HLViewer::openDialogForFile(std::string_view path) {
         extension = path.substr(extpos + 1);
     }
 
-    if (extension == "bsp") {
-        dialog = std::make_unique<MapViewer>(path);
+    try {
+        if (extension == "bsp") {
+            dialog = std::make_unique<MapViewer>(path);
+        } else if (extension == "spr") {
+            dialog = std::make_unique<SpriteViewer>(path);
+        }
+    } catch (const std::exception &e) {
+        printe("Failed to open dialog for {}:\n{}", path, e.what());
+        addNewDialog(std::make_unique<ErrorDialog>(e.what(), ""));
+        return nullptr;
     }
 
     if (!dialog) {
@@ -58,8 +78,7 @@ DialogBase *HLViewer::openDialogForFile(std::string_view path) {
     }
 
     DialogBase *dialogPtr = dialog.get();
-    m_Dialogs.push_back(std::move(dialog));
-    // TODO: Sort them by title
+    addNewDialog(std::move(dialog));
     return dialogPtr;
 }
 

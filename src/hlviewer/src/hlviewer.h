@@ -21,6 +21,9 @@ public:
     //! @returns whether the file can be opened
     bool isFileSupported(std::string_view filename);
 
+    //! Adds a new dialog.
+    void addNewDialog(std::unique_ptr<DialogBase> &&dialog);
+
     //! Opens the dialog for specified file.
     DialogBase *openDialogForFile(std::string_view path);
 

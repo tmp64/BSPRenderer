@@ -6,6 +6,7 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/renderer_engine_interface.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/scene_shaders.h
+	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/sprite_model.h
 	${CMAKE_CURRENT_SOURCE_DIR}/include/renderer/utils.h
 
 	${CMAKE_CURRENT_SOURCE_DIR}/src/brush_renderer.cpp

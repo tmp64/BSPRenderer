@@ -4,6 +4,7 @@ set(SOURCE_FILES
 	include/hlviewer/assets/asset_loader.h
 	include/hlviewer/assets/asset_manager.h
 	include/hlviewer/assets/level_asset.h
+	include/hlviewer/assets/sprite_asset.h
 	include/hlviewer/assets/wad_asset.h
 	include/hlviewer/assets/wad_material_asset.h
 
@@ -22,6 +23,7 @@ set(SOURCE_FILES
 	src/assets/asset_loader.cpp
 	src/assets/asset_manager.cpp
 	src/assets/level_asset.cpp
+	src/assets/sprite_asset.cpp
 	src/assets/wad_asset.cpp
 	src/assets/wad_material_asset.cpp
 

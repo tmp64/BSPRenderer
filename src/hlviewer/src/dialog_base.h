@@ -25,6 +25,9 @@ public:
     //! Sets the dialog title
     void setTitle(std::string_view title);
 
+    //! Sets the default dialog size.
+    inline void setDefaultSize(glm::vec2 size) { m_DefaultSize = size; }
+
     //! @returns the unique index.
     inline unsigned getUniqueId() const { return m_uUniqueId; }
 

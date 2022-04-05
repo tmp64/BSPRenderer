@@ -2,12 +2,18 @@ set(SOURCE_FILES
 	CMakeLists.txt
 	src/dialog_base.cpp
 	src/dialog_base.h
+	src/error_dialog.cpp
+	src/error_dialog.h
 	src/file_browser.cpp
 	src/file_browser.h
 	src/hlviewer.cpp
 	src/hlviewer.h
 	src/map_viewer.cpp
 	src/map_viewer.h
+	src/sprite_analyzer.cpp
+	src/sprite_analyzer.h
+	src/sprite_viewer.cpp
+	src/sprite_viewer.h
 )
 
 add_executable(hlviewer
