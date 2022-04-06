@@ -10,6 +10,7 @@
 #include "fake_lightmap.h"
 #include "world_renderer.h"
 #include "brush_renderer.h"
+#include "sprite_renderer.h"
 
 ConVar<bool> r_drawworld("r_drawworld", true, "Draw world surfaces");
 ConVar<bool> r_drawsky("r_drawsky", true, "Draw skybox");
@@ -205,6 +206,7 @@ SceneRenderer::SceneRenderer(bsp::Level &level, std::string_view path, IRenderer
 
     m_pWorldRenderer = std::make_unique<WorldRenderer>(*this);
     m_pBrushRenderer = std::make_unique<BrushRenderer>(*this);
+    m_pSpriteRenderer = std::make_unique<SpriteRenderer>(*this);
 }
 
 SceneRenderer::~SceneRenderer() {
@@ -785,6 +787,10 @@ void SceneRenderer::drawSolidEntities() {
             m_pBrushRenderer->drawBrushEntity(m_ViewContext, pClent);
             break;
         }
+        case ModelType::Sprite: {
+            m_pSpriteRenderer->drawSpriteEntity(m_ViewContext, pClent);
+            break;
+        }
         }
     }
 
@@ -850,6 +856,10 @@ void SceneRenderer::drawTransEntities() {
                     m_pBrushRenderer->drawBrushEntity(m_ViewContext, pClent);
                 }
             }
+            break;
+        }
+        case ModelType::Sprite: {
+            m_pSpriteRenderer->drawSpriteEntity(m_ViewContext, pClent);
             break;
         }
         }

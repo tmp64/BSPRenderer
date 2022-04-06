@@ -75,6 +75,9 @@ public:
         //! Returns view position in the world.
         inline const glm::vec3 &getViewOrigin() const { return m_vViewOrigin; }
 
+        //! @returns view angles.
+        inline const glm::vec3 &getViewAngles() const { return m_vViewAngles; }
+
         //! Returns view forward direction
         inline const glm::vec3 &getViewForward() const { return m_vForward; }
 
@@ -178,6 +181,7 @@ private:
     class CustomLightmap;
     class WorldRenderer;
     class BrushRenderer;
+    class SpriteRenderer;
 
     //! Maximum number of vertices. Limited by two byte vertex index in the EBO,
     //! (2^16 - 1) is reserved for primitive restart.
@@ -238,6 +242,7 @@ private:
 
     std::unique_ptr<WorldRenderer> m_pWorldRenderer;
     std::unique_ptr<BrushRenderer> m_pBrushRenderer;
+    std::unique_ptr<SpriteRenderer> m_pSpriteRenderer;
 
     // Viewport
     glm::ivec2 m_vViewportSize = glm::ivec2(0, 0);

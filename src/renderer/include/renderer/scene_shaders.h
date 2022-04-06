@@ -136,12 +136,54 @@ private:
     Var<glm::vec3> m_uColor;
 };
 
+//! Sprite Shader
+class SpriteShader : public ShaderT<SpriteShader> {
+public:
+    SpriteShader(unsigned type = 0)
+        : BaseClass(type) {
+        setTitle("SceneShaders::SpriteShader");
+        setVert("assets:shaders/scene/sprite.vert");
+        setFrag("assets:shaders/scene/sprite.frag");
+        setTypes(SHADER_TYPE_CUSTOM);
+
+        addUniform(m_uGlobalUniform, "GlobalUniform", SceneRenderer::GLOBAL_UNIFORM_BIND);
+        addUniform(m_uModelMat, "u_ModelMatrix");
+        addUniform(m_uTexture, "u_Texture");
+        addUniform(m_uFrame, "u_flSpriteFrame");
+        addUniform(m_uRenderMode, "u_iRenderMode");
+        addUniform(m_uFxAmount, "u_flFxAmount");
+        addUniform(m_uFxColor, "u_vFxColor");
+    }
+
+    void onShaderCompiled() override {
+        m_uTexture.set(0);
+    }
+
+    void setModelMatrix(glm::mat4 mat) { m_uModelMat.set(mat); }
+    void setRenderMode(int renderMode) { m_uRenderMode.set(renderMode); }
+    void setRenderFx(float amount, glm::vec3 color) {
+        m_uFxAmount.set(amount);
+        m_uFxColor.set(color);
+    }
+    void setFrame(float frame) { m_uFrame.set(std::floor(frame)); }
+
+private:
+    UniformBlock m_uGlobalUniform;
+    Var<glm::mat4> m_uModelMat;
+    TextureVar m_uTexture;
+    Var<float> m_uFrame;
+    Var<int> m_uRenderMode;
+    Var<float> m_uFxAmount;
+    Var<glm::vec3> m_uFxColor;
+};
+
 struct Shaders {
     static inline BrushShader brush;
     static inline SkyboxShader skybox;
     static inline PatchesShader patches;
     static inline PostProcessShader postprocess;
     static inline BrushWireframeShader brushWireframe;
+    static inline SpriteShader spriteShader;
 };
 
 } // namespace SceneShaders

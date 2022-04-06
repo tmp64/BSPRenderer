@@ -4,7 +4,7 @@
 #include <material_system/material_system.h>
 #include <renderer/model.h>
 
-struct SpriteModel {
+struct SpriteModel : public Model {
     bsp::SpriteInfo spriteInfo;
     MaterialPtr spriteMat;
 };

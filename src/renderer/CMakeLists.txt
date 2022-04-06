@@ -20,6 +20,8 @@ set(SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/fake_lightmap.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/lightmap_iface.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/scene_renderer.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/sprite_renderer.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/src/sprite_renderer.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/world_renderer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/world_renderer.h
 )

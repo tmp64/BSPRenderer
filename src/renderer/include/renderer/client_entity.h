@@ -28,6 +28,8 @@ public:
     int iFxAmount;
     glm::ivec3 vFxColor;
     Model *pModel;
+    float flFrame;
+    float flScale = 1;
 };
 
 inline bool ClientEntity::isOpaque() const {
