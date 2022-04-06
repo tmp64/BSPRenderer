@@ -39,7 +39,7 @@ void SceneRenderer::BrushRenderer::drawBrushEntity(const ViewContext &context,
                                ->getShader<SceneShaders::BrushShader>();
             shader.setModelMatrix(entData.transformMat);
             shader.setRenderMode(clent->iRenderMode);
-            shader.setRenderFx(clent->iFxAmount / 255.f, {0, 0, 0});
+            shader.setRenderFx(clent->iFxAmount / 255.f, glm::vec3(clent->vFxColor) / 255.0f);
         }
 
         batchAddSurface(surf);
