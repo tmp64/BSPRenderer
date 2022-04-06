@@ -231,7 +231,7 @@ std::string bsp::EntityKeyValuesDict::exportToString() const {
 }
 
 int bsp::EntityKeyValuesDict::findEntityByName(std::string_view targetName, int after) const {
-    for (int i = after; i < size(); i++) {
+    for (int i = after + 1; i < size(); i++) {
         if (m_Ents[i].getTargetName() == targetName) {
             return i;
         }
@@ -241,7 +241,7 @@ int bsp::EntityKeyValuesDict::findEntityByName(std::string_view targetName, int 
 }
 
 int bsp::EntityKeyValuesDict::findEntityByClassName(std::string_view className, int after) const {
-    for (int i = after; i < size(); i++) {
+    for (int i = after + 1; i < size(); i++) {
         if (m_Ents[i].getClassName() == className) {
             return i;
         }
