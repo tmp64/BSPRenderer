@@ -76,14 +76,19 @@ std::vector<glm::u8vec4> SpriteAsset::decodeFrame(const std::vector<uint8_t> &pa
         switch (format) {
         case bsp::SPR_NORMAL:
         case bsp::SPR_ADDITIVE: {
+            // 8-bit indexed format, using a 256-color palette
             pixels[i] = glm::u8vec4(color, 255);
             break;
         }
         case bsp::SPR_INDEXALPHA: {
-            pixels[i] = glm::u8vec4(color, palIdx);
+            // 8-bit alpha channel. The palette is ignored, except for the last color,
+            // which determines the overall sprite color. This format is also used for decal textures.
+            pixels[i] = glm::u8vec4(pal[255], palIdx);
             break;
         }
         case bsp::SPR_ALPHATEST: {
+            // 8-bit indexed format, using a 256-color palette. The last color in the palette
+            // is used for transparent areas. This format is also used for transparent textures.
             if (palIdx == 255) {
                 pixels[i] = glm::u8vec4(0, 0, 0, 0);
             } else {
