@@ -1,5 +1,6 @@
 #include "scene/brush_iface.glsl"
 #include "scene/global_uniform.glsl"
+#include "scene/rendermode.glsl"
 
 // Output color
 out vec4 outColor;
@@ -13,13 +14,6 @@ uniform sampler2DArray u_LMTexture;
 uniform int u_iRenderMode;
 uniform float u_flFxAmount;
 uniform vec3 u_vFxColor;
-
-#define kRenderNormal		0
-#define kRenderTransColor	1
-#define kRenderTransTexture	2
-#define kRenderGlow			3
-#define kRenderTransAlpha	4
-#define kRenderTransAdd		5
 #endif
 
 vec3 sampleLightmap(int i, float scale) {
