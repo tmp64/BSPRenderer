@@ -1,6 +1,9 @@
 #include <bsp/sprite.h>
+#include <bsp/entity_key_values.h>
 #include <imgui_impl_shaders.h>
 #include <hlviewer/assets/asset_manager.h>
+#include <hlviewer/assets/asset_loader.h>
+#include <hlviewer/scene_view.h>
 #include "sprite_viewer.h"
 
 namespace {
@@ -20,6 +23,8 @@ const char *s_SyncTypes[] = {
     "ST_SYNC",
     "ST_RAND",
 };
+
+const char *s_AvailSkies[] = {"desert", "2desert", "dusk", "night", "alien1", "xen8"};
 
 template <typename E, int N>
 void showEnumValue(const char *name, E value, const char *(&values)[N]) {
@@ -57,6 +62,112 @@ SpriteBlitShader s_2DShader;
 
 }
 
+class SpriteViewer::View3D {
+public:
+    View3D(SpriteViewer &viewer)
+        : m_Viewer(viewer) {
+        try {
+            AssetLoader loader;
+            m_Level = loader.loadLevel("assets:maps/dev/sprite_preview.bsp");
+            loader.processQueue(true);
+
+            m_pView = std::make_unique<View>(*this, m_Level);
+            updateSky(0);
+        } catch (const std::exception &e) {
+            m_bLoadError = true;
+            m_LoadErrorText = e.what();
+        }
+    }
+
+    void show() {
+        if (m_bLoadError) {
+            ImGui::TextUnformatted("3D view failed to load:");
+            ImGui::TextUnformatted(m_LoadErrorText.c_str());
+        } else {
+            if (ImGui::Combo("Skybox", &m_iCurSky, s_AvailSkies, (int)std::size(s_AvailSkies))) {
+                updateSky(m_iCurSky);
+            }
+
+            m_pView->showImage();
+        }
+    }
+
+    void preRender() {
+        if (m_pView) {
+            m_pView->setFov(90);
+            m_pView->renderBackBuffer();
+        }
+    }
+
+private:
+    class View : public SceneView {
+    public:
+        View3D &m_View;
+        ClientEntity m_Sprite;
+
+        View(View3D &view, LevelAsset &level)
+            : SceneView(level)
+            , m_View(view) {
+            // Set initial camera position
+            bsp::EntityKeyValuesDict ents(level.getLevel().getEntitiesLump());
+            int ent = ents.findEntityByName("camera_pos");
+
+            if (ent != -1) {
+                setCameraPos(ents[ent].get("origin").asFloat3());
+                setCameraRot(ents[ent].get("angles").asFloat3());
+            } else {
+                printw("Sprite preview map is missing camera_pos entity");
+            }
+        }
+
+        void addVisibleEnts() override {
+            switch (m_View.m_Viewer.m_pSprite->getModel().spriteInfo.texFormat) {
+            case bsp::SPR_NORMAL: {
+                m_Sprite.iRenderMode = kRenderNormal;
+                break;
+            }
+            case bsp::SPR_ADDITIVE: {
+                m_Sprite.iRenderMode = kRenderTransAdd;
+                break;
+            }
+            case bsp::SPR_INDEXALPHA:
+            case bsp::SPR_ALPHATEST: {
+                m_Sprite.iRenderMode = kRenderTransTexture;
+                break;
+            }
+            }
+
+            m_Sprite.vOrigin = {0, 0, 0};
+            m_Sprite.vAngles = {0, 0, 0};
+            m_Sprite.iRenderFx = kRenderFxNone;
+            m_Sprite.iFxAmount = 255;
+            m_Sprite.vFxColor = glm::ivec3(m_View.m_Viewer.m_FgColor * 255.0f);
+            m_Sprite.pModel = &m_View.m_Viewer.m_pSprite->getModel();
+            m_Sprite.flFrame = m_View.m_Viewer.m_flCurrentFrame;
+            m_Sprite.flScale = 1.0f;
+
+            if (m_Sprite.vFxColor == glm::ivec3(0, 0, 0)) {
+                m_Sprite.vFxColor = glm::ivec3(255, 255, 255);
+            }
+
+            addEntity(&m_Sprite);
+        }
+    };
+
+    SpriteViewer &m_Viewer;
+    bool m_bLoadError = false;
+    std::string m_LoadErrorText;
+
+    LevelAsset m_Level;
+    std::unique_ptr<View> m_pView;
+    int m_iCurSky = 0;
+    
+    void updateSky(int idx) {
+        m_iCurSky = idx;
+        m_pView->setSkyTexture(s_AvailSkies[idx]);
+    }
+};
+
 SpriteViewer::SpriteViewer(std::string_view path) {
     // Remove tag from path and set title
     size_t tagEnd = path.find(':');
@@ -87,6 +198,14 @@ SpriteViewer::SpriteViewer(std::string_view path) {
     }
 }
 
+void SpriteViewer::preRender() {
+    DialogBase::preRender();
+
+    if (m_p3DView) {
+        m_p3DView->preRender();
+    }
+}
+
 void SpriteViewer::showContents() {
     const bsp::SpriteInfo &info = m_pSprite->getModel().spriteInfo;
 
@@ -114,6 +233,9 @@ void SpriteViewer::showContents() {
         ImGui::SameLine();
         ImGui::Text("%d/%d", frame + 1, info.numFrames);
     }
+
+    ImGui::ColorEdit3("BG", &m_BgColor.r);
+    ImGui::ColorEdit3("FG", &m_FgColor.r);
 
     if (ImGui::BeginTabBar("TabBar")) {
         if (ImGui::BeginTabItem("2D view")) {
@@ -159,15 +281,18 @@ void SpriteViewer::show2D() {
     ImGui::SameLine();
     ImGui::Checkbox("Filter", &m_b2DFilter);
 
-    ImGui::ColorEdit3("BG", &m_2DBgColor.r);
-    ImGui::ColorEdit3("FG", &m_2DFgColor.r);
-
     glm::vec2 size(info.width, info.height);
     size *= m_fl2DScale;
     ImGui::Image(m_p2DMaterial.get(), ImVec2(size.x, size.y));
 }
 
-void SpriteViewer::show3D() {}
+void SpriteViewer::show3D() {
+    if (!m_p3DView) {
+        m_p3DView = std::make_unique<View3D>(*this);
+    }
+
+    m_p3DView->show();
+}
 
 void SpriteViewer::showInfo() {
     const bsp::SpriteInfo &info = m_pSprite->getModel().spriteInfo;
@@ -188,7 +313,7 @@ void SpriteViewer::update2DContents() {
     // Set up the framebuffer
     glViewport(0, 0, info.width, info.height);
     m_2DFramebuffer.bind(GL_FRAMEBUFFER);
-    glClearColor(m_2DBgColor.r, m_2DBgColor.g, m_2DBgColor.b, 1.0f);
+    glClearColor(m_BgColor.r, m_BgColor.g, m_BgColor.b, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     
     // Blending
@@ -208,7 +333,7 @@ void SpriteViewer::update2DContents() {
     ShaderInstance *shaderInstance = s_2DShader.getShaderInstance(SHADER_TYPE_BLIT_IDX);
     shaderInstance->enable(0);
     shaderInstance->getShader<SpriteBlitShader>().m_Frame.set(std::floor(m_flCurrentFrame));
-    shaderInstance->getShader<SpriteBlitShader>().m_Color.set(m_2DFgColor);
+    shaderInstance->getShader<SpriteBlitShader>().m_Color.set(m_FgColor);
 
     glActiveTexture(GL_TEXTURE0);
     m_pSprite->getModel().spriteMat->getTexture(0)->bind();

@@ -1,3 +1,4 @@
+#include <hlviewer/assets/asset_manager.h>
 #include <hlviewer/world_state_base.h>
 
 #include <hlviewer/entities/light_entity.h>
@@ -30,6 +31,49 @@ std::string WorldStateBase::getSkyName() {
     const bsp::EntityKeyValues &worldspawn = m_LevelEntityDict[0];
     int skynameIdx = worldspawn.indexOf("skyname");
     return skynameIdx != -1 ? worldspawn.get(skynameIdx).asString() : "desert";
+}
+
+Model *WorldStateBase::loadModel(std::string_view modelName) {
+    if (modelName.empty()) {
+        return nullptr;
+    }
+
+    try {
+        if (modelName[0] == '*') {
+            int modelidx = std::stoi(std::string(modelName.substr(1)), nullptr, 10);
+            BrushModel *pModel = getBrushModel(modelidx);
+
+            if (!pModel) {
+                printe("WorldStateBase::loadModel(): Invalid brush model index '{}'", modelName);
+            }
+
+            return pModel;
+        }
+
+        if (modelName.size() >= 4) {
+            std::string_view extension = modelName.substr(modelName.size() - 4, 4);
+            if (extension == ".spr") {
+                auto it = m_Sprites.find(std::string(modelName));
+                if (it != m_Sprites.end()) {
+                    return &it->second->getModel();
+                } else {
+                    std::string path = "assets:" + std::string(modelName);
+                    SpriteAssetRef ref = AssetManager::get().loadSprite(path);
+
+                    if (!ref) {
+                        return nullptr;
+                    }
+
+                    m_Sprites.insert({std::string(modelName), ref});
+                    return &ref->getModel();
+                }
+            }
+        }
+    } catch (const std::exception &e) {
+        printe("Failed to load model '{}':\n{}", modelName, e.what());
+    }
+
+    return nullptr;
 }
 
 BrushModel *WorldStateBase::getBrushModel(size_t idx) {

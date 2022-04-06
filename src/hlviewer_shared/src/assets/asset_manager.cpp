@@ -103,6 +103,7 @@ SpriteAssetRef AssetManager::loadSprite(std::string_view path) {
         return ref;
     }
 
+    printi("AssetManager: Loading sprite {}", path);
     SpriteAsset asset;
     asset.loadFromFile(*this, path);
 

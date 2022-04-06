@@ -6,6 +6,7 @@
 #include <bsp/level.h>
 #include <renderer/const.h>
 #include <hlviewer/assets/level_asset.h>
+#include <hlviewer/assets/sprite_asset.h>
 #include <hlviewer/entities/base_entity.h>
 #include <hlviewer/brush_model.h>
 #include <hlviewer/vis.h>
@@ -26,6 +27,10 @@ public:
 
     //! @returns the sky name
     std::string getSkyName();
+
+    //! Loads a model with specified name.
+    //! @returns model or nullpltr
+    Model *loadModel(std::string_view modelName);
 
     //! Returns the brush model or nullptr if doesn't exist.
     BrushModel *getBrushModel(size_t idx);
@@ -87,6 +92,9 @@ private:
 
     // Lighting
     LightStyle m_LightStyles[MAX_LIGHTSTYLES];
+
+    // Asset refs
+    std::map<std::string, SpriteAssetRef> m_Sprites;
 
     // Level loading
     void loadBrushModels();

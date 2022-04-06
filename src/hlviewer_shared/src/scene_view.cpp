@@ -227,17 +227,17 @@ void SceneView::addVisibleEnts() {
                          glm::vec4(pEnt->getAABBColor(), 255) / 255.0f, pEnt->getAABBTintColor());
         }
 
-        if (pEnt->getModel() && pEnt->getModel()->type == ModelType::Brush) {
+        if (pEnt->getModel()) {
             if (entCount == MAX_VISIBLE_ENTS) {
                 continue;
             }
 
-            // Check if visible in PVS
-            {
+            if (pEnt->getModel()->type == ModelType::Brush) {
+                // Check if visible in PVS
                 glm::vec3 mins = pEnt->getOrigin() + pEnt->getModel()->vMins;
                 glm::vec3 maxs = pEnt->getOrigin() + pEnt->getModel()->vMaxs;
                 if (!m_pWorldState->getVis().boxInPvs(m_vPosition, mins, maxs)) {
-                    //continue;
+                    continue;
                 }
             }
 
@@ -249,8 +249,14 @@ void SceneView::addVisibleEnts() {
             pClent->iFxAmount = pEnt->getFxAmount();
             pClent->vFxColor = pEnt->getFxColor();
             pClent->pModel = pEnt->getModel();
+            pClent->flFrame = pEnt->getFrame();
+            pClent->flScale = pEnt->getScale();
 
-            m_SceneRenderer.addEntity(pClent);
+            if (pClent->vFxColor == glm::ivec3(0, 0, 0)) {
+                pClent->vFxColor = glm::ivec3(255, 255, 255);
+            }
+
+            addEntity(pClent);
             entCount++;
         }
     }
@@ -260,6 +266,10 @@ void SceneView::addVisibleEnts() {
         m_BoxInstances.bind();
         m_BoxInstances.update(0, m_uBoxCount * sizeof(BoxInstance), m_BoxInstancesData.data());
     }
+}
+
+void SceneView::addEntity(ClientEntity *pClent) {
+    m_SceneRenderer.addEntity(pClent);
 }
 
 void SceneView::addEntityBox(glm::vec3 origin, glm::vec3 size, glm::vec4 color, glm::vec4 tintColor) {

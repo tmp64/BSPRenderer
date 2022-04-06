@@ -1,5 +1,6 @@
 #include <app_base/bitmap.h>
 #include <graphics/texture2d_array.h>
+#include <renderer/scene_shaders.h>
 #include <hlviewer/assets/sprite_asset.h>
 #include <hlviewer/assets/asset_manager.h>
 
@@ -52,6 +53,12 @@ void SpriteAsset::loadFromFile(AssetManager &assMgr, std::string_view path) {
     m_Model.spriteMat = MaterialSystem::get().createMaterial(path);
     m_Model.spriteMat->setSize(1, 1);
     m_Model.spriteMat->setTexture(0, std::move(tex));
+    m_Model.spriteMat->setShader(SHADER_TYPE_CUSTOM_IDX, &SceneShaders::Shaders::spriteShader);
+    m_Model.spriteMat->setUsesGraphicalSettings(true);
+
+    // Set up model
+    m_Model.type = ModelType::Sprite;
+    m_Model.flRadius = (float)std::max(spriteSize.x, spriteSize.y);
 
     assMgr.fakeDelay();
 }

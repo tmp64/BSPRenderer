@@ -11,22 +11,29 @@ class SpriteViewer : public DialogBase {
 public:
     SpriteViewer(std::string_view path);
 
+    void preRender() override;
+
 protected:
     void showContents() override;
 
 private:
+    class View3D;
+
     SpriteAssetRef m_pSprite;
     bool m_bPlayAnim = true;
     float m_flFramerate = 10.0f;
     float m_flCurrentFrame = 0.0f;
+    glm::vec3 m_BgColor = glm::vec3(0, 0, 0);
+    glm::vec3 m_FgColor = glm::vec3(1, 1, 1);
 
     // 2D
     MaterialPtr m_p2DMaterial;
     Framebuffer m_2DFramebuffer;
-    glm::vec3 m_2DBgColor = glm::vec3(0, 0, 0);
-    glm::vec3 m_2DFgColor = glm::vec3(1, 1, 1);
     float m_fl2DScale = 1;
     bool m_b2DFilter = false;
+
+    // 3D
+    std::unique_ptr<View3D> m_p3DView;
 
     void showMenuBar();
     void show2D();

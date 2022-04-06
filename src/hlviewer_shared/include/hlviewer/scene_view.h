@@ -69,6 +69,10 @@ protected:
     //! Adds entities to the scene renderer.
     virtual void addVisibleEnts();
 
+    //! Adds an entity to the scene renderer.
+    //! Must only be called from addVisibleEnts.
+    void addEntity(ClientEntity *pClent);
+
     //! Adds an entity box.
     //! @param  origin      Box center
     //! @param  size        Box size

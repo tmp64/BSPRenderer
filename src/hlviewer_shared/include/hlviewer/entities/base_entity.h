@@ -105,6 +105,9 @@ public:
     inline const glm::vec4 &getAABBTintColor() { return m_AABBTintColor; }
 
     inline Model *getModel() { return m_pModel; }
+    inline float getFrame() { return m_flFrame; }
+    inline float getFramerate() { return m_flFramerate; }
+    inline float getScale() { return m_flScale; }
 
     inline RenderMode getRenderMode() { return m_nRenderMode; }
     inline RenderFx getRenderFx() { return m_nRenderFx; }
@@ -140,6 +143,9 @@ private:
 
     // Model
     Model *m_pModel = nullptr;
+    float m_flFrame = 0;
+    float m_flFramerate = 0;
+    float m_flScale = 1;
 
     // Rendering effects
     RenderMode m_nRenderMode = kRenderNormal;

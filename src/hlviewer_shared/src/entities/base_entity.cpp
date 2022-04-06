@@ -139,17 +139,14 @@ void BaseEntity::setAABBTintColor(glm::vec4 color) {
 }
 
 void BaseEntity::setModel(std::string_view model) {
-    if (model[0] == '*') {
-        // Brush model
-        int modelidx = std::stoi(std::string(model.substr(1)), nullptr, 10);
-        BrushModel *pModel = m_pWorldState->getBrushModel(modelidx);
+    Model *pModel = m_pWorldState->loadModel(model);
 
-        if (!pModel) {
-            printe("Entity {}: invalid brush model index '{}'", entindex(), model);
-        }
-
+    if (pModel) {
         setModel(pModel);
-        setUseAABB(false); // Use brush model BSP tree instead
+        setUseAABB(false); 
+    } else {
+        setModel(nullptr);
+        setUseAABB(true); 
     }
 }
 
