@@ -16,7 +16,7 @@ const char *s_SpriteFormats[] = {
     "SPR_NORMAL",
     "SPR_ADDITIVE",
     "SPR_INDEXALPHA",
-    "SPR_ALPHTEST",
+    "SPR_ALPHATEST",
 };
 
 const char *s_SyncTypes[] = {
